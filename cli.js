@@ -202,9 +202,9 @@ async function runInit(argv, log = console.log) {
 async function importTokenModules(error) {
   try {
     const [store, config, utils] = await Promise.all([
-      import("./mcp-bearer-store.ts"),
-      import("./config.ts"),
-      import("./utils.ts"),
+      import("./src/auth/mcp-bearer-store.ts"),
+      import("./dist/config.js"),
+      import("./src/utils.ts"),
     ]);
     return { store, config, utils };
   } catch (err) {

@@ -1,0 +1,17 @@
+import type { ImportKind } from "../contracts/core.js";
+import type { ConfigDiscoveryPath, ConfigSourceSpec } from "./contracts.js";
+export declare const GENERIC_GLOBAL_CONFIG_PATH: string;
+export declare const AGENTS_GLOBAL_CONFIG_PATHS: readonly [string, string];
+export declare const PROJECT_CONFIG_NAME = ".mcp.json";
+export declare const PROJECT_PI_CONFIG_NAME = "mcp.json";
+export declare const REPOPROMPT_BINARY_CANDIDATES: string[];
+export declare const IMPORT_PATHS: Record<ImportKind, string[]>;
+export declare function getPiGlobalConfigPath(overridePath?: string): string;
+export declare function getGenericGlobalConfigPath(): string;
+export declare function getProjectConfigPath(cwd?: string): string;
+export declare function getProjectPiConfigPath(cwd?: string): string;
+export declare function getConfigDiscoveryPaths(overridePath?: string, cwd?: string): ConfigDiscoveryPath[];
+export declare function getConfigSources(overridePath?: string, cwd?: string): ConfigSourceSpec[];
+export declare function isExclusiveConfigMode(): boolean;
+export declare function getEffectivePiGlobalConfigPath(overridePath?: string): string;
+export declare function resolveConfiguredOAuthDir(raw: unknown, cwd?: string): string | undefined;

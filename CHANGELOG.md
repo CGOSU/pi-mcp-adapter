@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Reduced Pi extension import work by keeping cached metadata, schemas, and registration on the startup path while dynamically loading MCP connection and execution runtime modules. A valid all-lazy metadata cache now defers that runtime import and connection until first MCP use; eager, keep-alive, and cold-cache behavior still initializes as before.
+- Reorganized implementation into `src/contracts`, `src/catalog`, `src/config`, `src/runtime`, `src/auth`, `src/tools`, `src/ui`, `src/commands`, and `src/extension`, while retaining root compatibility facades and publishing tracked public `dist` output.
+- Reorganized tests into `test/unit`, `test/integration`, `test/node`, and `test/fixtures`; package manifests and runners now keep test assets outside the published tarball.
 - Git-based Pi package installs no longer compile the public TypeScript helpers during production-only dependency installation; the committed public build is rebuilt at `prepack` time for npm packaging.
 
 ### Fixed

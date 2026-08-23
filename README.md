@@ -785,6 +785,25 @@ npm run benchmark:startup -- --runs 3
 
 The command launches fresh Pi RPC processes with an isolated config directory and reports baseline, cold (`JITI_FS_CACHE=0`) and cached extension medians for module import, Pi's `main TOTAL`, and wall time. Results depend on the host and cache state; the deferred runtime work is paid by the first MCP operation rather than removed.
 
+## Source layout and startup boundary
+
+The public Pi extension entry point remains the root `index.ts`. Root `config.ts`, `metadata-cache.ts`, `types.ts`, and `oauth.ts` are compatibility facades for public consumers; internal modules import their exact domain paths instead of importing those aggregate facades.
+
+Implementation is organized by responsibility:
+
+- `src/contracts` — lightweight public/runtime contracts and status/UI schemas;
+- `src/catalog` — metadata caches, catalog snapshots, tool names, and selector indexes;
+- `src/config` — config paths, reads, merges, discovery, writes, and package/plugin loaders;
+- `src/runtime` — MCP connections, lifecycle, recovery, probes, transports, and handlers;
+- `src/auth` — OAuth, bearer credentials, callback handling, and keyring helpers;
+- `src/tools` — direct, namespace, proxy, script, prompt, resource, approval, and rendering tools;
+- `src/ui` and `src/commands` — UI servers/panels and command handlers;
+- `src/extension` — installation, session state, ownership, initialization, and tool-surface coordination.
+
+Startup statically loads only configuration reads, cached metadata, lightweight schemas, registration helpers, and the tool surface. MCP runtime connections, OAuth flow/storage, command handlers, gateway/direct execution, script workers, and UI runtime stay behind cached native `dynamic import()` boundaries. A valid all-lazy metadata cache can therefore skip full runtime initialization at `session_start`; eager, keep-alive, cold-cache, and explicit direct-tool behavior retain their existing semantics.
+
+Tests mirror these domains under `test/unit` and `test/integration`; native Node/public-package checks live under `test/node`, and reusable process fixtures live under `test/fixtures`. The package publishes `src`, the root compatibility facades, generated `dist`, CLI files, skills, and UI assets, while excluding tests.
+
 ## How It Works
 
 - One `mcp` tool in context (~200 tokens) instead of hundreds

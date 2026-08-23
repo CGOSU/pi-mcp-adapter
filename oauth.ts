@@ -1,10 +1,10 @@
-import { getValidToken } from "./mcp-auth-flow.ts";
+import { getValidToken } from "./src/auth/mcp-auth-flow.ts";
 import {
   inspectAuthForUrl,
   updateTokens,
   type AuthStorageOptions,
   type StoredTokens,
-} from "./mcp-auth.ts";
+} from "./src/auth/mcp-auth.ts";
 
 export type McpOAuthTokens = StoredTokens;
 export type McpOAuthStorageOptions = AuthStorageOptions;

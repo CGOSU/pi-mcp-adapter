@@ -24,14 +24,14 @@
 import { rmSync } from "node:fs"
 import { UnauthorizedError } from "@modelcontextprotocol/client"
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent"
-import { McpServerManager } from "../server-manager.ts"
+import { McpServerManager } from "../src/runtime/server-manager.ts"
 import {
   completeAuthFromInput,
   initializeOAuth,
   shutdownOAuth,
   startAuth,
-} from "../mcp-auth-flow.ts"
-import type { ServerEntry } from "../types.ts"
+} from "../src/auth/mcp-auth-flow.ts"
+import type { ServerEntry } from "../src/contracts/core.ts"
 
 const scenario = process.env.MCP_CONFORMANCE_SCENARIO ?? ""
 const serverUrl = process.argv[2] ?? ""

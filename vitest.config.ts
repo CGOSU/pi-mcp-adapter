@@ -9,11 +9,11 @@ export default defineConfig({
       // Cache tests opt in explicitly to keep existing tests platform-neutral.
       PI_MCP_ADAPTER_DISABLE_AUTH_CACHE: "1",
     },
-    include: ["__tests__/**/*.test.ts"],
+    include: ["test/unit/**/*.test.ts", "test/integration/**/*.test.ts"],
     coverage: {
       provider: "v8",
-      include: ["*.ts"],
-      exclude: ["__tests__/**", "vitest.config.ts", "cli.js"],
+      include: ["*.ts", "src/**/*.ts"],
+      exclude: ["test/**", "vitest.config.ts", "cli.js"],
     },
   },
 });
