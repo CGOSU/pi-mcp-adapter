@@ -73,6 +73,8 @@ Precedence is:
 
 Servers are **lazy by default** — they won't connect until you actually call one of their tools. The adapter caches tool metadata so search and describe work without live connections.
 
+When a valid metadata cache covers only lazy servers, the extension also defers importing its full MCP runtime during `session_start`; the first MCP operation pays that one-time runtime-load and connection cost. Eager and keep-alive servers, empty or invalid caches, and explicit direct-tool startup retain their existing initialization behavior. This moves startup work later—it does not make the connection cost disappear.
+
 ```
 mcp({ search: "screenshot" })
 ```
@@ -764,6 +766,16 @@ In interactive sessions, you can also authenticate from `/mcp` with `ctrl+a` or 
 ### MCP output schemas
 
 Advertised tool `outputSchema` values support JSON Schema draft-07 and 2020-12. Unstamped schemas use the SDK's 2020-12 default. Returned `structuredContent` is validated against the advertised schema for both proxy and direct-tool calls.
+
+## Startup benchmark
+
+Run the cross-platform startup comparison from a checkout with Pi available on `PATH`:
+
+```bash
+npm run benchmark:startup -- --runs 3
+```
+
+The command launches fresh Pi RPC processes with an isolated config directory and reports baseline, cold (`JITI_FS_CACHE=0`) and cached extension medians for module import, Pi's `main TOTAL`, and wall time. Results depend on the host and cache state; the deferred runtime work is paid by the first MCP operation rather than removed.
 
 ## How It Works
 

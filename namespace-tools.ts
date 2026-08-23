@@ -3,7 +3,6 @@ import { Type } from "typebox";
 import type { McpExtensionState } from "./state.ts";
 import { isServerDisabled, type McpConfig } from "./types.ts";
 import { isServerCacheValid, type MetadataCache } from "./metadata-cache.ts";
-import { executeCall } from "./proxy-modes.ts";
 import { createMcpProxyToolCallRenderer, createMcpToolResultRenderer, resolveMcpToolRenderOptions, type McpToolRenderOptions, type RenderTheme, type McpToolRenderContext } from "./tool-result-renderer.ts";
 export { namespaceProxyName } from "./mcp-references.ts";
 import { hasCallableCachedTargets, isMcpServerDirectlyRegistered, namespaceProxyName, type DirectToolSelectorOverride } from "./mcp-references.ts";
@@ -88,16 +87,18 @@ function resolveNamespaceProxyTools(
 
 /**
  * Lazily-required reference to the agent state — passed as a closure so the
- * namespace proxy tool's execute can call `executeCall` once `state` exists.
- * `getInitPromise` lets the executor await the first initialization round
- * the same way `createDirectToolExecutor` does.
+ * namespace proxy tool's execute can initialize the runtime only when it is
+ * actually called. The legacy init-promise callback remains supported for
+ * callers that own initialization separately.
  */
 export type GetState = () => McpExtensionState | null;
+export type EnsureState = (signal?: AbortSignal) => Promise<McpExtensionState>;
 export type GetInitPromise = () => Promise<McpExtensionState> | null;
 export type GetPiTools = () => ToolInfo[];
 
 function namespaceExecute(
   getState: GetState,
+  ensureState: EnsureState | undefined,
   getInitPromise: GetInitPromise,
   serverName: string,
   getPiTools: GetPiTools,
@@ -115,17 +116,14 @@ function namespaceExecute(
     }
     let state = getState();
     if (!state) {
-      const initPromise = getInitPromise();
-      if (initPromise) {
-        try {
-          state = await initPromise;
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return {
-            content: [{ type: "text" as const, text: `MCP initialization failed for ${serverName}: ${message}` }],
-            details: { error: "init_failed", server: serverName, message },
-          };
-        }
+      try {
+        state = await (ensureState ? ensureState(signal) : getInitPromise());
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          content: [{ type: "text" as const, text: `MCP initialization failed for ${serverName}: ${message}` }],
+          details: { error: "init_failed", server: serverName, message },
+        };
       }
     }
     if (!state) {
@@ -134,6 +132,7 @@ function namespaceExecute(
         details: { error: "not_initialized", server: serverName },
       };
     }
+    const { executeCall } = await import("./proxy-modes.ts");
     return executeCall(
       state,
       params.tool,
@@ -164,6 +163,7 @@ export interface SyncNamespaceProxyToolsInput {
   unavailableServers?: ReadonlySet<string>;
   pi: ExtensionAPI;
   getState: GetState;
+  ensureState?: EnsureState;
   getInitPromise: GetInitPromise;
   getPiTools: GetPiTools;
   renderOptions?: McpToolRenderOptions;
@@ -205,6 +205,7 @@ function registerNamespaceProxyTool(
     renderResult,
     execute: namespaceExecute(
       input.getState,
+      input.ensureState,
       input.getInitPromise,
       spec.serverName,
       input.getPiTools,

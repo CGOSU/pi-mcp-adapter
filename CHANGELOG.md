@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Direct tools can opt into guarded raw MCP result details, retaining bounded structured fields while summarizing oversized values.
 - Embedding hosts can import the configuration loader and metadata cache helpers from public package subpaths.
 - Embedding hosts can validate cached metadata against an explicit private process environment.
+- Added `npm run benchmark:startup` to compare an isolated baseline with cold and cached extension startup timings.
+
+### Changed
+- Reduced Pi extension import work by keeping cached metadata, schemas, and registration on the startup path while dynamically loading MCP connection and execution runtime modules. A valid all-lazy metadata cache now defers that runtime import and connection until first MCP use; eager, keep-alive, and cold-cache behavior still initializes as before.
 
 ### Fixed
 - MCP gateway descriptions now stay stable across metadata-only refreshes and keep live counts behind `mcp({})`. Thanks to [@voidfreud](https://github.com/voidfreud) for PR #432.

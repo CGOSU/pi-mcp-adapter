@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { DIRECT_TOOLS_ADVISORY_THRESHOLD, buildProxyDescription, resolveDirectTools } from "../direct-tools.ts";
+import { DIRECT_TOOLS_ADVISORY_THRESHOLD, buildProxyDescription, prepareDirectToolArguments, resolveDirectTools } from "../direct-tools.ts";
 import {
   computeServerHash,
   getMissingConfiguredDirectToolServers,
@@ -31,6 +31,17 @@ afterEach(() => {
       process.env[key] = value;
     }
   }
+});
+
+describe("direct-tool catalog compatibility", () => {
+  it("re-exports startup helpers from the lightweight catalog module", async () => {
+    const catalog = await import("../direct-tool-catalog.ts");
+
+    expect(DIRECT_TOOLS_ADVISORY_THRESHOLD).toBe(catalog.DIRECT_TOOLS_ADVISORY_THRESHOLD);
+    expect(buildProxyDescription).toBe(catalog.buildProxyDescription);
+    expect(prepareDirectToolArguments).toBe(catalog.prepareDirectToolArguments);
+    expect(resolveDirectTools).toBe(catalog.resolveDirectTools);
+  });
 });
 
 describe("formatToolName", () => {

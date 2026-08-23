@@ -59,6 +59,7 @@ describe("syncNamespaceProxyTools", () => {
     vi.resetModules();
   });
   afterEach(() => {
+    vi.doUnmock("../proxy-modes.ts");
     vi.restoreAllMocks();
   });
 
@@ -81,6 +82,41 @@ describe("syncNamespaceProxyTools", () => {
     expect(registered.has("mcp__context_mode")).toBe(true);
     const tool = registered.get("mcp__context_mode")!;
     expect(tool.execute).toBeTypeOf("function");
+  });
+
+  it("defers proxy execution and uses the injected state initializer", async () => {
+    const execution = { content: [{ type: "text", text: "ok" }], details: {} };
+    const executeCall = vi.fn().mockResolvedValue(execution);
+    const proxyModuleFactory = vi.fn(() => ({ executeCall }));
+    vi.doMock("../proxy-modes.ts", proxyModuleFactory);
+
+    const { syncNamespaceProxyTools } = await importSync();
+    const { pi, registered } = makePi();
+    const state = {} as any;
+    const ensureState = vi.fn().mockResolvedValue(state);
+    const getPiTools = vi.fn(() => []);
+
+    syncNamespaceProxyTools({
+      config: { mcpServers: { docs: { command: "docs" } } },
+      cache: CACHE_SHAPE([["docs", { tools: [{ name: "search" }] }]]),
+      envOverride: null,
+      existingDirectNames: new Set(),
+      existingNamespaceNames: new Set(),
+      pi,
+      getState: () => null,
+      ensureState,
+      getInitPromise: () => null,
+      getPiTools,
+    });
+
+    expect(proxyModuleFactory).not.toHaveBeenCalled();
+
+    const result = await registered.get("mcp__docs")!.execute("call-1", { tool: "search" }, undefined);
+
+    expect(ensureState).toHaveBeenCalledWith(undefined);
+    expect(proxyModuleFactory).toHaveBeenCalledTimes(1);
+    expect(executeCall).toHaveBeenCalledWith(state, "search", {}, "docs", getPiTools, undefined, "proxy");
+    expect(result).toBe(execution);
   });
 
   it("registers proxy-only servers that expose only resources", async () => {

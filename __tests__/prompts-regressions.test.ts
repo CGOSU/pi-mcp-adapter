@@ -107,6 +107,17 @@ describe("MCP prompt regressions", () => {
     expect(notify).toHaveBeenCalledWith(expect.stringContaining("no longer advertised"), "error");
   });
 
+  it("initializes cached prompt commands through the injected state callback", async () => {
+    const notify = vi.fn();
+    const ensureState = vi.fn().mockResolvedValue(state({ config: { mcpServers: {} } }));
+    const pi = { sendUserMessage: vi.fn() } as unknown as ExtensionAPI;
+
+    await createPromptCommand(pi, () => null, metadata, ensureState).handler("", context(notify));
+
+    expect(ensureState).toHaveBeenCalledWith(undefined);
+    expect(notify).toHaveBeenCalledWith(expect.stringContaining("no longer configured"), "error");
+  });
+
   it("retains same-config cached prompts after an advertised prompts/list failure", () => {
     const configHash = computeServerHash(definition);
     saveMetadataCache({

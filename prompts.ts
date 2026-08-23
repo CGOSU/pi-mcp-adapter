@@ -6,7 +6,6 @@ import type {
 import type { McpExtensionState } from "./state.ts";
 import { isServerDisabled, type McpConfig, type PromptMetadata } from "./types.ts";
 import { formatPromptCommandName } from "./types.ts";
-import { lazyConnect } from "./init.ts";
 import { isServerCacheValid, loadMetadataCache, reconstructPromptMetadata } from "./metadata-cache.ts";
 import { logger } from "./logger.ts";
 import { truncateAtWord } from "./utils.ts";
@@ -226,17 +225,31 @@ function extractMessageText(message: PromptMessage): string {
  * per prompt at extension load time from the metadata cache; the same
  * factory is reused by tests to invoke the handler without a running pi.
  */
+export type EnsureMcpState = (signal?: AbortSignal) => Promise<McpExtensionState>;
+
 export function createPromptCommand(
   pi: ExtensionAPI,
   getState: () => McpExtensionState | null,
   metadata: PromptMetadata,
+  ensureState?: EnsureMcpState,
 ) {
   const description = buildCommandDescription(metadata);
 
   return {
     description,
     handler: async (args: string, ctx: ExtensionCommandContext) => {
-      const state = getState();
+      let state = getState();
+      if (!state && ensureState) {
+        try {
+          state = await ensureState(ctx.signal);
+        } catch (error) {
+          if (ctx.hasUI) {
+            const message = error instanceof Error ? error.message : String(error);
+            ctx.ui.notify(`MCP initialization failed: ${message}`, "error");
+          }
+          return;
+        }
+      }
       if (!state) {
         if (ctx.hasUI) ctx.ui.notify("MCP not initialized", "error");
         return;
@@ -271,6 +284,7 @@ export function createPromptCommand(
         return;
       }
 
+      const { lazyConnect } = await import("./init.ts");
       const connected = await lazyConnect(state, metadata.serverName, ctx.signal);
       if (!connected) {
         if (ctx.hasUI) {
