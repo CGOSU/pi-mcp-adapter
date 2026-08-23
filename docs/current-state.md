@@ -14,6 +14,7 @@
 
 - 启动路径保留缓存目录、Schema 和注册逻辑；连接、命令、OAuth、脚本、proxy/direct 执行和 UI runtime 通过共享懒加载按需导入。
 - 有效且全为 lazy 的 metadata cache 会跳过 `session_start` 的完整 runtime 初始化；首次 MCP 使用承担一次延迟加载。eager、keep-alive、冷缓存和 `MCP_DIRECT_TOOLS` 语义保持。
+- Git 安装路径不再执行依赖 devDependencies 的 `prepare` 编译；公共 Node exports 的 `dist` 构建已纳入仓库，npm 打包时由 `prepack` 重建，版本仍为 `2.27.0`。
 - `npm run benchmark:startup -- --runs 3` 已在 Windows / Pi 0.84.2 验证：冷 module import 中位数 363ms，缓存命中中位数 58ms；详细实测和验证记录见 [`docs/session-log.md`](session-log.md)。
 
 ## 待处理
@@ -22,8 +23,8 @@
 
 ## 交付状态
 
-- 选择性 Git 提交已推送到目标仓库；工作树仍保留未跟踪的 `AGENTS.md` 与 `docs/clean-code.md`，两者均未纳入提交。
+- 启动优化提交已推送到目标仓库；当前 Git 安装兼容性修复尚未提交或推送。工作树仍保留未跟踪的 `AGENTS.md` 与 `docs/clean-code.md`，两者均未纳入提交。
 
 ## 最近一次更新
 
-- 2026-08-23：完成启动边界、懒加载、启动回归和文档收尾记录。
+- 2026-08-23：完成启动边界、懒加载、启动回归、文档收尾和 Git 安装兼容性修复记录。

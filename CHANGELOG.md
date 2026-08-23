@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Reduced Pi extension import work by keeping cached metadata, schemas, and registration on the startup path while dynamically loading MCP connection and execution runtime modules. A valid all-lazy metadata cache now defers that runtime import and connection until first MCP use; eager, keep-alive, and cold-cache behavior still initializes as before.
+- Git-based Pi package installs no longer compile the public TypeScript helpers during production-only dependency installation; the committed public build is rebuilt at `prepack` time for npm packaging.
 
 ### Fixed
 - MCP gateway descriptions now stay stable across metadata-only refreshes and keep live counts behind `mcp({})`. Thanks to [@voidfreud](https://github.com/voidfreud) for PR #432.

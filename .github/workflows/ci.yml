@@ -21,16 +21,37 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - name: Verify committed public build
+        run: |
+          npm run build:public
+          git diff --exit-code -- dist
       - name: Build interactive visualizer example
         run: |
           npm install --prefix examples/interactive-visualizer --no-package-lock --no-audit --no-fund
           npm run --prefix examples/interactive-visualizer build
       - name: Typecheck
         run: npm run typecheck
+      - run: npm run test:public-exports
       - run: npm test
       - run: npm run test:oauth
       - run: npm run test:conformance
       - run: npm pack --dry-run
+
+  production-install:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install production dependencies like Pi Git packages
+        run: npm install --omit=dev --no-audit --no-fund
+      - name: Load public exports without devDependencies
+        run: >-
+          node --input-type=module --eval
+          "for (const name of ['config', 'metadata-cache', 'types']) await import('pi-mcp-adapter/' + name)"
 
   node24-worker-fds:
     runs-on: ubuntu-latest

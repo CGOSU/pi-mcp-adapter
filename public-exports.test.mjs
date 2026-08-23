@@ -1,24 +1,19 @@
 import assert from "node:assert/strict";
-import { cp, mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { tmpdir } from "node:os";
-
 test("public metadata, config, and type helpers load in plain Node from node_modules", async () => {
-  const fixtureRoot = await mkdtemp(path.join(tmpdir(), "pi-mcp-public-exports-"));
+  const fixtureRoot = await mkdtemp(path.join(process.cwd(), ".tmp-public-exports-"));
   try {
     const packageRoot = path.join(fixtureRoot, "node_modules", "pi-mcp-adapter");
     await mkdir(path.dirname(packageRoot), { recursive: true });
-    await cp(process.cwd(), packageRoot, {
-      recursive: true,
-      filter(source) {
-        const relative = path.relative(process.cwd(), source);
-        return relative === "" || (!relative.startsWith("node_modules")
-          && !relative.startsWith(".git"));
+    for (const entry of await readdir(process.cwd())) {
+      if (entry === "node_modules" || entry === ".git" || entry.startsWith(".tmp-public-exports-")) {
+        continue;
       }
-    });
-    await symlink(path.join(process.cwd(), "node_modules"), path.join(packageRoot, "node_modules"), "dir");
+      await cp(path.join(process.cwd(), entry), path.join(packageRoot, entry), { recursive: true });
+    }
     const result = spawnSync(process.execPath, [
       "--input-type=module",
       "--eval",

@@ -6,6 +6,7 @@
     "noEmit": false,
     "noEmitOnError": true,
     "outDir": "dist",
+    "newLine": "lf",
     "rewriteRelativeImportExtensions": true,
     "rootDir": ".",
     "sourceMap": true

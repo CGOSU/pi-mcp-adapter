@@ -25,3 +25,9 @@
   根因：既有测试 runner 未为 Windows `.cmd` shim 使用 shell，public export 测试需要创建 node_modules symlink，另有 Linux/Unix 权限和 mode 假设；
   修复：本次不扩大范围修改既有测试基础设施；使用针对性 Vitest、typecheck、public build、静态导入图和独立启动基准验证本次变更，并保留完整失败结果；
   验证：`npm test`、`npm run test:public-exports` 和串行完整 Vitest 的真实结果记录于 [`docs/session-log.md`](session-log.md)。
+
+- 日期：2026-08-23；
+  现象：通过 Git 安装 Pi 包时，`npm install --omit=dev` 在 `npm run build:public` 处失败，并报告大量缺少 Node/Pi 类型的 TypeScript 错误；
+  根因：npm 会对 Git 依赖执行 `prepare`，但 production-only 安装不会安装 TypeScript、`@types/node` 或 Pi 开发类型包；
+  修复：删除安装期 `prepare`，改用 `prepack`，并将公共 `dist` 构建纳入仓库；CI 增加生成物一致性和 Windows production-only 安装验证；
+  验证：临时干净副本执行 `npm install --omit=dev --no-audit --no-fund` 成功，并成功导入三个公共 Node exports。

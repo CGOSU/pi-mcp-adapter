@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +10,7 @@ const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf
   files?: string[];
   peerDependencies?: Record<string, string>;
   peerDependenciesMeta?: Record<string, { optional?: boolean }>;
+  scripts?: Record<string, string>;
   exports?: Record<string, unknown>;
   types?: string;
 };
@@ -21,6 +22,20 @@ const hostPeerPackages = {
 };
 
 describe("package.json files", () => {
+  it("does not compile during dependency installation", () => {
+    expect(packageJson.scripts?.prepare).toBeUndefined();
+    expect(packageJson.scripts?.prepack).toBe("npm run build:public");
+  });
+
+  it("includes built files for public exports", () => {
+    const publishedFiles = new Set(packageJson.files ?? []);
+
+    expect(publishedFiles.has("dist")).toBe(true);
+    for (const file of ["dist/types.js", "dist/config.js", "dist/metadata-cache.js"]) {
+      expect(existsSync(join(repoRoot, file))).toBe(true);
+    }
+  });
+
   it("exports source entry points and plain Node host helpers", () => {
     expect(packageJson.types).toBe("./index.ts");
     expect(packageJson.exports).toMatchObject({

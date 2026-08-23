@@ -22,6 +22,14 @@ But the MCP ecosystem has useful stuff - databases, browsers, APIs. This adapter
 pi install npm:pi-mcp-adapter
 ```
 
+For a Git checkout of the current development version:
+
+```bash
+pi install git:github.com/CGOSU/pi-mcp-adapter.git
+```
+
+Git-based Pi installs do not compile TypeScript during the production-only dependency install. The public Node helpers are shipped as a committed build and are rebuilt automatically before npm packaging.
+
 Restart Pi after installation.
 
 ## What happens on first run
