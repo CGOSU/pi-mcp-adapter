@@ -46,14 +46,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Pack the committed production artifact
+        shell: pwsh
+        run: |
+          $tarball = npm pack --ignore-scripts --pack-destination $env:RUNNER_TEMP --silent
+          "TARBALL=$tarball" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Install production dependencies like Pi Git packages
-        run: npm install --omit=dev --no-audit --no-fund
+        shell: pwsh
+        run: |
+          $consumer = Join-Path $env:RUNNER_TEMP "pi-mcp-production-consumer"
+          New-Item -ItemType Directory -Force -Path $consumer | Out-Null
+          Push-Location $consumer
+          npm init -y --silent | Out-Null
+          npm install --omit=dev --no-audit --no-fund (Join-Path $env:RUNNER_TEMP $env:TARBALL) --silent
+          Pop-Location
       - name: Load public exports without devDependencies
-        run: >-
-          node --input-type=module --eval
-          "for (const name of ['config', 'metadata-cache', 'types', 'oauth']) await import('pi-mcp-adapter/' + name)"
+        shell: pwsh
+        run: |
+          $consumer = Join-Path $env:RUNNER_TEMP "pi-mcp-production-consumer"
+          Push-Location $consumer
+          node --input-type=module --eval "for (const name of ['config', 'metadata-cache', 'types', 'oauth']) await import('pi-mcp-adapter/' + name)"
+          Pop-Location
       - name: Smoke test the published CLI bundle
-        run: node node_modules/pi-mcp-adapter/dist/cli.js --help
+        shell: pwsh
+        run: |
+          $consumer = Join-Path $env:RUNNER_TEMP "pi-mcp-production-consumer"
+          node (Join-Path $consumer "node_modules/pi-mcp-adapter/dist/cli.js") --help
 
   node24-worker-fds:
     runs-on: ubuntu-latest
