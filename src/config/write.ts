@@ -2,12 +2,11 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { isServerDisabled } from "../contracts/core.js";
-import { getConfigSources, getPiGlobalConfigPath, getProjectConfigPath, getProjectPiConfigPath, IMPORT_PATHS } from "./paths.js";
-import { expandImports, mergeConfigs } from "./merge.js";
-import { extractServers, loadImportedConfig, parseJsonConfig, readValidatedConfig } from "./read.js";
-import { getConfiguredHostConfigDiscovery } from "./load.js";
+import { getConfigSources, getPiGlobalConfigPath, getProjectConfigPath, getProjectPiConfigPath } from "./paths.js";
+import { mergeConfigs } from "./merge.js";
+import { parseJsonConfig, readValidatedConfig } from "./read.js";
 import type { ConfigWritePreview } from "./contracts.js";
-import type { ImportKind, McpConfig, ServerEntry, ServerProvenance } from "../contracts/core.js";
+import type { McpConfig, ServerEntry, ServerProvenance } from "../contracts/core.js";
 
 function serializeRawConfig(raw: Record<string, unknown>): string {
   return `${JSON.stringify(raw, null, 2)}\n`;
@@ -154,13 +153,7 @@ export function writeProjectServerDisabledOverride(
     for (const source of getConfigSources(overridePath, cwd)) {
       if (source.readPath === filePath) continue;
       const loaded = readValidatedConfig(source.readPath, `MCP config from ${source.readPath}`);
-      if (loaded) lowerConfig = mergeConfigs(lowerConfig, expandImports(loaded, cwd));
-    }
-    if (raw.imports !== undefined) {
-      if (!Array.isArray(raw.imports) || raw.imports.some((kind) => typeof kind !== "string" || !Object.hasOwn(IMPORT_PATHS, kind))) {
-        throw new Error(`Failed to update project MCP override at ${filePath}: imports contains an unsupported config kind`);
-      }
-      lowerConfig = mergeConfigs(lowerConfig, expandImports({ mcpServers: {}, imports: raw.imports as ImportKind[] }, cwd));
+      if (loaded) lowerConfig = mergeConfigs(lowerConfig, loaded);
     }
     if (isServerDisabled(lowerConfig.mcpServers[serverName])) next.disabled = false;
   }
@@ -174,33 +167,6 @@ export function writeProjectServerDisabledOverride(
   raw[serverKey] = servers;
   writeRawConfigObject(filePath, raw);
   return { path: filePath, changed: true };
-}
-
-export function previewCompatibilityImports(importKinds: ImportKind[], overridePath?: string): ConfigWritePreview {
-  const targetPath = getPiGlobalConfigPath(overridePath);
-  const raw = readRawConfigObject(targetPath);
-  const currentImports = Array.isArray(raw.imports) ? raw.imports.filter((value): value is ImportKind => typeof value === "string") : [];
-  const merged = [...new Set([...currentImports, ...importKinds])];
-  const nextRaw = { ...raw, imports: merged };
-  setServersObject(nextRaw, getServersObject(nextRaw));
-  return buildConfigWritePreview(targetPath, nextRaw);
-}
-
-export function ensureCompatibilityImports(importKinds: ImportKind[], overridePath?: string): { path: string; added: ImportKind[] } {
-  const targetPath = getPiGlobalConfigPath(overridePath);
-  const raw = readRawConfigObject(targetPath);
-  const currentImports = Array.isArray(raw.imports) ? raw.imports.filter((value): value is ImportKind => typeof value === "string") : [];
-  const merged = [...new Set([...currentImports, ...importKinds])];
-  const added = merged.filter((kind) => !currentImports.includes(kind));
-  if (added.length === 0) {
-    return { path: targetPath, added: [] };
-  }
-
-  raw.imports = merged;
-  const servers = getServersObject(raw);
-  setServersObject(raw, servers);
-  writeRawConfigObject(targetPath, raw);
-  return { path: targetPath, added };
 }
 
 export function buildStarterProjectConfig(): McpConfig {
@@ -242,43 +208,15 @@ export function writeSharedServerEntry(filePath: string, serverName: string, ent
 
 export function getServerProvenance(overridePath?: string, cwd = process.cwd()): Map<string, ServerProvenance> {
   const provenance = new Map<string, ServerProvenance>();
-  const userPath = getPiGlobalConfigPath(overridePath);
-
-  if (getConfiguredHostConfigDiscovery(overridePath, cwd) === "on") {
-    for (const importKind of Object.keys(IMPORT_PATHS) as ImportKind[]) {
-      const imported = loadImportedConfig(importKind, cwd, `Failed to inspect imported MCP config from ${importKind}:`);
-      if (!imported) continue;
-      for (const name of Object.keys(extractServers(imported.value, importKind))) {
-        // Keep writes inside Pi-owned storage even though the source is external.
-        // Later import kinds win in the same deterministic order as loadDiscoveredHostConfigs.
-        provenance.set(name, { path: userPath, kind: "import", importKind });
-      }
-    }
-  }
 
   for (const source of getConfigSources(overridePath, cwd)) {
     const loaded = readValidatedConfig(source.readPath, `MCP config from ${source.readPath}`);
     if (!loaded) continue;
 
-    if (loaded.imports?.length) {
-      for (const importKind of loaded.imports) {
-        const imported = loadImportedConfig(importKind, cwd, `Failed to inspect imported MCP config from ${importKind}:`);
-        if (!imported) continue;
-
-        const servers = extractServers(imported.value, importKind);
-        for (const name of Object.keys(servers)) {
-          if (!provenance.has(name)) {
-            provenance.set(name, { path: userPath, kind: "import", importKind });
-          }
-        }
-      }
-    }
-
     for (const name of Object.keys(loaded.mcpServers)) {
       provenance.set(name, {
         path: source.writePath,
         kind: source.kind,
-        ...(source.importKind !== undefined ? { importKind: source.importKind } : {}),
       });
     }
   }
@@ -308,7 +246,7 @@ export function writeDirectToolsConfig(
     const servers = getServersObject(raw);
 
     for (const { name, value, prov } of entries) {
-      if (prov.kind === "import") {
+      if (prov.kind === "shared") {
         const fullDef = fullConfig.mcpServers[name];
         if (fullDef) {
           servers[name] = { ...fullDef, directTools: value };

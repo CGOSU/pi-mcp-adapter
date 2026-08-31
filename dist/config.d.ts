@@ -113,7 +113,6 @@ import type { TextContent, ImageContent } from "@earendil-works/pi-ai";
 
 
 export type Transport = McpTransport;
-export type ImportKind = "cursor" | "claude-code" | "claude-desktop" | "codex" | "opencode" | "windsurf" | "vscode";
 type SdkTool = ListToolsResult["tools"][number];
 type SdkResource = ListResourcesResult["resources"][number];
 type SdkPrompt = ListPromptsResult["prompts"][number];
@@ -268,7 +267,6 @@ export interface McpOutputGuardSettings {
     detailsMaxBytes?: number;
 }
 export type ToolPrefix = "server" | "none" | "short" | "mcp";
-export type HostConfigDiscovery = "off" | "prompt" | "on";
 export type McpFooterStatus = "full" | "compact" | "off";
 export interface McpTraceSettings {
     /** Enable tracing for all servers unless a server sets trace to false. */
@@ -302,8 +300,6 @@ export interface McpSettings {
     mcpFooterStatus?: McpFooterStatus;
     /** Show successful startup connection notifications. Defaults to true. */
     notifyOnStartupConnect?: boolean;
-    /** Discover detected host-specific MCP configs only when explicitly enabled. */
-    hostConfigDiscovery?: HostConfigDiscovery;
     /** Agent Plugin package directories to load MCP servers from. */
     agentPluginPaths?: string[];
     idleTimeout?: number;
@@ -371,7 +367,6 @@ export interface McpSettings {
 }
 export interface McpConfig {
     mcpServers: Record<string, ServerEntry>;
-    imports?: ImportKind[];
     settings?: McpSettings;
 }
 export interface McpAdapterOptions {
@@ -409,8 +404,7 @@ export interface DirectToolSpec {
 }
 export interface ServerProvenance {
     path: string;
-    kind: "user" | "project" | "import";
-    importKind?: string;
+    kind: "user" | "project" | "shared";
 }
 export interface McpAuthResult {
     ok: boolean;
@@ -485,8 +479,7 @@ export interface ConfigSourceSpec {
     label: string;
     readPath: string;
     writePath: string;
-    kind: "user" | "project" | "import";
-    importKind?: string;
+    kind: "user" | "project" | "shared";
     shared: boolean;
     scope: "global" | "project";
 }
@@ -495,30 +488,20 @@ export interface ConfigDiscoveryPath {
     path: string;
     exists: boolean;
 }
-export interface DiscoveredImportConfig {
-    kind: ImportKind;
-    path: string;
-}
 export interface ConfigDiscoverySource extends ConfigDiscoveryPath {
     id: ConfigSourceSpec["id"];
     scope: ConfigSourceSpec["scope"];
     kind: "shared" | "pi";
     serverCount: number;
 }
-export interface ImportConfigSummary extends DiscoveredImportConfig {
-    serverCount: number;
-}
-export interface HostConfigSummary extends ImportConfigSummary {
-    active: boolean;
-}
 export interface McpConfigConflict {
     serverName: string;
     sources: Array<{
-        kind: "shared" | "pi" | "host";
+        kind: "shared" | "pi";
         path: string;
     }>;
     winner: {
-        kind: "shared" | "pi" | "host";
+        kind: "shared" | "pi";
         path: string;
     };
 }
@@ -532,9 +515,6 @@ export interface RepoPromptDiscovery {
 }
 export interface McpDiscoverySummary {
     sources: ConfigDiscoverySource[];
-    imports: ImportConfigSummary[];
-    hostConfigs: HostConfigSummary[];
-    hostConfigDiscovery: HostConfigDiscovery;
     agentPlugins: AgentPluginSummary[];
     conflicts: McpConfigConflict[];
     hasAnyConfig: boolean;
@@ -564,7 +544,6 @@ export declare const AGENTS_GLOBAL_CONFIG_PATHS: readonly [string, string];
 
 export declare const PROJECT_PI_CONFIG_NAME = "mcp.json";
 export declare const REPOPROMPT_BINARY_CANDIDATES: string[];
-export declare const IMPORT_PATHS: Record<ImportKind, string[]>;
 export declare function getPiGlobalConfigPath(overridePath?: string): string;
 export declare function getGenericGlobalConfigPath(): string;
 export declare function getProjectConfigPath(cwd?: string): string;
@@ -581,18 +560,12 @@ export interface LoadedConfigSource {
 }
 export declare function loadConfigSources(overridePath?: string, cwd?: string): LoadedConfigSource[];
 export declare function getMergedSettingsFromSources(sources: readonly LoadedConfigSource[]): McpSettings | undefined;
-export declare function getConfiguredHostConfigDiscoveryFromSources(sources: readonly LoadedConfigSource[]): HostConfigDiscovery;
 export declare function cloneMcpConfig(config: McpConfig): McpConfig;
 export declare function loadMcpConfig(overridePath?: string, cwd?: string): McpConfig;
 export declare function getMergedSettings(overridePath?: string, cwd?: string): McpSettings | undefined;
-export declare function getConfiguredHostConfigDiscovery(overridePath?: string, cwd?: string): HostConfigDiscovery;
-export declare function loadDiscoveredHostConfigs(cwd: string): McpConfig;
 
-export declare function findAvailableImportConfigs(cwd?: string): DiscoveredImportConfig[];
 export declare function getMcpStandardConfigSummary(overridePath?: string, cwd?: string): McpStandardConfigSummary;
-export declare function getMcpDiscoverySummary(overridePath?: string, cwd?: string, options?: {
-    includeHostConfigs?: boolean;
-}): McpDiscoverySummary;
+export declare function getMcpDiscoverySummary(overridePath?: string, cwd?: string): McpDiscoverySummary;
 
 export interface ServerDisabledOverrideResult {
     path: string;
@@ -604,11 +577,6 @@ export interface ServerDisabledOverrideResult {
  * writer never copies a server definition or its credentials into the file.
  */
 export declare function writeProjectServerDisabledOverride(overridePath: string | undefined, cwd: string, serverName: string, disabled: boolean): ServerDisabledOverrideResult;
-export declare function previewCompatibilityImports(importKinds: ImportKind[], overridePath?: string): ConfigWritePreview;
-export declare function ensureCompatibilityImports(importKinds: ImportKind[], overridePath?: string): {
-    path: string;
-    added: ImportKind[];
-};
 export declare function buildStarterProjectConfig(): McpConfig;
 export declare function previewStarterProjectConfig(cwd?: string): ConfigWritePreview;
 export declare function writeStarterProjectConfig(cwd?: string): string;

@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  findAvailableImportConfigs,
   getMcpDiscoverySummary,
   loadMcpConfig,
 } from "../../../config.ts";
@@ -17,7 +16,7 @@ afterEach(async () => {
 });
 
 describe("exclusive MCP config", () => {
-  it("loads the private agent config and only its named imports", async () => {
+  it("loads only the private agent config in exclusive mode", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi-mcp-exclusive-"));
     roots.push(root);
     const agentDir = join(root, "agent");
@@ -50,13 +49,11 @@ describe("exclusive MCP config", () => {
     vi.stubEnv("PI_MCP_CONFIG_MODE", "exclusive");
 
     const config = loadMcpConfig(override, workspace);
-    expect(Object.keys(config.mcpServers).sort()).toEqual(["exact_root", "explicit_vscode"]);
-    expect(findAvailableImportConfigs(workspace)).toEqual([]);
+    expect(Object.keys(config.mcpServers).sort()).toEqual(["exact_root"]);
     const discovery = getMcpDiscoverySummary(override, workspace);
     expect(discovery.sources.map(({ id }) => id)).toEqual(["pi-global"]);
-    expect(discovery.imports.map(({ kind }) => kind)).toEqual(["vscode"]);
     expect(discovery.agentPlugins).toEqual([]);
-    expect(discovery.hostConfigDiscovery).toBe("off");
+    expect(discovery.conflicts).toEqual([]);
   });
 });
 

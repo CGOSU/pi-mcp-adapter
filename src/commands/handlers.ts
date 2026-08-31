@@ -2,14 +2,12 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import type { OverlayHandle } from "@earendil-works/pi-tui";
 import type { McpExtensionState } from "../extension/state.ts";
 import { isServerDisabled } from "../contracts/core.ts";
-import type { McpAuthResult, McpConfig, McpPanelCallbacks, McpPanelResult, ImportKind } from "../contracts/core.ts";
+import type { McpAuthResult, McpConfig, McpPanelCallbacks, McpPanelResult } from "../contracts/core.ts";
 import { getMcpDiscoverySummary, getMcpStandardConfigSummary } from "../config/discovery.ts";
 import { getProjectConfigPath } from "../config/paths.ts";
 import type { KnownServerPreset } from "../config/contracts.ts";
 import {
-  ensureCompatibilityImports,
   getServerProvenance,
-  previewCompatibilityImports,
   previewSharedServerEntry,
   previewStarterProjectConfig,
   writeDirectToolsConfig,
@@ -84,7 +82,7 @@ export async function showStatus(state: McpExtensionState, ctx: ExtensionContext
 
   if (Object.keys(state.config.mcpServers).length === 0) {
     lines.push("No MCP servers configured");
-    lines.push("Run /mcp setup to adopt imports or scaffold a starter .mcp.json");
+    lines.push("Run /mcp setup to inspect standard configs or scaffold a starter .mcp.json");
   }
 
   ctx.ui.notify(lines.join("\n"), "info");
@@ -459,7 +457,7 @@ function buildSharedConfigNoticeLines(configOverridePath: string | undefined, cw
   return {
     lines: [
       `Using standard MCP config from ${sourceList}.`,
-      "Pi only writes compatibility imports and adapter-specific overrides into Pi-owned files when needed.",
+      "Pi writes adapter-specific overrides into Pi-owned files when needed.",
     ],
     fingerprint: discovery.fingerprint,
   };
@@ -471,7 +469,6 @@ export async function openMcpSetup(
   ctx: ExtensionContext,
   configOverridePath?: string,
   mode: "empty" | "setup" = "setup",
-  options: { includeHostConfigs?: boolean } = {},
 ): Promise<PanelFlowResult> {
   if (!ctx.hasUI) return { configChanged: false };
   if (!canRenderPanel(ctx)) {
@@ -483,32 +480,26 @@ export async function openMcpSetup(
     return { configChanged: false };
   }
 
-  const discovery = getMcpDiscoverySummary(configOverridePath, ctx.cwd, options);
+  const discovery = getMcpDiscoverySummary(configOverridePath, ctx.cwd);
   const onboardingState = loadOnboardingState();
   const { createMcpSetupPanel } = await import("../ui/mcp-setup-panel.ts");
   let configChanged = false;
 
   const callbacks = {
-    previewImports: (imports: ImportKind[]) => previewCompatibilityImports(imports, configOverridePath),
     previewStarterProject: () => previewStarterProjectConfig(ctx.cwd),
     previewRepoPrompt: () => {
-      const repoPrompt = getMcpDiscoverySummary(configOverridePath, ctx.cwd, options).repoPrompt;
+      const repoPrompt = getMcpDiscoverySummary(configOverridePath, ctx.cwd).repoPrompt;
       if (!repoPrompt.entry || !repoPrompt.targetPath || !repoPrompt.serverName) return null;
       return previewSharedServerEntry(repoPrompt.targetPath, repoPrompt.serverName, repoPrompt.entry);
     },
     previewKnownServer: (preset: KnownServerPreset) => previewSharedServerEntry(getProjectConfigPath(ctx.cwd), preset.id, preset.entry),
-    adoptImports: async (imports: ImportKind[]) => {
-      const result = ensureCompatibilityImports(imports, configOverridePath);
-      if (result.added.length > 0) configChanged = true;
-      return result;
-    },
     scaffoldProjectConfig: async () => {
       const path = writeStarterProjectConfig(ctx.cwd);
       configChanged = true;
       return { path };
     },
     addRepoPrompt: async () => {
-      const repoPrompt = getMcpDiscoverySummary(configOverridePath, ctx.cwd, options).repoPrompt;
+      const repoPrompt = getMcpDiscoverySummary(configOverridePath, ctx.cwd).repoPrompt;
       if (!repoPrompt.entry || !repoPrompt.targetPath || !repoPrompt.serverName) {
         throw new Error("RepoPrompt is not available to add from this setup screen.");
       }
@@ -628,7 +619,7 @@ export async function openMcpPanel(
     return { configChanged: false };
   }
   if (Object.keys(state.config.mcpServers).length === 0) {
-    return openMcpSetup(state, pi, ctx, configOverridePath, "empty", { includeHostConfigs: false });
+    return openMcpSetup(state, pi, ctx, configOverridePath, "empty");
   }
 
   const config = state.config;

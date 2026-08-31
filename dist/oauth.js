@@ -78,25 +78,6 @@ var REPOPROMPT_BINARY_CANDIDATES = [
   join2(homedir2(), "RepoPrompt", "repoprompt_cli"),
   "/Applications/Repo Prompt.app/Contents/MacOS/repoprompt-mcp"
 ];
-var IMPORT_PATHS = {
-  cursor: [join2(homedir2(), ".cursor", "mcp.json")],
-  "claude-code": [
-    join2(homedir2(), ".claude", "mcp.json"),
-    join2(homedir2(), ".claude.json"),
-    join2(homedir2(), ".claude", "claude_desktop_config.json")
-  ],
-  "claude-desktop": [join2(homedir2(), "Library", "Application Support", "Claude", "claude_desktop_config.json")],
-  codex: [
-    join2(homedir2(), ".codex", "config.toml"),
-    join2(homedir2(), ".codex", "config.json")
-  ],
-  opencode: [
-    join2(homedir2(), ".config", "opencode", "opencode.json"),
-    "./opencode.json"
-  ],
-  windsurf: [join2(homedir2(), ".windsurf", "mcp.json")],
-  vscode: [".vscode/mcp.json"]
-};
 
 // src/auth/mcp-auth.ts
 var require2 = createRequire(import.meta.url);

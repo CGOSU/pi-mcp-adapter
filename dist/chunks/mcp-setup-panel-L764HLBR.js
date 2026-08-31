@@ -85,9 +85,6 @@ var McpSetupPanel = class _McpSetupPanel {
     this.tui = tui;
     this.keys = createPanelKeys(options.keybindings);
     this.screen = options.mode;
-    for (const entry of discovery.imports) {
-      this.selectedImports.add(entry.kind);
-    }
     this.resetInactivityTimeout();
   }
   discovery;
@@ -96,9 +93,7 @@ var McpSetupPanel = class _McpSetupPanel {
   done;
   screen;
   actionCursor = 0;
-  importCursor = 0;
   pathCursor = 0;
-  selectedImports = /* @__PURE__ */ new Set();
   busy = false;
   notice = null;
   tui;
@@ -122,16 +117,13 @@ var McpSetupPanel = class _McpSetupPanel {
   getActions() {
     const actions = [];
     if (this.screen === "empty") {
-      actions.push({ id: "run-setup", label: "Run setup", description: "Inspect detected configs, adopt imports, and scaffold a minimal `.mcp.json`." });
-    }
-    if (this.discovery.imports.length > 0) {
-      actions.push({ id: "adopt-imports", label: "Adopt detected compatibility imports", description: `Choose which host-specific MCP configs Pi should import into its own override file. ${this.discovery.imports.length} source${this.discovery.imports.length === 1 ? "" : "s"} found.` });
+      actions.push({ id: "run-setup", label: "Run setup", description: "Inspect standard configs and scaffold a minimal `.mcp.json`." });
     }
     actions.push({ id: "view-example", label: "View example `.mcp.json`", description: "Preview a working shared MCP config you can paste or adapt." });
     if (!this.discovery.sources.some((source) => source.id === "shared-project" && source.exists)) {
       actions.push({ id: "scaffold-project", label: "Scaffold project `.mcp.json`", description: "Write a minimal project config using the standard shared MCP file path, then reload Pi." });
     }
-    actions.push({ id: "show-precedence", label: "Explain config precedence", description: "Show the read order and where Pi writes compatibility settings." });
+    actions.push({ id: "show-precedence", label: "Explain config precedence", description: "Show the standard MCP read order and where Pi writes adapter overrides." });
     if (this.getDetectedPaths().length > 0) {
       actions.push({ id: "open-paths", label: "Open detected config paths", description: "Browse the actual config files that Pi discovered on this machine." });
     }
@@ -146,8 +138,7 @@ var McpSetupPanel = class _McpSetupPanel {
   }
   getDetectedPaths() {
     const paths = [
-      ...this.discovery.sources.filter((source) => source.exists).map((source) => source.path),
-      ...this.discovery.imports.map((entry) => entry.path)
+      ...this.discovery.sources.filter((source) => source.exists).map((source) => source.path)
     ];
     return [...new Set(paths)];
   }
@@ -164,7 +155,7 @@ var McpSetupPanel = class _McpSetupPanel {
       return;
     }
     if (matchesKey(data, "escape")) {
-      if (this.screen === "imports" || this.screen === "paths") {
+      if (this.screen === "paths") {
         this.screen = this.discovery.hasAnyConfig ? "setup" : "empty";
         this.tui.requestRender();
         return;
@@ -174,10 +165,6 @@ var McpSetupPanel = class _McpSetupPanel {
       return;
     }
     if (this.busy) return;
-    if (this.screen === "imports") {
-      this.handleImportsInput(data);
-      return;
-    }
     if (this.screen === "paths") {
       this.handlePathsInput(data);
       return;
@@ -196,33 +183,6 @@ var McpSetupPanel = class _McpSetupPanel {
     if (this.keys.selectConfirm(data)) {
       const selected = this.getSelectedAction();
       if (selected) void this.runAction(selected);
-    }
-  }
-  handleImportsInput(data) {
-    const imports = this.discovery.imports;
-    if (this.keys.selectUp(data)) {
-      this.importCursor = Math.max(0, this.importCursor - 1);
-      this.tui.requestRender();
-      return;
-    }
-    if (this.keys.selectDown(data)) {
-      this.importCursor = Math.min(imports.length - 1, this.importCursor + 1);
-      this.tui.requestRender();
-      return;
-    }
-    if (matchesKey(data, "space")) {
-      const current = imports[this.importCursor];
-      if (!current) return;
-      if (this.selectedImports.has(current.kind)) {
-        this.selectedImports.delete(current.kind);
-      } else {
-        this.selectedImports.add(current.kind);
-      }
-      this.tui.requestRender();
-      return;
-    }
-    if (this.keys.selectConfirm(data)) {
-      void this.applySelectedImports();
     }
   }
   handlePathsInput(data) {
@@ -250,12 +210,6 @@ var McpSetupPanel = class _McpSetupPanel {
     if (action.id === "run-setup") {
       this.screen = "setup";
       this.actionCursor = 0;
-      this.tui.requestRender();
-      return;
-    }
-    if (action.id === "adopt-imports") {
-      this.screen = "imports";
-      this.importCursor = 0;
       this.tui.requestRender();
       return;
     }
@@ -298,21 +252,6 @@ var McpSetupPanel = class _McpSetupPanel {
     this.notice = { text: "Review the details below. Press Enter on an action with a side effect to apply it.", tone: "muted" };
     this.tui.requestRender();
   }
-  async applySelectedImports() {
-    const selected = this.discovery.imports.filter((entry) => this.selectedImports.has(entry.kind)).map((entry) => entry.kind);
-    if (selected.length === 0) {
-      this.notice = { text: "Select at least one compatibility import first.", tone: "warning" };
-      this.tui.requestRender();
-      return;
-    }
-    await this.runBusy(async () => {
-      const result = await this.callbacks.adoptImports(selected);
-      this.callbacks.markSetupCompleted();
-      this.notice = result.added.length > 0 ? { text: `Added ${result.added.join(", ")} to ${result.path}. Pi will reload after this panel closes.`, tone: "success" } : { text: `No changes needed in ${result.path}.`, tone: "muted" };
-      this.screen = this.discovery.hasAnyConfig ? "setup" : "empty";
-      this.actionCursor = 0;
-    });
-  }
   async runBusy(fn) {
     this.busy = true;
     this.notice = { text: "Working...", tone: "muted" };
@@ -352,9 +291,7 @@ var McpSetupPanel = class _McpSetupPanel {
       lines.push(this.padLine("", innerW));
     }
     lines.push(`\u251C${border}\u2524`);
-    if (this.screen === "imports") {
-      lines.push(...this.renderImports(innerW));
-    } else if (this.screen === "paths") {
+    if (this.screen === "paths") {
       lines.push(...this.renderPaths(innerW));
     } else {
       lines.push(...this.renderActions(innerW));
@@ -393,25 +330,6 @@ var McpSetupPanel = class _McpSetupPanel {
     lines.push(this.padLine(fg(this.t.muted, hint), innerW));
     return lines;
   }
-  renderImports(innerW) {
-    const lines = [];
-    lines.push(this.padLine("Select compatibility imports. Space toggles, Enter saves, Esc goes back.", innerW));
-    lines.push(this.padLine("", innerW));
-    for (let index = 0; index < this.discovery.imports.length; index++) {
-      const entry = this.discovery.imports[index];
-      if (!entry) continue;
-      const selected2 = this.selectedImports.has(entry.kind) ? "[x]" : "[ ]";
-      const cursor = index === this.importCursor ? fg(this.t.selected, "\u203A") : " ";
-      lines.push(this.padLine(`${cursor} ${selected2} ${entry.kind}  ${entry.path}`, innerW));
-    }
-    lines.push(this.padLine("", innerW));
-    const selected = this.discovery.imports.filter((entry) => this.selectedImports.has(entry.kind)).map((entry) => entry.kind);
-    const preview = this.callbacks.previewImports(selected);
-    for (const line of this.formatWritePreview("Compatibility import write preview", preview, [], this.previewWidth(innerW))) {
-      lines.push(this.padLine(line, innerW));
-    }
-    return lines;
-  }
   renderPaths(innerW) {
     const lines = [];
     lines.push(this.padLine("Select a detected config path to open. Enter opens it, Esc goes back.", innerW));
@@ -428,23 +346,19 @@ var McpSetupPanel = class _McpSetupPanel {
     if (!this.discovery.hasAnyConfig) {
       return fg(this.t.warning, this.options.onboardingState.setupCompleted ? "No MCP servers are active right now." : "No MCP config is active yet.");
     }
-    if (this.discovery.totalServerCount === 0 && (this.discovery.imports.length > 0 || !!this.discovery.repoPrompt.executablePath)) {
-      return fg(this.t.warning, "Pi found MCP-related setup options, but none are active in Pi yet.");
+    if (this.discovery.totalServerCount === 0 && !!this.discovery.repoPrompt.executablePath) {
+      return fg(this.t.warning, "Pi found a setup option, but no MCP servers are active yet.");
     }
     const shared = this.discovery.sources.filter((source) => source.kind === "shared" && source.serverCount > 0).length;
     const piOwned = this.discovery.sources.filter((source) => source.kind === "pi" && source.serverCount > 0).length;
     return fg(this.t.hint, `Detected ${this.discovery.totalServerCount} configured servers across ${shared} shared and ${piOwned} Pi-owned source${shared + piOwned === 1 ? "" : "s"}.`);
   }
   secondarySummaryLine() {
-    const hostNote = this.discovery.hostConfigs.length > 0 ? ` Host discovery is ${this.discovery.hostConfigDiscovery}; ${this.discovery.hostConfigs.length} host source${this.discovery.hostConfigs.length === 1 ? "" : "s"} detected.` : "";
     const conflictNote = this.discovery.conflicts.length > 0 ? ` ${this.discovery.conflicts.length} same-name conflict${this.discovery.conflicts.length === 1 ? "" : "s"} reported.` : "";
     if (!this.discovery.hasAnyConfig) {
-      return `Create a shared .mcp.json, adopt host imports, or quick-add RepoPrompt from this screen.${hostNote}${conflictNote}`;
+      return `Create a shared .mcp.json or quick-add RepoPrompt from this screen.${conflictNote}`;
     }
-    if (this.discovery.totalServerCount === 0 && this.discovery.imports.length > 0) {
-      return `Detected ${this.discovery.imports.length} compatibility import source${this.discovery.imports.length === 1 ? "" : "s"}. Adopt them into Pi or inspect the underlying files.${hostNote}${conflictNote}`;
-    }
-    return `Shared MCP files are preferred. Pi-owned files are only for compatibility imports and adapter-specific overrides.${hostNote}${conflictNote}`;
+    return `Shared MCP files are preferred. Pi-owned files are only for adapter-specific overrides.${conflictNote}`;
   }
   visibleActionRange(total) {
     if (total <= COMPACT_ACTION_ROWS) return { start: 0, end: total };
@@ -462,18 +376,8 @@ var McpSetupPanel = class _McpSetupPanel {
     switch (action?.id) {
       case "run-setup":
         return this.formatPreview([
-          "Run setup to adopt host-specific imports, inspect detected paths, and scaffold a minimal `.mcp.json` if needed."
+          "Run setup to inspect standard config paths and scaffold a minimal `.mcp.json` if needed."
         ], previewW);
-      case "adopt-imports":
-        return this.formatWritePreview(
-          "Compatibility import write preview",
-          this.callbacks.previewImports(this.discovery.imports.filter((entry) => this.selectedImports.has(entry.kind)).map((entry) => entry.kind)),
-          [
-            `Detected imports: ${this.discovery.imports.map((entry) => `${entry.kind} (${entry.serverCount} servers)`).join(", ")}`,
-            "Selected imports are written into the Pi agent dir config as Pi-owned compatibility state."
-          ],
-          previewW
-        );
       case "view-example":
         return this.formatPreview([
           "Example shared `.mcp.json`:",
@@ -491,18 +395,17 @@ var McpSetupPanel = class _McpSetupPanel {
       case "show-precedence":
         return this.formatPreview([
           "Read order (later entries win):",
-          "0. detected host configs (opt-in lowest-precedence fallback)",
           "1. ~/.config/mcp/mcp.json",
           "2. ~/.agents/mcp.json",
           "3. ~/.agents/mcp/mcp.json",
           "4. <Pi agent dir>/mcp.json",
           "5. .mcp.json",
           `6. ${getConfigDirName()}/mcp.json`,
-          `Host discovery: ${this.discovery.hostConfigDiscovery}. Conflicts reported: ${this.discovery.conflicts.length}.`,
+          `Conflicts reported: ${this.discovery.conflicts.length}.`,
           ...this.discovery.conflicts.slice(0, 8).map(
             (conflict) => `${conflict.serverName}: ${conflict.sources.map((source) => source.path).join(" -> ")} (winner: ${conflict.winner.path})`
           ),
-          "Pi writes compatibility imports and adapter-only overrides to Pi-owned files."
+          "Pi writes adapter-specific overrides to Pi-owned files."
         ], previewW);
       case "open-paths":
         return this.formatPreview(this.getDetectedPaths().length > 0 ? ["Detected paths:", ...this.getDetectedPaths()] : ["No config paths were detected."], previewW);

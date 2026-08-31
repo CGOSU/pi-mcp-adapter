@@ -3,7 +3,6 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { getAgentPath, getConfigDirName } from "./agent-dir.ts";
-import type { ImportKind } from "../contracts/core.js";
 import type { ConfigDiscoveryPath, ConfigSourceSpec } from "./contracts.js";
 
 export const GENERIC_GLOBAL_CONFIG_PATH = join(homedir(), ".config", "mcp", "mcp.json");
@@ -17,26 +16,6 @@ export const REPOPROMPT_BINARY_CANDIDATES = [
   join(homedir(), "RepoPrompt", "repoprompt_cli"),
   "/Applications/Repo Prompt.app/Contents/MacOS/repoprompt-mcp",
 ];
-
-export const IMPORT_PATHS: Record<ImportKind, string[]> = {
-  cursor: [join(homedir(), ".cursor", "mcp.json")],
-  "claude-code": [
-    join(homedir(), ".claude", "mcp.json"),
-    join(homedir(), ".claude.json"),
-    join(homedir(), ".claude", "claude_desktop_config.json"),
-  ],
-  "claude-desktop": [join(homedir(), "Library", "Application Support", "Claude", "claude_desktop_config.json")],
-  codex: [
-    join(homedir(), ".codex", "config.toml"),
-    join(homedir(), ".codex", "config.json"),
-  ],
-  opencode: [
-    join(homedir(), ".config", "opencode", "opencode.json"),
-    "./opencode.json",
-  ],
-  windsurf: [join(homedir(), ".windsurf", "mcp.json")],
-  vscode: [".vscode/mcp.json"],
-};
 
 export function getPiGlobalConfigPath(overridePath?: string): string {
   return overridePath ? resolve(overridePath) : getAgentPath("mcp.json");
@@ -86,8 +65,7 @@ export function getConfigSources(overridePath?: string, cwd = process.cwd()): Co
       label: "user-global standard MCP",
       readPath: GENERIC_GLOBAL_CONFIG_PATH,
       writePath: userPath,
-      kind: "import",
-      importKind: "global MCP config",
+      kind: "shared",
       shared: true,
       scope: "global",
     });
@@ -100,8 +78,7 @@ export function getConfigSources(overridePath?: string, cwd = process.cwd()): Co
       label: index === 0 ? "user-global .agents MCP" : "user-global .agents nested MCP",
       readPath: agentsPath,
       writePath: userPath,
-      kind: "import",
-      importKind: index === 0 ? ".agents MCP config" : ".agents/mcp MCP config",
+      kind: "shared",
       shared: true,
       scope: "global",
     });

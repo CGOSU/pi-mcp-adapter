@@ -62,14 +62,6 @@ function getMissingEnvVars(value, environment) {
   }
   return [...missing];
 }
-function toStringRecord(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
-  const result = {};
-  for (const [key, entry] of Object.entries(value)) {
-    if (typeof entry === "string") result[key] = entry;
-  }
-  return Object.keys(result).length > 0 ? result : void 0;
-}
 function interpolateSecretExpression(value, environment) {
   if (value.startsWith("!!")) return interpolateEnvVars(value.slice(1), environment);
   return value.startsWith("!") ? value : interpolateEnvVars(value, environment);
@@ -293,7 +285,6 @@ export {
   parallelLimit,
   getConfigPathFromArgv,
   interpolateEnvVars,
-  toStringRecord,
   interpolateEnvRecord,
   resolveCommandSecret,
   resolveCommandSecretsRecord,

@@ -1,364 +1,21 @@
 import {
-  IMPORT_PATHS,
+  mergeConfigs,
+  readValidatedConfig
+} from "./chunk-YZ65OQRG.js";
+import {
   getConfigSources,
   isExclusiveConfigMode
-} from "./chunk-PI2QHUXN.js";
-import {
-  toStringRecord
-} from "./chunk-Z3P2QPCB.js";
+} from "./chunk-KNN6K7BJ.js";
 import {
   getAgentDir,
   getAgentPath,
   getConfigDirName
 } from "./chunk-ELOBWFRH.js";
 
-// src/config/read.ts
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { parse as parseToml } from "smol-toml";
-import stripJsonComments from "strip-json-comments";
-function resolveImportCandidates(importKind, cwd) {
-  return (IMPORT_PATHS[importKind] ?? []).map((candidate) => {
-    if (importKind === "opencode" && candidate === "./opencode.json") {
-      const start = resolve(cwd);
-      let gitRoot;
-      let current = start;
-      while (true) {
-        if (existsSync(join(current, ".git"))) {
-          gitRoot = current;
-          break;
-        }
-        const parent = dirname(current);
-        if (parent === current) break;
-        current = parent;
-      }
-      if (!gitRoot) return join(start, "opencode.json");
-      current = start;
-      while (true) {
-        const projectConfig = join(current, "opencode.json");
-        if (existsSync(projectConfig) || current === gitRoot) return projectConfig;
-        current = dirname(current);
-      }
-    }
-    return candidate.startsWith(".") ? resolve(cwd, candidate) : candidate;
-  });
-}
-function parseJsonConfig(raw) {
-  return JSON.parse(stripJsonComments(raw, { trailingCommas: true }));
-}
-function readImportedConfig(path) {
-  const raw = readFileSync(path, "utf-8");
-  return path.endsWith(".toml") ? parseToml(raw) : parseJsonConfig(raw);
-}
-function loadImportedConfig(importKind, cwd, warningPrefix) {
-  if (importKind === "opencode") {
-    let merged = {};
-    let highestPrecedencePath;
-    for (const path of resolveImportCandidates(importKind, cwd)) {
-      if (!existsSync(path)) continue;
-      try {
-        const value = readImportedConfig(path);
-        if (value && typeof value === "object" && !Array.isArray(value)) {
-          merged = mergeOpenCodeConfigs(merged, value);
-          highestPrecedencePath = path;
-        }
-      } catch (error) {
-        console.warn(warningPrefix, error);
-      }
-    }
-    return highestPrecedencePath ? { path: highestPrecedencePath, value: merged } : null;
-  }
-  for (const path of resolveImportCandidates(importKind, cwd)) {
-    if (!existsSync(path)) continue;
-    try {
-      return { path, value: readImportedConfig(path) };
-    } catch (error) {
-      console.warn(warningPrefix, error);
-    }
-  }
-  return null;
-}
-function readValidatedConfig(path, label) {
-  if (!existsSync(path)) return null;
-  try {
-    return validateConfig(parseJsonConfig(readFileSync(path, "utf-8")));
-  } catch (error) {
-    console.warn(`Failed to load ${label}:`, error);
-    return null;
-  }
-}
-function validateConfig(raw) {
-  if (!isRecord(raw)) {
-    return { mcpServers: {} };
-  }
-  return {
-    mcpServers: toServerEntries(raw.mcpServers ?? raw["mcp-servers"]),
-    ...Array.isArray(raw.imports) ? { imports: raw.imports } : {},
-    ...raw.settings !== void 0 ? { settings: raw.settings } : {}
-  };
-}
-function toServerEntries(servers) {
-  if (!isRecord(servers)) return {};
-  const entries = {};
-  for (const [name, entry] of Object.entries(servers)) {
-    if (isServerEntry(entry)) entries[name] = entry;
-  }
-  return entries;
-}
-function isServerEntry(value) {
-  return isRecord(value);
-}
-function isRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function mergeOpenCodeConfigs(base, next) {
-  const baseMcp = base.mcp;
-  const nextMcp = next.mcp;
-  const mergedMcp = {
-    ...baseMcp && typeof baseMcp === "object" && !Array.isArray(baseMcp) ? baseMcp : {}
-  };
-  if (nextMcp && typeof nextMcp === "object" && !Array.isArray(nextMcp)) {
-    for (const [name, nextEntry] of Object.entries(nextMcp)) {
-      const baseEntry = mergedMcp[name];
-      if (baseEntry && typeof baseEntry === "object" && !Array.isArray(baseEntry) && nextEntry && typeof nextEntry === "object" && !Array.isArray(nextEntry)) {
-        const safeBase = { ...baseEntry };
-        const override = nextEntry;
-        if (typeof override.type === "string" && override.type !== safeBase.type) {
-          for (const field of ["command", "environment", "cwd", "url", "headers", "oauth"]) delete safeBase[field];
-        }
-        if (typeof override.url === "string" && override.url !== safeBase.url) {
-          delete safeBase.headers;
-          delete safeBase.oauth;
-        }
-        if (Array.isArray(override.command)) {
-          const baseCommand = safeBase.command;
-          const commandChanged = !Array.isArray(baseCommand) || override.command.length !== baseCommand.length || override.command.some((value, index) => value !== baseCommand[index]);
-          if (commandChanged) {
-            delete safeBase.environment;
-            delete safeBase.cwd;
-          }
-        }
-        const mergedEntry = { ...safeBase, ...override };
-        for (const field of ["environment", "headers", "oauth"]) {
-          const baseField = safeBase[field];
-          const nextField = override[field];
-          if (baseField && typeof baseField === "object" && !Array.isArray(baseField) && nextField && typeof nextField === "object" && !Array.isArray(nextField)) {
-            mergedEntry[field] = { ...baseField, ...nextField };
-          }
-        }
-        mergedMcp[name] = mergedEntry;
-      } else {
-        mergedMcp[name] = nextEntry;
-      }
-    }
-  }
-  return { ...base, ...next, mcp: mergedMcp };
-}
-function extractServers(config, kind) {
-  if (!config || typeof config !== "object") return {};
-  const obj = config;
-  let servers;
-  switch (kind) {
-    case "claude-desktop":
-    case "claude-code":
-      servers = obj.mcpServers;
-      break;
-    case "codex":
-      servers = obj.mcp_servers ?? obj.mcpServers;
-      break;
-    case "cursor":
-    case "windsurf":
-    case "vscode":
-      servers = obj.mcpServers ?? obj["mcp-servers"];
-      break;
-    case "opencode":
-      servers = obj.mcp;
-      break;
-    default:
-      return {};
-  }
-  if (!servers || typeof servers !== "object" || Array.isArray(servers)) {
-    return {};
-  }
-  const mappedServers = {};
-  for (const [name, entry] of Object.entries(servers)) {
-    if (kind === "opencode") {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
-      const raw = entry;
-      if (raw.enabled === false) continue;
-      if (raw.type === "local" && Array.isArray(raw.command) && raw.command.length > 0 && raw.command.every((value) => typeof value === "string")) {
-        const env = toStringRecord(raw.environment);
-        const command = raw.command[0];
-        if (command === void 0) continue;
-        const mapped2 = {
-          command,
-          args: raw.command.slice(1),
-          ...env ? { env } : {},
-          ...typeof raw.cwd === "string" ? { cwd: raw.cwd } : {}
-        };
-        mappedServers[name] = mapped2;
-        continue;
-      }
-      if (raw.type === "remote" && typeof raw.url === "string") {
-        const headers = toStringRecord(raw.headers);
-        const mapped2 = {
-          url: raw.url,
-          ...headers ? { headers } : {}
-        };
-        if (raw.oauth === false) {
-          mapped2.oauth = false;
-        } else if (raw.oauth && typeof raw.oauth === "object" && !Array.isArray(raw.oauth)) {
-          const oauth = raw.oauth;
-          mapped2.auth = "oauth";
-          mapped2.oauth = {
-            ...typeof oauth.clientId === "string" ? { clientId: oauth.clientId } : {},
-            ...typeof oauth.clientSecret === "string" ? { clientSecret: oauth.clientSecret } : {},
-            ...typeof oauth.scope === "string" ? { scope: oauth.scope } : {},
-            ...typeof oauth.skipIssuerMetadataValidation === "boolean" ? { skipIssuerMetadataValidation: oauth.skipIssuerMetadataValidation } : {}
-          };
-        }
-        mappedServers[name] = mapped2;
-      }
-      continue;
-    }
-    if (!isRecord(entry)) continue;
-    if (kind !== "codex") {
-      mappedServers[name] = entry;
-      continue;
-    }
-    const mapped = { ...entry };
-    const bearerTokenEnv = mapped.bearer_token_env_var;
-    const httpHeaders = mapped.http_headers;
-    const envHttpHeaders = mapped.env_http_headers;
-    if (typeof bearerTokenEnv === "string") {
-      mapped.bearerTokenEnv = bearerTokenEnv;
-      if (mapped.auth === void 0) mapped.auth = "bearer";
-    }
-    if (httpHeaders && typeof httpHeaders === "object" && !Array.isArray(httpHeaders)) {
-      mapped.headers = { ...mapped.headers, ...httpHeaders };
-    }
-    if (envHttpHeaders && typeof envHttpHeaders === "object" && !Array.isArray(envHttpHeaders)) {
-      const headers = { ...mapped.headers };
-      for (const [header, envVar] of Object.entries(envHttpHeaders)) {
-        if (typeof envVar === "string" && headers[header] === void 0) headers[header] = `$env:${envVar}`;
-      }
-      mapped.headers = headers;
-    }
-    delete mapped.bearer_token_env_var;
-    delete mapped.http_headers;
-    delete mapped.env_http_headers;
-    mappedServers[name] = mapped;
-  }
-  return mappedServers;
-}
-
-// src/config/merge.ts
-function mergeConfigs(base, next) {
-  const imports = mergeImports(base.imports, next.imports);
-  const settings = next.settings ? { ...base.settings, ...next.settings } : base.settings;
-  return {
-    mcpServers: mergeServerMaps(base.mcpServers, next.mcpServers),
-    ...imports !== void 0 ? { imports } : {},
-    ...settings !== void 0 ? { settings } : {}
-  };
-}
-var URL_BOUND_AUTH_FIELDS = ["headers", "bearerToken", "bearerTokenEnv", "bearerTokenStore", "requestHeadersCommand"];
-function mergeServerMaps(base, next) {
-  const merged = { ...base };
-  for (const [name, definition] of Object.entries(next)) {
-    const existing = merged[name];
-    let baseEntry = existing ?? {};
-    if (existing && typeof definition.command === "string") {
-      baseEntry = { ...existing };
-      for (const field of [
-        "url",
-        "headers",
-        "requestHeadersCommand",
-        "auth",
-        "bearerToken",
-        "bearerTokenEnv",
-        "oauth",
-        "httpTransport",
-        "socket"
-      ]) {
-        delete baseEntry[field];
-      }
-    } else if (existing && typeof definition.url === "string") {
-      baseEntry = { ...existing };
-      for (const field of [
-        "command",
-        "args",
-        "env",
-        "cwd",
-        "pluginDataDir",
-        "literalEnv",
-        "socket"
-      ]) {
-        delete baseEntry[field];
-      }
-    } else if (existing && typeof definition.socket === "string") {
-      baseEntry = { ...existing };
-      for (const field of [
-        "command",
-        "args",
-        "env",
-        "cwd",
-        "pluginDataDir",
-        "literalEnv",
-        "url",
-        "headers",
-        "requestHeadersCommand",
-        "auth",
-        "bearerToken",
-        "bearerTokenEnv",
-        "oauth",
-        "httpTransport"
-      ]) {
-        delete baseEntry[field];
-      }
-    }
-    if (existing && typeof definition.url === "string" && definition.url !== existing.url) {
-      if (baseEntry === existing) baseEntry = { ...existing };
-      for (const field of URL_BOUND_AUTH_FIELDS) {
-        delete baseEntry[field];
-      }
-      if (baseEntry.oauth !== false) {
-        delete baseEntry.oauth;
-      }
-    }
-    merged[name] = { ...baseEntry, ...definition };
-  }
-  return merged;
-}
-function mergeImports(left, right) {
-  const merged = [...left ?? [], ...right ?? []];
-  if (merged.length === 0) return void 0;
-  return [...new Set(merged)];
-}
-function expandImports(config, cwd = process.cwd()) {
-  if (!config.imports?.length) return config;
-  const importedServers = {};
-  for (const importKind of config.imports) {
-    const imported = loadImportedConfig(importKind, cwd, `Failed to import MCP config from ${importKind}:`);
-    if (!imported) continue;
-    const servers = extractServers(imported.value, importKind);
-    for (const [name, definition] of Object.entries(servers)) {
-      if (!importedServers[name]) {
-        importedServers[name] = definition;
-      }
-    }
-  }
-  return {
-    imports: config.imports,
-    ...config.settings !== void 0 ? { settings: config.settings } : {},
-    mcpServers: mergeServerMaps(importedServers, config.mcpServers)
-  };
-}
-
 // src/config/package-mcp-loader.ts
-import { existsSync as existsSync2, readFileSync as readFileSync2, realpathSync, statSync } from "node:fs";
-import { isAbsolute, join as join2, relative, resolve as resolve2, sep } from "node:path";
-import stripJsonComments2 from "strip-json-comments";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import stripJsonComments from "strip-json-comments";
 function loadPackageMcpConfigs(cwd = process.cwd()) {
   const mcpServers = {};
   const seen = /* @__PURE__ */ new Set();
@@ -394,8 +51,8 @@ function loadPackageMcpConfigs(cwd = process.cwd()) {
 function getConfiguredPackageRoots(cwd) {
   const roots = [];
   for (const [settingsPath, scope] of [
-    [join2(cwd, getConfigDirName(), "settings.json"), "project"],
-    [join2(getAgentDir(), "settings.json"), "user"]
+    [join(cwd, getConfigDirName(), "settings.json"), "project"],
+    [join(getAgentDir(), "settings.json"), "user"]
   ]) {
     const settings = readOptionalJson(settingsPath, `${scope} Pi settings`);
     if (settings === void 0) continue;
@@ -415,21 +72,21 @@ function getConfiguredPackageRoots(cwd) {
   return roots;
 }
 function resolvePackageRoot(source, scope, cwd) {
-  const baseDir = scope === "user" ? getAgentDir() : join2(cwd, getConfigDirName());
+  const baseDir = scope === "user" ? getAgentDir() : join(cwd, getConfigDirName());
   if (source.startsWith("npm:")) {
     const name = source.slice(4).trim().match(/^(@?[^@]+(?:\/[^@]+)?)/)?.[1];
-    return name ? resolveContainedPath(join2(baseDir, "npm", "node_modules"), name) : null;
+    return name ? resolveContainedPath(join(baseDir, "npm", "node_modules"), name) : null;
   }
   const gitSource = source.startsWith("git:") ? source.slice(4).trim() : /^(?:(?:https?|ssh):\/\/|git@[^:]+:)/.test(source) ? source : null;
   if (gitSource) {
     const value = gitSource.replace(/^ssh:\/\/git@/, "").replace(/^git@([^:]+):/, "$1/").replace(/^[a-z]+:\/\//i, "");
     const path = value.replace(/@[^/]+$/, "").replace(/\.git$/, "");
-    return path && !path.startsWith("/") ? resolveContainedPath(join2(baseDir, "git"), path) : null;
+    return path && !path.startsWith("/") ? resolveContainedPath(join(baseDir, "git"), path) : null;
   }
-  return isAbsolute(source) ? resolve2(source) : resolve2(baseDir, source);
+  return isAbsolute(source) ? resolve(source) : resolve(baseDir, source);
 }
 function readPackageManifest(packageRoot) {
-  const manifest = readOptionalJson(join2(packageRoot, "package.json"), `Pi package manifest ${packageRoot}`);
+  const manifest = readOptionalJson(join(packageRoot, "package.json"), `Pi package manifest ${packageRoot}`);
   return manifest && typeof manifest === "object" && !Array.isArray(manifest) ? manifest : null;
 }
 function getManifestMcpPaths(value, packageName) {
@@ -457,23 +114,23 @@ function readMcpConfig(path, packageName) {
 }
 function readRequiredJson(path, description) {
   try {
-    return JSON.parse(stripJsonComments2(readFileSync2(path, "utf8"), { trailingCommas: true }));
+    return JSON.parse(stripJsonComments(readFileSync(path, "utf8"), { trailingCommas: true }));
   } catch (error) {
     throw new Error(`${description} ${path} contains invalid JSON: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
 }
 function readOptionalJson(path, description) {
-  if (!existsSync2(path)) return void 0;
+  if (!existsSync(path)) return void 0;
   return readRequiredJson(path, description);
 }
 function resolveContainedPath(root, path) {
-  const resolved = resolve2(root, path);
+  const resolved = resolve(root, path);
   const rel = relative(root, resolved);
   return rel === "" || !rel.startsWith("..") && !rel.startsWith(sep) && !isAbsolute(rel) ? resolved : null;
 }
 function resolvePackageConfigPath(packageRoot, path) {
   const lexicalPath = resolveContainedPath(packageRoot, path);
-  if (!lexicalPath || !existsSync2(lexicalPath) || !statSync(lexicalPath).isFile()) return null;
+  if (!lexicalPath || !existsSync(lexicalPath) || !statSync(lexicalPath).isFile()) return null;
   try {
     const realPackageRoot = realpathSync(packageRoot);
     const realConfigPath = realpathSync(lexicalPath);
@@ -490,8 +147,8 @@ function formatServerName(name) {
 }
 
 // src/config/agent-plugin-loader.ts
-import { existsSync as existsSync3, readFileSync as readFileSync3, statSync as statSync2 } from "node:fs";
-import { isAbsolute as isAbsolute2, relative as relative2, resolve as resolve3, sep as sep2 } from "node:path";
+import { existsSync as existsSync2, readFileSync as readFileSync2, statSync as statSync2 } from "node:fs";
+import { isAbsolute as isAbsolute2, relative as relative2, resolve as resolve2, sep as sep2 } from "node:path";
 var PLUGIN_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
 var MCP_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json";
 var PLUGIN_NAME_PATTERN = /^(?!.*(?:--|\.\.))[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/;
@@ -544,15 +201,15 @@ function loadAgentPluginMcpConfig(path, cwd) {
   const pluginRoot = resolvePluginPath(path, cwd);
   const manifest = readPluginManifest(pluginRoot, true);
   if (!manifest) return null;
-  const mcpPath = resolve3(pluginRoot, "mcp.json");
-  if (!existsSync3(mcpPath)) return { mcpServers: {} };
+  const mcpPath = resolve2(pluginRoot, "mcp.json");
+  if (!existsSync2(mcpPath)) return { mcpServers: {} };
   if (!statSync2(mcpPath).isFile()) {
     console.warn(`Agent Plugin ${manifest.name} has invalid MCP config: mcp.json is not a regular file`);
     return { mcpServers: {} };
   }
   let raw;
   try {
-    raw = JSON.parse(readFileSync3(mcpPath, "utf8"));
+    raw = JSON.parse(readFileSync2(mcpPath, "utf8"));
   } catch (error) {
     console.warn(`Agent Plugin ${manifest.name} has invalid MCP config: failed to parse mcp.json`, error);
     return { mcpServers: {} };
@@ -560,8 +217,8 @@ function loadAgentPluginMcpConfig(path, cwd) {
   return translateAgentPluginMcpConfig(raw, manifest, pluginRoot);
 }
 function readPluginManifest(pluginRoot, report) {
-  const manifestPath = resolve3(pluginRoot, "plugin.json");
-  if (!existsSync3(manifestPath)) {
+  const manifestPath = resolve2(pluginRoot, "plugin.json");
+  if (!existsSync2(manifestPath)) {
     if (report) console.warn(`Agent Plugin at ${pluginRoot} is invalid: missing plugin.json`);
     return null;
   }
@@ -571,7 +228,7 @@ function readPluginManifest(pluginRoot, report) {
   }
   let raw;
   try {
-    raw = JSON.parse(readFileSync3(manifestPath, "utf8"));
+    raw = JSON.parse(readFileSync2(manifestPath, "utf8"));
   } catch (error) {
     if (report) console.warn(`Agent Plugin at ${pluginRoot} is invalid: failed to parse plugin.json`, error);
     return null;
@@ -752,9 +409,9 @@ function translateHeaders(value, manifest, serverName) {
   return Object.keys(headers).length > 0 ? headers : void 0;
 }
 function resolvePluginPath(path, cwd) {
-  if (path === "~") return resolve3(process.env.HOME ?? "", ".");
-  if (path.startsWith("~/")) return resolve3(process.env.HOME ?? "", path.slice(2));
-  return isAbsolute2(path) ? resolve3(path) : resolve3(cwd, path);
+  if (path === "~") return resolve2(process.env.HOME ?? "", ".");
+  if (path.startsWith("~/")) return resolve2(process.env.HOME ?? "", path.slice(2));
+  return isAbsolute2(path) ? resolve2(path) : resolve2(cwd, path);
 }
 function isBareCommand(command) {
   return !command.includes("/") && !command.includes("\\") && !command.includes("${PLUGIN_ROOT}") && !command.includes("${PLUGIN_DATA}");
@@ -772,7 +429,7 @@ function resolvePluginCwd(value, pluginRoot, pluginDataDir) {
   return null;
 }
 function resolveContainedPath2(root, value, containmentRoot) {
-  const resolved = resolve3(root, value);
+  const resolved = resolve2(root, value);
   const rel = relative2(containmentRoot, resolved);
   if (rel === "" || !rel.startsWith("..") && !rel.startsWith(sep2) && !isAbsolute2(rel)) return resolved;
   return null;
@@ -814,20 +471,15 @@ function getMergedSettingsFromSources(sources) {
   }
   return settings;
 }
-function getConfiguredHostConfigDiscoveryFromSources(sources) {
-  const value = getMergedSettingsFromSources(sources)?.hostConfigDiscovery;
-  return value === "off" || value === "prompt" || value === "on" ? value : "off";
-}
 function cloneMcpConfig(config) {
   return structuredClone(config);
 }
 function loadMcpConfig(overridePath, cwd = process.cwd()) {
   const loadedSources = loadConfigSources(overridePath, cwd);
-  const hostConfigDiscovery = getConfiguredHostConfigDiscoveryFromSources(loadedSources);
-  let config = !isExclusiveConfigMode() && hostConfigDiscovery === "on" ? loadDiscoveredHostConfigs(cwd) : { mcpServers: {} };
+  let config = { mcpServers: {} };
   for (const { config: loaded } of loadedSources) {
     if (!loaded) continue;
-    config = mergeConfigs(config, expandImports(loaded, cwd));
+    config = mergeConfigs(config, loaded);
   }
   if (isExclusiveConfigMode()) return config;
   const packageConfig = loadPackageMcpConfigs(cwd);
@@ -837,33 +489,232 @@ function loadMcpConfig(overridePath, cwd = process.cwd()) {
   );
   return mergeConfigs({ mcpServers: packageServers }, mergeConfigs(pluginConfig, config));
 }
-function getConfiguredHostConfigDiscovery(overridePath, cwd = process.cwd()) {
-  return getConfiguredHostConfigDiscoveryFromSources(loadConfigSources(overridePath, cwd));
+
+// src/extension/failure-backoff.ts
+var FAILURE_BACKOFF_MS = 60 * 1e3;
+function getFailureAgeSeconds(state, serverName) {
+  const failedAt = state.failureTracker.get(serverName);
+  if (!failedAt) return null;
+  const ageMs = Date.now() - failedAt;
+  if (ageMs > FAILURE_BACKOFF_MS) return null;
+  return Math.round(ageMs / 1e3);
 }
-function loadDiscoveredHostConfigs(cwd) {
-  let config = { mcpServers: {} };
-  for (const importKind of Object.keys(IMPORT_PATHS)) {
-    const imported = loadImportedConfig(importKind, cwd, `Failed to discover imported MCP config from ${importKind}:`);
-    if (!imported) continue;
-    config = mergeConfigs(config, {
-      mcpServers: extractServers(imported.value, importKind)
+function getFailureMessage(state, serverName) {
+  if (getFailureAgeSeconds(state, serverName) === null) return null;
+  return state.failureMessages?.get(serverName) ?? null;
+}
+function isServerInActiveFailureBackoff(state, serverName) {
+  const connection = state.manager.getConnection(serverName);
+  return connection?.status !== "connected" && connection?.status !== "needs-auth" && getFailureAgeSeconds(state, serverName) !== null;
+}
+
+// src/logger.ts
+var LEVEL_PRIORITY = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3
+};
+var LEVEL_PREFIX = {
+  debug: "[MCP-UI:DEBUG]",
+  info: "[MCP-UI]",
+  warn: "[MCP-UI:WARN]",
+  error: "[MCP-UI:ERROR]"
+};
+var Logger = class {
+  minLevel = "info";
+  handlers = [];
+  defaultContext = {};
+  setLevel(level) {
+    this.minLevel = level;
+  }
+  setDefaultContext(context) {
+    this.defaultContext = context;
+  }
+  addHandler(handler) {
+    this.handlers.push(handler);
+  }
+  clearHandlers() {
+    this.handlers = [];
+  }
+  shouldLog(level) {
+    return LEVEL_PRIORITY[level] >= LEVEL_PRIORITY[this.minLevel];
+  }
+  emit(level, message, context, error) {
+    if (!this.shouldLog(level)) return;
+    const entry = {
+      level,
+      message,
+      context: { ...this.defaultContext, ...context },
+      ...error !== void 0 ? { error } : {},
+      timestamp: /* @__PURE__ */ new Date()
+    };
+    const prefix = LEVEL_PREFIX[level];
+    const contextStr = formatContext(entry.context);
+    const fullMessage = contextStr ? `${prefix} ${message} ${contextStr}` : `${prefix} ${message}`;
+    if (level === "error") {
+      console.error(fullMessage, error ?? "");
+    } else if (level === "warn") {
+      console.warn(fullMessage);
+    } else if (level === "debug") {
+      console.debug(fullMessage);
+    } else {
+      console.log(fullMessage);
+    }
+    for (const handler of this.handlers) {
+      try {
+        handler(entry);
+      } catch {
+      }
+    }
+  }
+  debug(message, context) {
+    this.emit("debug", message, context);
+  }
+  info(message, context) {
+    this.emit("info", message, context);
+  }
+  warn(message, context) {
+    this.emit("warn", message, context);
+  }
+  error(message, error, context) {
+    this.emit("error", message, context, error);
+  }
+  /**
+   * Create a child logger with additional default context.
+   */
+  child(context) {
+    return new ChildLogger(this, context);
+  }
+};
+var ChildLogger = class _ChildLogger {
+  constructor(parent, context) {
+    this.parent = parent;
+    this.context = context;
+  }
+  parent;
+  context;
+  debug(message, context) {
+    this.parent.debug(message, { ...this.context, ...context });
+  }
+  info(message, context) {
+    this.parent.info(message, { ...this.context, ...context });
+  }
+  warn(message, context) {
+    this.parent.warn(message, { ...this.context, ...context });
+  }
+  error(message, error, context) {
+    this.parent.error(message, error, { ...this.context, ...context });
+  }
+  child(context) {
+    return new _ChildLogger(this.parent, { ...this.context, ...context });
+  }
+};
+function formatContext(context) {
+  if (!context || Object.keys(context).length === 0) return "";
+  const parts = [];
+  for (const [key, value] of Object.entries(context)) {
+    if (value !== void 0 && value !== null) {
+      parts.push(`${key}=${typeof value === "string" ? value : JSON.stringify(value)}`);
+    }
+  }
+  return parts.length > 0 ? `(${parts.join(", ")})` : "";
+}
+var logger = new Logger();
+if (process.env.MCP_UI_DEBUG === "1" || process.env.MCP_UI_DEBUG === "true") {
+  logger.setLevel("debug");
+}
+
+// src/contracts/status.ts
+var MCP_STATUS_EVENT = "pi-mcp-adapter/status/v1";
+var MCP_STATUS_SNAPSHOT_VERSION = 1;
+
+// src/extension/status.ts
+function createMcpStatusSnapshot(state) {
+  const servers = [];
+  let totalTools = 0;
+  let totalResources = 0;
+  let connectedCount = 0;
+  let disabledCount = 0;
+  for (const name of Object.keys(state.config.mcpServers)) {
+    const definition = state.config.mcpServers[name];
+    const disabled = definition?.disabled === true;
+    const connection = disabled ? void 0 : state.manager.getConnection(name);
+    const failedAgoSeconds = disabled ? null : getFailureAgeSeconds(state, name);
+    const activeFailure = !disabled && isServerInActiveFailureBackoff(state, name);
+    const metadata = disabled || activeFailure ? void 0 : state.toolMetadata.get(name);
+    const toolCount = metadata?.length ?? (connection?.status === "connected" ? connection.tools.length : 0);
+    const resourceCount = disabled || activeFailure ? void 0 : state.resourceCounts?.get(name) ?? (connection?.status === "connected" ? connection.resources.length : void 0);
+    let status = "not-connected";
+    if (disabled) {
+      status = "disabled";
+      disabledCount++;
+    } else if (connection?.status === "connected") {
+      status = "connected";
+      connectedCount++;
+    } else if (connection?.status === "needs-auth") {
+      status = "needs-auth";
+    } else if (activeFailure) {
+      status = "failed";
+    } else if (metadata !== void 0) {
+      status = "cached";
+    }
+    totalTools += disabled ? 0 : toolCount;
+    if (!disabled && resourceCount !== void 0) totalResources += resourceCount;
+    servers.push({
+      name,
+      status,
+      toolCount,
+      ...resourceCount !== void 0 ? { resourceCount } : {},
+      ...status === "failed" && failedAgoSeconds !== null ? { failedAgoSeconds } : {},
+      disabled
     });
   }
-  return config;
+  return {
+    version: MCP_STATUS_SNAPSHOT_VERSION,
+    servers,
+    totalTools,
+    totalResources,
+    connectedCount,
+    disabledCount
+  };
+}
+function publishMcpStatusSnapshot(state, snapshot) {
+  const events = state.statusEvents;
+  if (!events) return;
+  try {
+    events.emit(MCP_STATUS_EVENT, snapshot ?? createMcpStatusSnapshot(state));
+  } catch {
+  }
+}
+function publishMcpStatusShutdown(events) {
+  if (!events) return;
+  try {
+    events.emit(MCP_STATUS_EVENT, {
+      version: MCP_STATUS_SNAPSHOT_VERSION,
+      servers: [],
+      totalTools: 0,
+      totalResources: 0,
+      connectedCount: 0,
+      disabledCount: 0
+    });
+  } catch {
+  }
 }
 
 export {
   getAgentPluginSummaries,
-  parseJsonConfig,
-  loadImportedConfig,
-  readValidatedConfig,
-  extractServers,
-  mergeConfigs,
-  expandImports,
   loadConfigSources,
   getMergedSettingsFromSources,
-  getConfiguredHostConfigDiscoveryFromSources,
   cloneMcpConfig,
   loadMcpConfig,
-  getConfiguredHostConfigDiscovery
+  FAILURE_BACKOFF_MS,
+  getFailureAgeSeconds,
+  getFailureMessage,
+  isServerInActiveFailureBackoff,
+  logger,
+  MCP_STATUS_EVENT,
+  MCP_STATUS_SNAPSHOT_VERSION,
+  publishMcpStatusSnapshot,
+  publishMcpStatusShutdown
 };

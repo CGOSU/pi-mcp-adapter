@@ -113,7 +113,6 @@ import type { TextContent, ImageContent } from "@earendil-works/pi-ai";
 
 
 export type Transport = McpTransport;
-export type ImportKind = "cursor" | "claude-code" | "claude-desktop" | "codex" | "opencode" | "windsurf" | "vscode";
 type SdkTool = ListToolsResult["tools"][number];
 type SdkResource = ListResourcesResult["resources"][number];
 type SdkPrompt = ListPromptsResult["prompts"][number];
@@ -268,7 +267,6 @@ export interface McpOutputGuardSettings {
     detailsMaxBytes?: number;
 }
 export type ToolPrefix = "server" | "none" | "short" | "mcp";
-export type HostConfigDiscovery = "off" | "prompt" | "on";
 export type McpFooterStatus = "full" | "compact" | "off";
 export interface McpTraceSettings {
     /** Enable tracing for all servers unless a server sets trace to false. */
@@ -302,8 +300,6 @@ export interface McpSettings {
     mcpFooterStatus?: McpFooterStatus;
     /** Show successful startup connection notifications. Defaults to true. */
     notifyOnStartupConnect?: boolean;
-    /** Discover detected host-specific MCP configs only when explicitly enabled. */
-    hostConfigDiscovery?: HostConfigDiscovery;
     /** Agent Plugin package directories to load MCP servers from. */
     agentPluginPaths?: string[];
     idleTimeout?: number;
@@ -371,7 +367,6 @@ export interface McpSettings {
 }
 export interface McpConfig {
     mcpServers: Record<string, ServerEntry>;
-    imports?: ImportKind[];
     settings?: McpSettings;
 }
 export interface McpAdapterOptions {
@@ -409,8 +404,7 @@ export interface DirectToolSpec {
 }
 export interface ServerProvenance {
     path: string;
-    kind: "user" | "project" | "import";
-    importKind?: string;
+    kind: "user" | "project" | "shared";
 }
 export interface McpAuthResult {
     ok: boolean;

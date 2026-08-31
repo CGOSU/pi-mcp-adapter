@@ -61,14 +61,11 @@ function createAuthCallbacks(): McpPanelCallbacks {
 function createEmptyDiscovery(): McpDiscoverySummary {
   return {
     sources: [],
-    imports: [],
     hasAnyConfig: false,
     hasAnyDetectedPaths: false,
     hasSharedServers: false,
     hasPiOwnedServers: false,
     totalServerCount: 0,
-    hostConfigs: [],
-    hostConfigDiscovery: "off",
     conflicts: [],
     fingerprint: "test",
     repoPrompt: { configured: false },
@@ -78,11 +75,9 @@ function createEmptyDiscovery(): McpDiscoverySummary {
 function createSetupCallbacks(): SetupPanelCallbacks {
   const preview = { path: "/tmp/x", existed: false, changed: true, beforeText: "", afterText: "", diffText: "" };
   return {
-    previewImports: () => preview,
     previewStarterProject: () => preview,
     previewRepoPrompt: () => null,
     previewKnownServer: () => preview,
-    adoptImports: async () => ({ added: [], path: "/tmp/x" }),
     scaffoldProjectConfig: vi.fn(async () => ({ path: "/tmp/x" })),
     addRepoPrompt: async () => ({ path: "/tmp/x", serverName: "repoprompt" }),
     addKnownServer: async (preset) => ({ path: "/tmp/x", serverName: preset.name }),
@@ -311,7 +306,7 @@ describe("mcp-setup-panel custom keybindings", () => {
     const output = panel.render(100).join("\n");
 
     expect(output).toContain("Read order (later entries win):");
-    expect(output).toContain("0. detected host configs (opt-in lowest-precedence fallback)");
+    expect(output).not.toContain("detected host configs");
     expect(output).toContain("2. ~/.agents/mcp.json");
     expect(output).toContain("3. ~/.agents/mcp/mcp.json");
     expect(output).toContain("6. .pi/mcp.json");

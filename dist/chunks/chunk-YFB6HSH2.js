@@ -1,6 +1,6 @@
 import {
   formatTerminalError
-} from "./chunk-Z3P2QPCB.js";
+} from "./chunk-IOFHQSPP.js";
 
 // src/extension/owner.ts
 function createMcpRuntimeOwner() {

@@ -2,24 +2,23 @@ import {
   buildProxyDescription,
   prepareDirectToolArguments,
   resolveDirectTools
-} from "./chunks/chunk-I5MJPLKC.js";
+} from "./chunks/chunk-PXUZVBTU.js";
 import {
   MCP_STATUS_EVENT,
   MCP_STATUS_SNAPSHOT_VERSION,
+  cloneMcpConfig,
   isServerInActiveFailureBackoff,
+  loadMcpConfig,
   logger,
   publishMcpStatusShutdown
-} from "./chunks/chunk-3G7YTFA4.js";
+} from "./chunks/chunk-KLTV33HH.js";
 import {
   createMcpRuntimeOwner,
   createOwnedUi,
   isAbortError
-} from "./chunks/chunk-CYSFURUK.js";
-import {
-  cloneMcpConfig,
-  loadMcpConfig
-} from "./chunks/chunk-AZSKIV4J.js";
-import "./chunks/chunk-PI2QHUXN.js";
+} from "./chunks/chunk-YFB6HSH2.js";
+import "./chunks/chunk-YZ65OQRG.js";
+import "./chunks/chunk-KNN6K7BJ.js";
 import {
   createCachedToolSelectorCandidateIndex,
   createMetadataCatalogSnapshot,
@@ -33,15 +32,17 @@ import {
   reconstructPromptMetadata,
   resolveToolPrefix,
   resourceNameToToolName
-} from "./chunks/chunk-NBQZZ3IQ.js";
+} from "./chunks/chunk-PXMBC3S7.js";
 import {
-  MCP_TOOL_APPROVAL_REQUEST_EVENT,
   formatTerminalError,
   getConfigPathFromArgv,
-  isServerDisabled,
   normalizeDirectToolInputSchema,
   truncateAtWord
-} from "./chunks/chunk-Z3P2QPCB.js";
+} from "./chunks/chunk-IOFHQSPP.js";
+import {
+  MCP_TOOL_APPROVAL_REQUEST_EVENT,
+  isServerDisabled
+} from "./chunks/chunk-LVZ7J2NB.js";
 import "./chunks/chunk-ELOBWFRH.js";
 
 // src/extension/install.ts
@@ -247,7 +248,7 @@ function createPromptCommand(pi, getState, metadata, ensureState) {
         }
         return;
       }
-      const { lazyConnect } = await import("./chunks/initialization-QWDGRTUG.js");
+      const { lazyConnect } = await import("./chunks/initialization-DPUM6PRB.js");
       const connected = await lazyConnect(state, metadata.serverName, ctx.signal);
       if (!connected) {
         if (ctx.hasUI) {
@@ -938,7 +939,7 @@ function namespaceExecute(getState, ensureState, getInitPromise, serverName, get
         details: { error: "not_initialized", server: serverName }
       };
     }
-    const { executeCall } = await import("./chunks/call-LROLQ6X4.js");
+    const { executeCall } = await import("./chunks/call-RJXVQCCY.js");
     return executeCall(
       state,
       params.tool,
@@ -1311,13 +1312,13 @@ function installMcpAdapter(pi, options) {
   let mcpCodeModulePromise = null;
   let directToolsModulePromise = null;
   let configWriteModulePromise = null;
-  const loadInitModule = () => initModulePromise ??= import("./chunks/initialization-QWDGRTUG.js");
-  const loadOAuthFlowModule = () => oauthFlowModulePromise ??= import("./chunks/mcp-auth-flow-XTCYFOQW.js");
-  const loadCommandsModule = () => commandsModulePromise ??= import("./chunks/handlers-2TLR4YXN.js");
-  const loadProxyModesModule = () => proxyModesModulePromise ??= import("./chunks/dispatcher-7XHUVNIJ.js");
-  const loadMcpCodeModule = () => mcpCodeModulePromise ??= import("./chunks/mcp-code-N3URALK3.js");
-  const loadDirectToolsModule = () => directToolsModulePromise ??= import("./chunks/direct-tools-XOJR7Z3Z.js");
-  const loadConfigWriteModule = () => configWriteModulePromise ??= import("./chunks/write-V2O5KVWN.js");
+  const loadInitModule = () => initModulePromise ??= import("./chunks/initialization-DPUM6PRB.js");
+  const loadOAuthFlowModule = () => oauthFlowModulePromise ??= import("./chunks/mcp-auth-flow-KEEFYRTZ.js");
+  const loadCommandsModule = () => commandsModulePromise ??= import("./chunks/handlers-CTGIQBO5.js");
+  const loadProxyModesModule = () => proxyModesModulePromise ??= import("./chunks/dispatcher-APOMLX4C.js");
+  const loadMcpCodeModule = () => mcpCodeModulePromise ??= import("./chunks/mcp-code-CHB3DHQL.js");
+  const loadDirectToolsModule = () => directToolsModulePromise ??= import("./chunks/direct-tools-47DPQVO7.js");
+  const loadConfigWriteModule = () => configWriteModulePromise ??= import("./chunks/write-MXRHDQM4.js");
   function retainInitFailure(error) {
     const message = truncateAtWord(formatTerminalError(error), INIT_FAILURE_MESSAGE_MAX_CHARS);
     retainedInitFailure = message;

@@ -1,24 +1,20 @@
 import {
   buildStarterProjectConfig,
-  ensureCompatibilityImports,
   getServerProvenance,
-  previewCompatibilityImports,
   previewSharedServerEntry,
   previewStarterProjectConfig,
   writeDirectToolsConfig,
   writeProjectServerDisabledOverride,
   writeSharedServerEntry,
   writeStarterProjectConfig
-} from "./chunk-EGE437IA.js";
-import "./chunk-AZSKIV4J.js";
-import "./chunk-PI2QHUXN.js";
-import "./chunk-Z3P2QPCB.js";
+} from "./chunk-LV4WSIE6.js";
+import "./chunk-YZ65OQRG.js";
+import "./chunk-KNN6K7BJ.js";
+import "./chunk-LVZ7J2NB.js";
 import "./chunk-ELOBWFRH.js";
 export {
   buildStarterProjectConfig,
-  ensureCompatibilityImports,
   getServerProvenance,
-  previewCompatibilityImports,
   previewSharedServerEntry,
   previewStarterProjectConfig,
   writeDirectToolsConfig,

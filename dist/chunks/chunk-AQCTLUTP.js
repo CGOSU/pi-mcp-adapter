@@ -7,18 +7,18 @@ import {
   getVisualizationStreamEnvelope,
   withSessionRecovery,
   wrapError
-} from "./chunk-NBJ35UZ7.js";
+} from "./chunk-ZKXUDEBO.js";
 import {
   logger
-} from "./chunk-3G7YTFA4.js";
+} from "./chunk-KLTV33HH.js";
 import {
   abortable,
   throwIfAborted
-} from "./chunk-XNQOPVY5.js";
+} from "./chunk-LETXAJ4X.js";
 import {
   combineAbortSignals,
   isAbortError
-} from "./chunk-CYSFURUK.js";
+} from "./chunk-YFB6HSH2.js";
 import {
   buildAllowAttribute,
   extractUiToolVisibility,
@@ -28,14 +28,16 @@ import {
   matchesToolPattern,
   resolveToolPrefix,
   resourceNameToToolName
-} from "./chunk-NBQZZ3IQ.js";
+} from "./chunk-PXMBC3S7.js";
 import {
-  MCP_TOOL_APPROVAL_REQUEST_EVENT,
   formatAuthRequiredMessage,
-  isServerDisabled,
   normalizeToolArguments,
   sanitizeTerminalText
-} from "./chunk-Z3P2QPCB.js";
+} from "./chunk-IOFHQSPP.js";
+import {
+  MCP_TOOL_APPROVAL_REQUEST_EVENT,
+  isServerDisabled
+} from "./chunk-LVZ7J2NB.js";
 
 // src/tools/mcp-output-guard.ts
 import { randomBytes } from "node:crypto";

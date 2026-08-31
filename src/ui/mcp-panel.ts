@@ -131,8 +131,6 @@ interface ToolState {
 interface ServerState {
   name: string;
   expanded: boolean;
-  source: "user" | "project" | "import";
-  importKind?: string;
   includeTools?: string[];
   excludeTools?: string[];
   exposeResources: boolean;
@@ -161,7 +159,6 @@ class McpPanel {
   private dirty = false;
   private confirmingDiscard = false;
   private discardSelected = 1;
-  private importNotice: string | null = null;
   private authNotice: string | null = null;
   private authInFlight: string | null = null;
   private inactivityTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -255,8 +252,6 @@ class McpPanel {
       this.servers.push({
         name: serverName,
         expanded: false,
-        source: prov?.kind ?? "user",
-        ...(prov?.importKind !== undefined ? { importKind: prov.importKind } : {}),
         ...(definition.includeTools !== undefined ? { includeTools: definition.includeTools } : {}),
         ...(definition.excludeTools !== undefined ? { excludeTools: definition.excludeTools } : {}),
         exposeResources: definition.exposeResources !== false,
@@ -358,7 +353,6 @@ class McpPanel {
 
   handleInput(data: string): void {
     this.resetInactivityTimeout();
-    this.importNotice = null;
     if (!this.authInFlight) this.authNotice = null;
 
     if (this.confirmingDiscard) {
@@ -457,9 +451,6 @@ class McpPanel {
         const tool = server.tools[item.toolIndex];
         if (!tool) return;
         this.toggleToolDirect(server, tool);
-        if (tool.isDirect && server.source === "import") {
-          this.importNotice = `Imported from ${sanitizeDisplayText(server.importKind ?? "external")} — will copy to user config on save`;
-        }
         this.updateDirty();
       }
       return;
@@ -604,9 +595,6 @@ class McpPanel {
     if (!server) return;
     if (item.type === "server") {
       const newState = !server.tools.every((t) => t.isDirect);
-      if (server.source === "import" && newState) {
-        this.importNotice = `Imported from ${sanitizeDisplayText(server.importKind ?? "external")} — will copy to user config on save`;
-      }
       let directTokens = 0;
       for (const tool of server.tools) {
         tool.isDirect = newState;
@@ -618,9 +606,6 @@ class McpPanel {
       const tool = server.tools[item.toolIndex];
       if (!tool) return;
       this.toggleToolDirect(server, tool);
-      if (tool.isDirect && server.source === "import") {
-        this.importNotice = `Imported from ${sanitizeDisplayText(server.importKind ?? "external")} — will copy to user config on save`;
-      }
     }
     this.updateDirty();
   }
@@ -832,10 +817,6 @@ class McpPanel {
         lines.push(emptyRow());
       }
 
-      if (this.importNotice) {
-        lines.push(row(fg(t.needsAuth, italic(sanitizeDisplayText(this.importNotice)))));
-        lines.push(emptyRow());
-      }
       if (this.authNotice) {
         lines.push(row(fg(t.needsAuth, italic(sanitizeDisplayText(this.authNotice)))));
         lines.push(emptyRow());
@@ -923,13 +904,11 @@ class McpPanel {
     const prefix = isCursor ? fg(t.selected, expandIcon) : fg(t.border, server.expanded ? expandIcon : "·");
 
     const serverName = sanitizeDisplayText(server.name);
-    const importKind = sanitizeDisplayText(server.importKind ?? "import");
     const nameStr = isCursor ? bold(fg(t.selected, serverName)) : serverName;
-    const importLabel = server.source === "import" ? fg(t.description, ` (${importKind})`) : "";
     const statusLabel = this.renderConnectionStatus(server);
 
     if (!server.hasCachedData && !this.authOnly) {
-      return `${prefix}   ${nameStr}${importLabel}  ${fg(t.description, "(not cached)")}${statusLabel}`;
+      return `${prefix}   ${nameStr}  ${fg(t.description, "(not cached)")}${statusLabel}`;
     }
 
     const directCount = server.directCount;
@@ -950,7 +929,7 @@ class McpPanel {
       toolInfo = fg(t.description, toolInfo);
     }
 
-    return `${prefix} ${toggleIcon} ${nameStr}${importLabel}  ${toolInfo}${statusLabel}`;
+    return `${prefix} ${toggleIcon} ${nameStr}  ${toolInfo}${statusLabel}`;
   }
 
   private selectedServerHasFailureMessage(): boolean {

@@ -32,9 +32,9 @@
 
 ## 未完成与交付边界
 
-- 本次源码、测试、文档和 tracked `dist` 改动已提交；未执行 `git push`。
+- 本次源码、测试和文档改动仍在工作区，未执行 git commit 或 push；tracked `dist` 由 `npm run build:public` 同步。
 - `AGENTS.md` 与 `docs/clean-code.md` 是刻意保留的未跟踪排除项，不纳入本次交付。
 
 ## 最近一次更新
 
-- 2026-08-23：完成领域源码/测试布局、公共发布同步、同机 A/B 性能、catalog/search 压力与 production-only 安装回归；保留 Windows benchmark 与测试限制的真实结果。
+- 2026-08-31：删除宿主专属 MCP 配置探测、兼容 imports、setup 采用流程和 CLI `init`；遗留字段被忽略，标准配置层与 token CLI 保留。已完成 typecheck、定向 UI/命令/CLI 测试和 CLI 删除命令验证；发布构建与 package/public export 验证见 [`docs/session-log.md`](session-log.md)。

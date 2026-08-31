@@ -1,6 +1,6 @@
 // Public configuration contracts shared by config domains.
 import type { AgentPluginSummary } from "./agent-plugin-loader.ts";
-import type { HostConfigDiscovery, ImportKind, McpConfig, ServerEntry } from "../contracts/core.js";
+import type { McpConfig, ServerEntry } from "../contracts/core.js";
 
 export interface KnownServerPreset {
   id: string;
@@ -47,8 +47,7 @@ export interface ConfigSourceSpec {
   label: string;
   readPath: string;
   writePath: string;
-  kind: "user" | "project" | "import";
-  importKind?: string;
+  kind: "user" | "project" | "shared";
   shared: boolean;
   scope: "global" | "project";
 }
@@ -59,11 +58,6 @@ export interface ConfigDiscoveryPath {
   exists: boolean;
 }
 
-export interface DiscoveredImportConfig {
-  kind: ImportKind;
-  path: string;
-}
-
 export interface ConfigDiscoverySource extends ConfigDiscoveryPath {
   id: ConfigSourceSpec["id"];
   scope: ConfigSourceSpec["scope"];
@@ -71,18 +65,10 @@ export interface ConfigDiscoverySource extends ConfigDiscoveryPath {
   serverCount: number;
 }
 
-export interface ImportConfigSummary extends DiscoveredImportConfig {
-  serverCount: number;
-}
-
-export interface HostConfigSummary extends ImportConfigSummary {
-  active: boolean;
-}
-
 export interface McpConfigConflict {
   serverName: string;
-  sources: Array<{ kind: "shared" | "pi" | "host"; path: string }>;
-  winner: { kind: "shared" | "pi" | "host"; path: string };
+  sources: Array<{ kind: "shared" | "pi"; path: string }>;
+  winner: { kind: "shared" | "pi"; path: string };
 }
 
 export interface RepoPromptDiscovery {
@@ -96,9 +82,6 @@ export interface RepoPromptDiscovery {
 
 export interface McpDiscoverySummary {
   sources: ConfigDiscoverySource[];
-  imports: ImportConfigSummary[];
-  hostConfigs: HostConfigSummary[];
-  hostConfigDiscovery: HostConfigDiscovery;
   agentPlugins: AgentPluginSummary[];
   conflicts: McpConfigConflict[];
   hasAnyConfig: boolean;

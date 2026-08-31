@@ -8,58 +8,53 @@ import {
   removeBearerToken,
   updateMetadataCache,
   updateStatusBar
-} from "./chunk-NBJ35UZ7.js";
+} from "./chunk-ZKXUDEBO.js";
 import {
+  getAgentPluginSummaries,
   getFailureAgeSeconds,
   getFailureMessage,
-  isServerInActiveFailureBackoff
-} from "./chunk-3G7YTFA4.js";
+  getMergedSettingsFromSources,
+  isServerInActiveFailureBackoff,
+  loadConfigSources
+} from "./chunk-KLTV33HH.js";
 import {
   authenticate,
   getAuthStorageOptions,
   inspectAuthForUrl,
   removeAuth,
   supportsOAuth
-} from "./chunk-XNQOPVY5.js";
+} from "./chunk-LETXAJ4X.js";
 import {
   isAbortError
-} from "./chunk-CYSFURUK.js";
+} from "./chunk-YFB6HSH2.js";
 import {
-  ensureCompatibilityImports,
   getServerProvenance,
-  previewCompatibilityImports,
   previewSharedServerEntry,
   previewStarterProjectConfig,
   writeDirectToolsConfig,
   writeSharedServerEntry,
   writeStarterProjectConfig
-} from "./chunk-EGE437IA.js";
-import {
-  extractServers,
-  getAgentPluginSummaries,
-  getConfiguredHostConfigDiscoveryFromSources,
-  getMergedSettingsFromSources,
-  loadConfigSources,
-  loadImportedConfig
-} from "./chunk-AZSKIV4J.js";
+} from "./chunk-LV4WSIE6.js";
+import "./chunk-YZ65OQRG.js";
 import {
   GENERIC_GLOBAL_CONFIG_PATH,
-  IMPORT_PATHS,
   PROJECT_CONFIG_NAME,
   REPOPROMPT_BINARY_CANDIDATES,
   getProjectConfigPath,
   isExclusiveConfigMode
-} from "./chunk-PI2QHUXN.js";
+} from "./chunk-KNN6K7BJ.js";
 import {
   loadMetadataCache,
   reconstructPromptMetadata
-} from "./chunk-NBQZZ3IQ.js";
+} from "./chunk-PXMBC3S7.js";
 import {
-  isServerDisabled,
   openPath,
   resolveServerUrl,
   sanitizeTerminalText
-} from "./chunk-Z3P2QPCB.js";
+} from "./chunk-IOFHQSPP.js";
+import {
+  isServerDisabled
+} from "./chunk-LVZ7J2NB.js";
 import {
   getAgentPath
 } from "./chunk-ELOBWFRH.js";
@@ -86,86 +81,47 @@ function getMcpStandardConfigSummary(overridePath, cwd = process.cwd()) {
     fingerprint: JSON.stringify({ sources: sources.map((source) => [source.id, source.exists, source.serverCount]) })
   };
 }
-function getMcpDiscoverySummary(overridePath, cwd = process.cwd(), options = {}) {
+function getMcpDiscoverySummary(overridePath, cwd = process.cwd()) {
   const loadedSources = loadConfigSources(overridePath, cwd);
   const sources = getConfigSourceSummaries(loadedSources);
-  const includeHostConfigs = options.includeHostConfigs !== false;
-  const importedConfigs = /* @__PURE__ */ new Map();
-  const getImportedConfig = (kind, warningPrefix) => {
-    if (!importedConfigs.has(kind)) importedConfigs.set(kind, loadImportedConfig(kind, cwd, warningPrefix));
-    return importedConfigs.get(kind) ?? null;
-  };
-  const importKinds = isExclusiveConfigMode() ? loadedSources[0]?.config?.imports ?? [] : Object.keys(IMPORT_PATHS);
-  const imports = includeHostConfigs ? importKinds.map((kind) => {
-    const imported = getImportedConfig(kind, `Failed to inspect imported MCP config from ${kind}:`);
-    if (!imported) return null;
-    return {
-      kind,
-      path: imported.path,
-      serverCount: Object.keys(extractServers(imported.value, kind)).length
-    };
-  }).filter((value) => value !== null) : [];
-  const hostConfigDiscovery = isExclusiveConfigMode() ? "off" : getConfiguredHostConfigDiscoveryFromSources(loadedSources);
-  const hostConfigs = imports.map((entry) => ({ ...entry, active: hostConfigDiscovery === "on" }));
   const settings = getMergedSettingsFromSources(loadedSources);
   const agentPlugins = isExclusiveConfigMode() ? [] : getAgentPluginSummaries(settings?.agentPluginPaths, cwd);
+  const conflicts = getConfigConflicts(loadedSources);
   const totalServerCount = sources.reduce((sum, source) => sum + source.serverCount, 0) + agentPlugins.reduce((sum, plugin) => sum + plugin.serverCount, 0);
   const hasSharedServers = sources.some((source) => source.kind === "shared" && source.serverCount > 0) || agentPlugins.some((plugin) => plugin.serverCount > 0);
   const hasPiOwnedServers = sources.some((source) => source.kind === "pi" && source.serverCount > 0);
-  const hasAnyDetectedPaths = sources.some((source) => source.exists) || imports.length > 0 || agentPlugins.length > 0;
-  const hasAnyConfig = totalServerCount > 0 || imports.some((entry) => entry.serverCount > 0) || hasAnyDetectedPaths;
+  const hasAnyDetectedPaths = sources.some((source) => source.exists) || agentPlugins.length > 0;
+  const hasAnyConfig = totalServerCount > 0 || hasAnyDetectedPaths;
   const summaryWithoutRepoPrompt = {
     sources,
-    imports,
-    hostConfigs,
-    hostConfigDiscovery,
     agentPlugins,
-    conflicts: getConfigConflicts(loadedSources, imports, cwd, getImportedConfig),
+    conflicts,
     hasAnyConfig,
     hasAnyDetectedPaths,
     hasSharedServers,
     hasPiOwnedServers,
     totalServerCount
   };
-  const fingerprint = JSON.stringify({
-    sources: sources.map((source) => [source.id, source.exists, source.serverCount]),
-    imports: imports.map((entry) => [entry.kind, entry.path, entry.serverCount]),
-    agentPlugins: agentPlugins.map((entry) => [entry.path, entry.name, entry.serverCount]),
-    hostConfigDiscovery,
-    conflicts: summaryWithoutRepoPrompt.conflicts
-  });
   return {
     ...summaryWithoutRepoPrompt,
-    fingerprint,
+    fingerprint: JSON.stringify({
+      sources: sources.map((source) => [source.id, source.exists, source.serverCount]),
+      agentPlugins: agentPlugins.map((entry) => [entry.path, entry.name, entry.serverCount]),
+      conflicts
+    }),
     repoPrompt: detectRepoPrompt(summaryWithoutRepoPrompt, cwd, loadedSources)
   };
 }
-function getConfigConflicts(loadedSources, imports, cwd, getImportedConfig) {
+function getConfigConflicts(loadedSources) {
   const seen = /* @__PURE__ */ new Map();
   const record = (name, source) => {
     const entries = seen.get(name) ?? [];
     if (!entries.some((entry) => entry.kind === source.kind && entry.path === source.path)) entries.push(source);
     seen.set(name, entries);
   };
-  for (const entry of imports) {
-    const imported = getImportedConfig(entry.kind, `Failed to inspect imported MCP config from ${entry.kind}:`);
-    if (!imported) continue;
-    for (const name of Object.keys(extractServers(imported.value, entry.kind))) {
-      record(name, { kind: "host", path: imported.path });
-    }
-  }
-  for (const { source, config: loaded } of loadedSources) {
-    if (!loaded) continue;
-    if (loaded.imports?.length) {
-      for (const importKind of loaded.imports) {
-        const imported = getImportedConfig(importKind, `Failed to inspect imported MCP config from ${importKind}:`);
-        if (!imported) continue;
-        for (const name of Object.keys(extractServers(imported.value, importKind))) {
-          record(name, { kind: "host", path: imported.path });
-        }
-      }
-    }
-    for (const name of Object.keys(loaded.mcpServers)) {
+  for (const { source, config } of loadedSources) {
+    if (!config) continue;
+    for (const name of Object.keys(config.mcpServers)) {
       record(name, {
         kind: source.shared ? "shared" : "pi",
         path: source.readPath
@@ -332,7 +288,7 @@ async function showStatus(state, ctx) {
   }
   if (Object.keys(state.config.mcpServers).length === 0) {
     lines.push("No MCP servers configured");
-    lines.push("Run /mcp setup to adopt imports or scaffold a starter .mcp.json");
+    lines.push("Run /mcp setup to inspect standard configs or scaffold a starter .mcp.json");
   }
   ctx.ui.notify(lines.join("\n"), "info");
 }
@@ -629,12 +585,12 @@ function buildSharedConfigNoticeLines(configOverridePath, cwd) {
   return {
     lines: [
       `Using standard MCP config from ${sourceList}.`,
-      "Pi only writes compatibility imports and adapter-specific overrides into Pi-owned files when needed."
+      "Pi writes adapter-specific overrides into Pi-owned files when needed."
     ],
     fingerprint: discovery.fingerprint
   };
 }
-async function openMcpSetup(state, pi, ctx, configOverridePath, mode = "setup", options = {}) {
+async function openMcpSetup(state, pi, ctx, configOverridePath, mode = "setup") {
   if (!ctx.hasUI) return { configChanged: false };
   if (!canRenderPanel(ctx)) {
     ctx.ui.notify(`The interactive MCP setup panel is only available in the terminal UI (current mode: ${ctx.mode}). Edit .mcp.json directly, or run /mcp status to review servers.`, "info");
@@ -644,31 +600,25 @@ async function openMcpSetup(state, pi, ctx, configOverridePath, mode = "setup", 
     ctx.ui.notify("MCP setup is unavailable when config is supplied by createMcpAdapter().", "info");
     return { configChanged: false };
   }
-  const discovery = getMcpDiscoverySummary(configOverridePath, ctx.cwd, options);
+  const discovery = getMcpDiscoverySummary(configOverridePath, ctx.cwd);
   const onboardingState = loadOnboardingState();
-  const { createMcpSetupPanel } = await import("./mcp-setup-panel-D3LDYR25.js");
+  const { createMcpSetupPanel } = await import("./mcp-setup-panel-L764HLBR.js");
   let configChanged = false;
   const callbacks = {
-    previewImports: (imports) => previewCompatibilityImports(imports, configOverridePath),
     previewStarterProject: () => previewStarterProjectConfig(ctx.cwd),
     previewRepoPrompt: () => {
-      const repoPrompt = getMcpDiscoverySummary(configOverridePath, ctx.cwd, options).repoPrompt;
+      const repoPrompt = getMcpDiscoverySummary(configOverridePath, ctx.cwd).repoPrompt;
       if (!repoPrompt.entry || !repoPrompt.targetPath || !repoPrompt.serverName) return null;
       return previewSharedServerEntry(repoPrompt.targetPath, repoPrompt.serverName, repoPrompt.entry);
     },
     previewKnownServer: (preset) => previewSharedServerEntry(getProjectConfigPath(ctx.cwd), preset.id, preset.entry),
-    adoptImports: async (imports) => {
-      const result = ensureCompatibilityImports(imports, configOverridePath);
-      if (result.added.length > 0) configChanged = true;
-      return result;
-    },
     scaffoldProjectConfig: async () => {
       const path = writeStarterProjectConfig(ctx.cwd);
       configChanged = true;
       return { path };
     },
     addRepoPrompt: async () => {
-      const repoPrompt = getMcpDiscoverySummary(configOverridePath, ctx.cwd, options).repoPrompt;
+      const repoPrompt = getMcpDiscoverySummary(configOverridePath, ctx.cwd).repoPrompt;
       if (!repoPrompt.entry || !repoPrompt.targetPath || !repoPrompt.serverName) {
         throw new Error("RepoPrompt is not available to add from this setup screen.");
       }
@@ -764,7 +714,7 @@ async function openMcpPanel(state, pi, ctx, configOverridePath, onDirectToolsCon
     return { configChanged: false };
   }
   if (Object.keys(state.config.mcpServers).length === 0) {
-    return openMcpSetup(state, pi, ctx, configOverridePath, "empty", { includeHostConfigs: false });
+    return openMcpSetup(state, pi, ctx, configOverridePath, "empty");
   }
   const config = state.config;
   const cache = loadMetadataCache();
@@ -773,7 +723,7 @@ async function openMcpPanel(state, pi, ctx, configOverridePath, onDirectToolsCon
   const { lines: noticeLines, fingerprint } = buildSharedConfigNoticeLines(configPath, ctx.cwd);
   let overlayHandle;
   const callbacks = buildMcpPanelCallbacks(state, config, ctx, () => overlayHandle);
-  const { createMcpPanel } = await import("./mcp-panel-4XPFQWFJ.js");
+  const { createMcpPanel } = await import("./mcp-panel-KEQV2AYY.js");
   let configChanged = false;
   await new Promise((resolve2) => {
     ctx.ui.custom(
@@ -833,7 +783,7 @@ async function openMcpAuthPanel(state, pi, ctx, configOverridePath) {
   const provenanceMap = getServerProvenance(configPath, ctx.cwd);
   let overlayHandle;
   const callbacks = buildMcpPanelCallbacks(state, config, ctx, () => overlayHandle);
-  const { createMcpPanel } = await import("./mcp-panel-4XPFQWFJ.js");
+  const { createMcpPanel } = await import("./mcp-panel-KEQV2AYY.js");
   await new Promise((resolve2) => {
     ctx.ui.custom(
       (tui, _theme, keybindings, done) => {

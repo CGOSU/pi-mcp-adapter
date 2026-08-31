@@ -7,34 +7,36 @@ import {
   executeList,
   executeSearch,
   formatManualAuthInstructions
-} from "./chunk-YX6YYFGP.js";
+} from "./chunk-ZSWU6NM7.js";
 import {
   parseUiPromptHandoff
-} from "./chunk-RZDPR4KU.js";
+} from "./chunk-AQCTLUTP.js";
 import {
   clearFailure,
   updateStatusBar
-} from "./chunk-NBJ35UZ7.js";
+} from "./chunk-ZKXUDEBO.js";
 import {
   getFailureAgeSeconds
-} from "./chunk-3G7YTFA4.js";
+} from "./chunk-KLTV33HH.js";
 import {
   completeAuthFromInput,
   startAuth,
   supportsOAuth,
   throwIfAborted
-} from "./chunk-XNQOPVY5.js";
+} from "./chunk-LETXAJ4X.js";
 import {
   combineAbortSignals
-} from "./chunk-CYSFURUK.js";
+} from "./chunk-YFB6HSH2.js";
 import "./chunk-QEVIMIQ3.js";
-import "./chunk-AZSKIV4J.js";
-import "./chunk-PI2QHUXN.js";
-import "./chunk-NBQZZ3IQ.js";
+import "./chunk-YZ65OQRG.js";
+import "./chunk-KNN6K7BJ.js";
+import "./chunk-PXMBC3S7.js";
 import {
-  isServerDisabled,
   resolveServerUrl
-} from "./chunk-Z3P2QPCB.js";
+} from "./chunk-IOFHQSPP.js";
+import {
+  isServerDisabled
+} from "./chunk-LVZ7J2NB.js";
 import "./chunk-ELOBWFRH.js";
 
 // src/tools/proxy/ui-messages.ts

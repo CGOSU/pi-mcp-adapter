@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `npm run benchmark:startup` to compare an isolated baseline with cold and cached extension startup timings.
 
 ### Changed
+- Removed host-specific MCP configuration discovery, compatibility imports, and the `pi-mcp-adapter init` helper. Legacy `imports` and `settings.hostConfigDiscovery` fields are ignored; `/mcp setup` now handles only standard MCP paths, Pi overrides, scaffolding, known servers, RepoPrompt, and path inspection. Removed the unused TOML parser dependency.
 - Reduced Pi extension import work by keeping cached metadata, schemas, and registration on the startup path while dynamically loading MCP connection and execution runtime modules. A valid all-lazy metadata cache now defers that runtime import and connection until first MCP use; eager, keep-alive, and cold-cache behavior still initializes as before.
 - Reorganized implementation into `src/contracts`, `src/catalog`, `src/config`, `src/runtime`, `src/auth`, `src/tools`, `src/ui`, `src/commands`, and `src/extension`; removed 53 unpublished root forwarding facades while retaining the five public source entry files.
 - Reorganized tests into `test/unit`, `test/integration`, `test/node`, and `test/fixtures`; package manifests and runners now keep test assets outside the published tarball.

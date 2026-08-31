@@ -1,26 +1,11 @@
-// Optional host discovery, diagnostics, and RepoPrompt suggestions.
+// Configuration source diagnostics and RepoPrompt suggestions.
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { getAgentPluginSummaries } from "./agent-plugin-loader.ts";
-import { GENERIC_GLOBAL_CONFIG_PATH, IMPORT_PATHS, PROJECT_CONFIG_NAME, REPOPROMPT_BINARY_CANDIDATES, isExclusiveConfigMode } from "./paths.js";
-import { getConfiguredHostConfigDiscoveryFromSources, getMergedSettingsFromSources, loadConfigSources, type LoadedConfigSource } from "./load.js";
-import { extractServers, loadImportedConfig, resolveImportPath } from "./read.js";
-import type { ConfigDiscoverySource, DiscoveredImportConfig, ImportConfigSummary, McpConfigConflict, McpDiscoverySummary, McpStandardConfigSummary, RepoPromptDiscovery } from "./contracts.js";
-import type { ImportKind, ServerEntry } from "../contracts/core.js";
-
-export function findAvailableImportConfigs(cwd = process.cwd()): DiscoveredImportConfig[] {
-  if (isExclusiveConfigMode()) return [];
-  const discovered: DiscoveredImportConfig[] = [];
-
-  for (const importKind of Object.keys(IMPORT_PATHS) as ImportKind[]) {
-    const importPath = resolveImportPath(importKind, cwd);
-    if (importPath) {
-      discovered.push({ kind: importKind, path: importPath });
-    }
-  }
-
-  return discovered;
-}
+import { GENERIC_GLOBAL_CONFIG_PATH, PROJECT_CONFIG_NAME, REPOPROMPT_BINARY_CANDIDATES, isExclusiveConfigMode } from "./paths.js";
+import { getMergedSettingsFromSources, loadConfigSources, type LoadedConfigSource } from "./load.js";
+import type { ConfigDiscoverySource, McpConfigConflict, McpDiscoverySummary, McpStandardConfigSummary, RepoPromptDiscovery } from "./contracts.js";
+import type { ServerEntry } from "../contracts/core.js";
 
 function getConfigSourceSummaries(loadedSources: readonly LoadedConfigSource[]): ConfigDiscoverySource[] {
   return loadedSources.map(({ source, config }) => ({
@@ -43,57 +28,26 @@ export function getMcpStandardConfigSummary(overridePath?: string, cwd = process
   };
 }
 
-export function getMcpDiscoverySummary(
-  overridePath?: string,
-  cwd = process.cwd(),
-  options: { includeHostConfigs?: boolean } = {},
-): McpDiscoverySummary {
+export function getMcpDiscoverySummary(overridePath?: string, cwd = process.cwd()): McpDiscoverySummary {
   const loadedSources = loadConfigSources(overridePath, cwd);
   const sources = getConfigSourceSummaries(loadedSources);
-  const includeHostConfigs = options.includeHostConfigs !== false;
-  const importedConfigs = new Map<ImportKind, { path: string; value: unknown } | null>();
-  const getImportedConfig = (kind: ImportKind, warningPrefix: string): { path: string; value: unknown } | null => {
-    if (!importedConfigs.has(kind)) importedConfigs.set(kind, loadImportedConfig(kind, cwd, warningPrefix));
-    return importedConfigs.get(kind) ?? null;
-  };
-
-  const importKinds = isExclusiveConfigMode()
-    ? (loadedSources[0]?.config?.imports ?? [])
-    : (Object.keys(IMPORT_PATHS) as ImportKind[]);
-  const imports = includeHostConfigs
-    ? importKinds
-      .map((kind) => {
-        const imported = getImportedConfig(kind, `Failed to inspect imported MCP config from ${kind}:`);
-        if (!imported) return null;
-        return {
-          kind,
-          path: imported.path,
-          serverCount: Object.keys(extractServers(imported.value, kind)).length,
-        } satisfies ImportConfigSummary;
-      })
-      .filter((value): value is ImportConfigSummary => value !== null)
-    : [];
-  const hostConfigDiscovery = isExclusiveConfigMode()
-    ? "off"
-    : getConfiguredHostConfigDiscoveryFromSources(loadedSources);
-  const hostConfigs = imports.map((entry) => ({ ...entry, active: hostConfigDiscovery === "on" }));
   const settings = getMergedSettingsFromSources(loadedSources);
   const agentPlugins = isExclusiveConfigMode()
     ? []
     : getAgentPluginSummaries(settings?.agentPluginPaths, cwd);
-  const totalServerCount = sources.reduce((sum, source) => sum + source.serverCount, 0) + agentPlugins.reduce((sum, plugin) => sum + plugin.serverCount, 0);
-  const hasSharedServers = sources.some((source) => source.kind === "shared" && source.serverCount > 0) || agentPlugins.some(plugin => plugin.serverCount > 0);
+  const conflicts = getConfigConflicts(loadedSources);
+  const totalServerCount = sources.reduce((sum, source) => sum + source.serverCount, 0)
+    + agentPlugins.reduce((sum, plugin) => sum + plugin.serverCount, 0);
+  const hasSharedServers = sources.some((source) => source.kind === "shared" && source.serverCount > 0)
+    || agentPlugins.some((plugin) => plugin.serverCount > 0);
   const hasPiOwnedServers = sources.some((source) => source.kind === "pi" && source.serverCount > 0);
-  const hasAnyDetectedPaths = sources.some((source) => source.exists) || imports.length > 0 || agentPlugins.length > 0;
-  const hasAnyConfig = totalServerCount > 0 || imports.some((entry) => entry.serverCount > 0) || hasAnyDetectedPaths;
+  const hasAnyDetectedPaths = sources.some((source) => source.exists) || agentPlugins.length > 0;
+  const hasAnyConfig = totalServerCount > 0 || hasAnyDetectedPaths;
 
   const summaryWithoutRepoPrompt = {
     sources,
-    imports,
-    hostConfigs,
-    hostConfigDiscovery,
     agentPlugins,
-    conflicts: getConfigConflicts(loadedSources, imports, cwd, getImportedConfig),
+    conflicts,
     hasAnyConfig,
     hasAnyDetectedPaths,
     hasSharedServers,
@@ -101,55 +55,28 @@ export function getMcpDiscoverySummary(
     totalServerCount,
   };
 
-  const fingerprint = JSON.stringify({
-    sources: sources.map((source) => [source.id, source.exists, source.serverCount]),
-    imports: imports.map((entry) => [entry.kind, entry.path, entry.serverCount]),
-    agentPlugins: agentPlugins.map((entry) => [entry.path, entry.name, entry.serverCount]),
-    hostConfigDiscovery,
-    conflicts: summaryWithoutRepoPrompt.conflicts,
-  });
-
   return {
     ...summaryWithoutRepoPrompt,
-    fingerprint,
+    fingerprint: JSON.stringify({
+      sources: sources.map((source) => [source.id, source.exists, source.serverCount]),
+      agentPlugins: agentPlugins.map((entry) => [entry.path, entry.name, entry.serverCount]),
+      conflicts,
+    }),
     repoPrompt: detectRepoPrompt(summaryWithoutRepoPrompt, cwd, loadedSources),
   };
 }
 
-function getConfigConflicts(
-  loadedSources: readonly LoadedConfigSource[],
-  imports: ImportConfigSummary[],
-  cwd: string,
-  getImportedConfig: (kind: ImportKind, warningPrefix: string) => { path: string; value: unknown } | null,
-): McpConfigConflict[] {
-  const seen = new Map<string, Array<{ kind: "shared" | "pi" | "host"; path: string }>>();
-  const record = (name: string, source: { kind: "shared" | "pi" | "host"; path: string }): void => {
+function getConfigConflicts(loadedSources: readonly LoadedConfigSource[]): McpConfigConflict[] {
+  const seen = new Map<string, Array<{ kind: "shared" | "pi"; path: string }>>();
+  const record = (name: string, source: { kind: "shared" | "pi"; path: string }): void => {
     const entries = seen.get(name) ?? [];
     if (!entries.some((entry) => entry.kind === source.kind && entry.path === source.path)) entries.push(source);
     seen.set(name, entries);
   };
 
-  // Host candidates are listed first because, when enabled, they are the
-  // lowest-precedence fallback. The fixed IMPORT_PATHS order is deterministic.
-  for (const entry of imports) {
-    const imported = getImportedConfig(entry.kind, `Failed to inspect imported MCP config from ${entry.kind}:`);
-    if (!imported) continue;
-    for (const name of Object.keys(extractServers(imported.value, entry.kind))) {
-      record(name, { kind: "host", path: imported.path });
-    }
-  }
-  for (const { source, config: loaded } of loadedSources) {
-    if (!loaded) continue;
-    if (loaded.imports?.length) {
-      for (const importKind of loaded.imports) {
-        const imported = getImportedConfig(importKind, `Failed to inspect imported MCP config from ${importKind}:`);
-        if (!imported) continue;
-        for (const name of Object.keys(extractServers(imported.value, importKind))) {
-          record(name, { kind: "host", path: imported.path });
-        }
-      }
-    }
-    for (const name of Object.keys(loaded.mcpServers)) {
+  for (const { source, config } of loadedSources) {
+    if (!config) continue;
+    for (const name of Object.keys(config.mcpServers)) {
       record(name, {
         kind: source.shared ? "shared" : "pi",
         path: source.readPath,

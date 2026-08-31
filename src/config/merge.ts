@@ -1,13 +1,10 @@
 // Configuration precedence and credential-safe merging.
-import { loadImportedConfig, extractServers } from "./read.js";
-import type { ImportKind, McpConfig, ServerEntry } from "../contracts/core.js";
+import type { McpConfig, ServerEntry } from "../contracts/core.js";
 
 export function mergeConfigs(base: McpConfig, next: McpConfig): McpConfig {
-  const imports = mergeImports(base.imports, next.imports);
   const settings = next.settings ? { ...base.settings, ...next.settings } : base.settings;
   return {
     mcpServers: mergeServerMaps(base.mcpServers, next.mcpServers),
-    ...(imports !== undefined ? { imports } : {}),
     ...(settings !== undefined ? { settings } : {}),
   };
 }
@@ -74,33 +71,4 @@ function mergeServerMaps(
     merged[name] = { ...baseEntry, ...definition };
   }
   return merged;
-}
-
-function mergeImports(left: ImportKind[] | undefined, right: ImportKind[] | undefined): ImportKind[] | undefined {
-  const merged = [...(left ?? []), ...(right ?? [])];
-  if (merged.length === 0) return undefined;
-  return [...new Set(merged)];
-}
-
-export function expandImports(config: McpConfig, cwd = process.cwd()): McpConfig {
-  if (!config.imports?.length) return config;
-
-  const importedServers: Record<string, ServerEntry> = {};
-  for (const importKind of config.imports) {
-    const imported = loadImportedConfig(importKind, cwd, `Failed to import MCP config from ${importKind}:`);
-    if (!imported) continue;
-
-    const servers = extractServers(imported.value, importKind);
-    for (const [name, definition] of Object.entries(servers)) {
-      if (!importedServers[name]) {
-        importedServers[name] = definition;
-      }
-    }
-  }
-
-  return {
-    imports: config.imports,
-    ...(config.settings !== undefined ? { settings: config.settings } : {}),
-    mcpServers: mergeServerMaps(importedServers, config.mcpServers),
-  };
 }

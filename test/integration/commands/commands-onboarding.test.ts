@@ -23,6 +23,7 @@ vi.mock("../../../src/ui/mcp-setup-panel.ts", () => ({
 
 describe("commands onboarding", () => {
   const originalHome = process.env.HOME;
+  const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
   const originalOAuthDir = process.env.MCP_OAUTH_DIR;
   const originalCwd = process.cwd();
 
@@ -40,6 +41,11 @@ describe("commands onboarding", () => {
 
   afterEach(() => {
     process.env.HOME = originalHome;
+    if (originalAgentDir === undefined) {
+      delete process.env.PI_CODING_AGENT_DIR;
+    } else {
+      process.env.PI_CODING_AGENT_DIR = originalAgentDir;
+    }
     if (originalOAuthDir === undefined) {
       delete process.env.MCP_OAUTH_DIR;
     } else {
@@ -76,9 +82,10 @@ describe("commands onboarding", () => {
     const home = mkdtempSync(join(tmpdir(), "pi-mcp-commands-home-"));
     const project = mkdtempSync(join(tmpdir(), "pi-mcp-commands-project-"));
     process.env.HOME = home;
+    process.env.PI_CODING_AGENT_DIR = join(home, ".pi", "agent");
     process.chdir(project);
 
-    writeJson(join(home, ".config", "mcp", "mcp.json"), {
+    writeJson(join(project, ".mcp.json"), {
       mcpServers: {
         sharedServer: { command: "shared" },
       },
@@ -153,8 +160,9 @@ describe("commands onboarding", () => {
 
     expect(mocks.createMcpSetupPanel).toHaveBeenCalled();
     const discovery = mocks.createMcpSetupPanel.mock.calls[0]?.[0];
-    expect(discovery.imports).toEqual([]);
-    expect(discovery.hostConfigs).toEqual([]);
+    expect(discovery).not.toHaveProperty("imports");
+    expect(discovery).not.toHaveProperty("hostConfigs");
+    expect(discovery).not.toHaveProperty("hostConfigDiscovery");
     expect(warning).not.toHaveBeenCalled();
     warning.mockRestore();
   });

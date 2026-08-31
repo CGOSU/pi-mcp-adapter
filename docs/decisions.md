@@ -8,6 +8,12 @@
 
 ## 已确认决策
 
+### 2026-08-31：仅保留标准 MCP 配置来源
+
+- 决定：删除宿主专属 MCP 配置探测、兼容导入、setup 采用流程和 CLI `init`；`imports` 与 `settings.hostConfigDiscovery` 遗留字段在配置边界被忽略。标准共享文件、Pi override、provenance、setup 写入和 token CLI 保留。
+- 原因：宿主配置格式和路径不是稳定的 MCP 配置契约；保留探测或兼容入口会让启动、诊断和交互流程继续读取用户未明确选择的宿主文件。
+- 约束：不得扫描 Cursor、Claude、Codex、OpenCode、Windsurf、VS Code 等宿主路径；共享来源的 `directTools` 写回仍必须落到 Pi-owned 文件；不引入迁移或兼容层。
+
 ### 2026-08-23：公共 npm 包采用五入口 ESM code splitting
 
 - 决定：包根、`types`、`config`、`metadata-cache`、`oauth` 五个公共入口分别构建为 ESM，并在各自入口内部保留 native `dynamic import()` 与延迟 chunks；发布 `dist`、`dist/cli.js` 及 script worker、keyring helper、AppBridge 三项独立运行资源。

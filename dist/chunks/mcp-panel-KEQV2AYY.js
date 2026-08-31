@@ -5,12 +5,14 @@ import {
   isUiToolVisibleToModel,
   resolveToolPrefix,
   resourceNameToToolName
-} from "./chunk-NBQZZ3IQ.js";
+} from "./chunk-PXMBC3S7.js";
 import {
-  isServerDisabled,
   sanitizeTerminalText,
   stripOscSequences
-} from "./chunk-Z3P2QPCB.js";
+} from "./chunk-IOFHQSPP.js";
+import {
+  isServerDisabled
+} from "./chunk-LVZ7J2NB.js";
 import {
   createPanelKeys
 } from "./chunk-PHMBX3VN.js";
@@ -176,8 +178,6 @@ var McpPanel = class _McpPanel {
       this.servers.push({
         name: serverName,
         expanded: false,
-        source: prov?.kind ?? "user",
-        ...prov?.importKind !== void 0 ? { importKind: prov.importKind } : {},
         ...definition.includeTools !== void 0 ? { includeTools: definition.includeTools } : {},
         ...definition.excludeTools !== void 0 ? { excludeTools: definition.excludeTools } : {},
         exposeResources: definition.exposeResources !== false,
@@ -206,7 +206,6 @@ var McpPanel = class _McpPanel {
   dirty = false;
   confirmingDiscard = false;
   discardSelected = 1;
-  importNotice = null;
   authNotice = null;
   authInFlight = null;
   inactivityTimeout = null;
@@ -292,7 +291,6 @@ var McpPanel = class _McpPanel {
   }
   handleInput(data) {
     this.resetInactivityTimeout();
-    this.importNotice = null;
     if (!this.authInFlight) this.authNotice = null;
     if (this.confirmingDiscard) {
       this.handleDiscardInput(data);
@@ -392,9 +390,6 @@ var McpPanel = class _McpPanel {
         const tool = server.tools[item.toolIndex];
         if (!tool) return;
         this.toggleToolDirect(server, tool);
-        if (tool.isDirect && server.source === "import") {
-          this.importNotice = `Imported from ${sanitizeDisplayText(server.importKind ?? "external")} \u2014 will copy to user config on save`;
-        }
         this.updateDirty();
       }
       return;
@@ -521,9 +516,6 @@ var McpPanel = class _McpPanel {
     if (!server) return;
     if (item.type === "server") {
       const newState = !server.tools.every((t) => t.isDirect);
-      if (server.source === "import" && newState) {
-        this.importNotice = `Imported from ${sanitizeDisplayText(server.importKind ?? "external")} \u2014 will copy to user config on save`;
-      }
       let directTokens = 0;
       for (const tool of server.tools) {
         tool.isDirect = newState;
@@ -535,9 +527,6 @@ var McpPanel = class _McpPanel {
       const tool = server.tools[item.toolIndex];
       if (!tool) return;
       this.toggleToolDirect(server, tool);
-      if (tool.isDirect && server.source === "import") {
-        this.importNotice = `Imported from ${sanitizeDisplayText(server.importKind ?? "external")} \u2014 will copy to user config on save`;
-      }
     }
     this.updateDirty();
   }
@@ -718,10 +707,6 @@ var McpPanel = class _McpPanel {
         lines.push(row(`${rainbowProgress(prog, 10)}  ${fg(t.hint, `${this.cursorIndex + 1}/${total}`)}`));
         lines.push(emptyRow());
       }
-      if (this.importNotice) {
-        lines.push(row(fg(t.needsAuth, italic(sanitizeDisplayText(this.importNotice)))));
-        lines.push(emptyRow());
-      }
       if (this.authNotice) {
         lines.push(row(fg(t.needsAuth, italic(sanitizeDisplayText(this.authNotice)))));
         lines.push(emptyRow());
@@ -794,12 +779,10 @@ var McpPanel = class _McpPanel {
     const expandIcon = server.expanded ? "\u25BE" : "\u25B8";
     const prefix = isCursor ? fg(t.selected, expandIcon) : fg(t.border, server.expanded ? expandIcon : "\xB7");
     const serverName = sanitizeDisplayText(server.name);
-    const importKind = sanitizeDisplayText(server.importKind ?? "import");
     const nameStr = isCursor ? bold(fg(t.selected, serverName)) : serverName;
-    const importLabel = server.source === "import" ? fg(t.description, ` (${importKind})`) : "";
     const statusLabel = this.renderConnectionStatus(server);
     if (!server.hasCachedData && !this.authOnly) {
-      return `${prefix}   ${nameStr}${importLabel}  ${fg(t.description, "(not cached)")}${statusLabel}`;
+      return `${prefix}   ${nameStr}  ${fg(t.description, "(not cached)")}${statusLabel}`;
     }
     const directCount = server.directCount;
     const totalCount = server.tools.length;
@@ -817,7 +800,7 @@ var McpPanel = class _McpPanel {
       }
       toolInfo = fg(t.description, toolInfo);
     }
-    return `${prefix} ${toggleIcon} ${nameStr}${importLabel}  ${toolInfo}${statusLabel}`;
+    return `${prefix} ${toggleIcon} ${nameStr}  ${toolInfo}${statusLabel}`;
   }
   selectedServerHasFailureMessage() {
     const item = this.visibleItems[this.cursorIndex];

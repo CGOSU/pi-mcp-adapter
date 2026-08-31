@@ -44,3 +44,9 @@
 - 发布边界：`npm pack --dry-run --json`/tarball 回归为 51 个文件，低于 60，且无 `src/**`、`test/**`、source map 或已删除 facade；动态 chunk 与三项资源的相对 URL 产物检查通过。包根入口在带开发期 Pi `typebox` peer 的 public exports 检查中通过；production-only 子路径不依赖 devDependencies。
 - Lazy Load：`node scripts/benchmark-startup.mjs --runs 3` 的 source module/main/wall 中位数为 `437ms`/`475ms`/`1128ms`，bundle 为 `199ms`/`228ms`/`754ms`，未超过 15% 回退；静态启动导入图通过。
 - 环境遗留：最终 `npm run test:vitest` 为 96 个文件通过、13 个文件失败（1183 个测试通过、137 个失败、12 个跳过）；失败仍集中于 Windows 全局 host 配置污染、`taskkill`/进程清理、symlink 权限、缺少 interactive visualizer 构建产物、keyring 与 POSIX 文件 mode 等既有环境限制，未发现本次发布 bundle 的模块解析失败。
+
+### 2026-08-31：删除宿主配置导入与探测
+
+- 完成：删除配置层的宿主专属 MCP 探测、兼容 imports、setup 采用 UI 和 CLI `init`/`--discover-host-configs`；`imports` 与 `settings.hostConfigDiscovery` 遗留字段不再生效。保留标准共享配置路径、Pi override、provenance、setup scaffold/known server/RepoPrompt/path inspection、`directTools` 写回和 token CLI；移除 `smol-toml`。
+- 通过：`npm run typecheck`；`npx vitest run test/integration/commands/commands-onboarding.test.ts test/integration/ui/mcp-panel-keybindings.test.ts test/unit/support/cli.test.ts`（27 个测试）；`npx vitest run test/unit/config/config-loading-snapshot.test.ts test/integration/config/exclusive-config.test.ts test/integration/support/disabled-server.test.ts`（13 个测试）；`node cli.js --help`、`node cli.js init`、`node cli.js --discover-host-configs`（帮助与删除命令边界符合预期）；`git diff --check`。
+- 通过：`npm run build:public` 生成 45 个 tracked public 文件；`npm run test:public-exports` 的 5 个 Node tests；`npm.cmd pack --dry-run --json --ignore-scripts` 发布边界为 51 个文件且不含 `src/`、`test/` 或 source map；`git diff --check`。完整相关配置测试未运行；未执行 git commit/push。
