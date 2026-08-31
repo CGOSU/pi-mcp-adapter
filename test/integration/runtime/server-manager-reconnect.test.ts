@@ -58,7 +58,7 @@ describe("McpServerManager.reconnect", () => {
   const def = { url: "https://example.test/mcp" };
 
   it("is single-flight: concurrent reconnects for the same server share one underlying reconnect", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
 
     const stale = await manager.connect("remote", def);
@@ -77,7 +77,7 @@ describe("McpServerManager.reconnect", () => {
   });
 
   it("identity guard: never tears down a connection it did not prove stale", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
 
     const stale = await manager.connect("remote", def);
@@ -99,7 +99,7 @@ describe("McpServerManager.reconnect", () => {
   });
 
   it("keeps a shared reconnect alive when one caller aborts waiting", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
 
     const stale = await manager.connect("remote", def);
@@ -124,7 +124,7 @@ describe("McpServerManager.reconnect", () => {
   });
 
   it("carries in-flight work from the stale connection to the fresh connection", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
 
     const stale = await manager.connect("remote", def);
@@ -138,7 +138,7 @@ describe("McpServerManager.reconnect", () => {
   });
 
   it("identity guard: a stale connection's late onclose does not clobber the fresh connection's status", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
 
     const stale = await manager.connect("remote", def);

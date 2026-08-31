@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { OverlayHandle } from "@earendil-works/pi-tui";
-import type { openMcpAuthPanel, openMcpPanel } from "../../../commands.ts";
-import type { createMcpPanel } from "../../../mcp-panel.ts";
+import type { openMcpAuthPanel, openMcpPanel } from "../../../src/commands/handlers.ts";
+import type { createMcpPanel } from "../../../src/ui/mcp-panel.ts";
 
 const mocks = vi.hoisted(() => ({
   authenticate: vi.fn(),
@@ -43,7 +43,7 @@ describe("authenticateServer", () => {
 
   it("does not open an empty auth panel for disabled-only OAuth config", async () => {
     const ui = { notify: vi.fn(), custom: vi.fn() };
-    const { openMcpAuthPanel } = await import("../../../commands.ts");
+    const { openMcpAuthPanel } = await import("../../../src/commands/handlers.ts");
 
     await openMcpAuthPanel({
       programmaticConfig: false,
@@ -91,7 +91,7 @@ describe("authenticateServer", () => {
         panel.handleInput("\r");
       }),
     };
-    const commands = await import("../../../commands.ts");
+    const commands = await import("../../../src/commands/handlers.ts");
     const state = {
       programmaticConfig: false,
       config: { mcpServers: { sentry: { url: "https://mcp.sentry.dev/mcp", auth: "oauth" } } },
@@ -120,7 +120,7 @@ describe("authenticateServer", () => {
     process.env.MCP_AUTH_URL = "https://mcp.sentry.dev/mcp";
     mocks.authenticate.mockResolvedValueOnce("authenticated");
     const ui = { notify: vi.fn(), setStatus: vi.fn() };
-    const { authenticateServer } = await import("../../../commands.ts");
+    const { authenticateServer } = await import("../../../src/commands/handlers.ts");
 
     try {
       const definition = { url: "${MCP_AUTH_URL}", auth: "oauth" as const };
@@ -149,7 +149,7 @@ describe("authenticateServer", () => {
     delete process.env.MCP_AUTH_URL;
     mocks.authenticate.mockClear();
     const ui = { notify: vi.fn(), setStatus: vi.fn() };
-    const { authenticateServer } = await import("../../../commands.ts");
+    const { authenticateServer } = await import("../../../src/commands/handlers.ts");
 
     try {
       const result = await authenticateServer("sentry", {
@@ -172,7 +172,7 @@ describe("authenticateServer", () => {
   it("reports credential removal failures without escaping the logout command boundary", async () => {
     mocks.removeAuth.mockRejectedValueOnce(new Error("simulated secure credential store unavailable"));
     const ui = { notify: vi.fn() };
-    const { logoutServer } = await import("../../../commands.ts");
+    const { logoutServer } = await import("../../../src/commands/handlers.ts");
 
     const close = vi.fn();
     const result = await logoutServer("sentry", {
@@ -192,7 +192,7 @@ describe("authenticateServer", () => {
   it("reports a close failure accurately after credentials were removed", async () => {
     mocks.removeAuth.mockResolvedValueOnce(undefined);
     const ui = { notify: vi.fn() };
-    const { logoutServer } = await import("../../../commands.ts");
+    const { logoutServer } = await import("../../../src/commands/handlers.ts");
 
     const result = await logoutServer("sentry", {
       config: { mcpServers: { sentry: { url: "https://mcp.sentry.dev/mcp", auth: "oauth" } } },
@@ -223,7 +223,7 @@ describe("authenticateServer", () => {
       confirm: vi.fn(async () => true),
       input: vi.fn(async () => callbackUrl),
     };
-    const { authenticateServer } = await import("../../../commands.ts");
+    const { authenticateServer } = await import("../../../src/commands/handlers.ts");
 
     const result = await authenticateServer("sentry", {
       mcpServers: {
@@ -260,7 +260,7 @@ describe("authenticateServer", () => {
       return "cancelled";
     });
     const ui = { notify: vi.fn(), setStatus: vi.fn(), confirm: vi.fn(), input: vi.fn() };
-    const { authenticateServer } = await import("../../../commands.ts");
+    const { authenticateServer } = await import("../../../src/commands/handlers.ts");
 
     await authenticateServer("sentry", {
       mcpServers: { sentry: { url: "https://mcp.sentry.dev/mcp", auth: "oauth" } },
@@ -273,7 +273,7 @@ describe("authenticateServer", () => {
   it("blocks bearer token set because the extension UI has no masked secret input", async () => {
     process.env.PI_MCP_ADAPTER_TEST_AUTH_STORE = "memory";
     const ui = { notify: vi.fn(), input: vi.fn() };
-    const { manageBearerToken } = await import("../../../commands.ts");
+    const { manageBearerToken } = await import("../../../src/commands/handlers.ts");
 
     const result = await manageBearerToken("set", "remote", {
       config: { mcpServers: { remote: { url: "https://example.test/mcp", auth: "bearer", bearerTokenStore: true } } },
@@ -289,7 +289,7 @@ describe("authenticateServer", () => {
     process.env.PI_MCP_ADAPTER_TEST_AUTH_STORE = "memory";
     delete process.env.PI_MCP_TEST_UNSET_SECRET;
     const ui = { notify: vi.fn() };
-    const { manageBearerToken } = await import("../../../commands.ts");
+    const { manageBearerToken } = await import("../../../src/commands/handlers.ts");
 
     const result = await manageBearerToken("status", "remote", {
       config: { mcpServers: { remote: { url: "https://user:${PI_MCP_TEST_UNSET_SECRET}@example.test/mcp", auth: "bearer", bearerTokenStore: true } } },
@@ -306,7 +306,7 @@ describe("authenticateServer", () => {
     resetTestBearerTokenStore();
     saveBearerTokenForUrl("remote", "secret-token", "https://example.test/mcp");
     const ui = { notify: vi.fn() };
-    const { manageBearerToken } = await import("../../../commands.ts");
+    const { manageBearerToken } = await import("../../../src/commands/handlers.ts");
 
     const result = await manageBearerToken("status", "remote", {
       config: { mcpServers: { remote: { url: "https://example.test/mcp", auth: "bearer", bearerTokenStore: true } } },
@@ -323,7 +323,7 @@ describe("authenticateServer", () => {
     resetTestBearerTokenStore();
     saveBearerTokenForUrl("remote", "secret-token", "https://example.test/mcp");
     const ui = { notify: vi.fn() };
-    const { manageBearerToken } = await import("../../../commands.ts");
+    const { manageBearerToken } = await import("../../../src/commands/handlers.ts");
 
     const result = await manageBearerToken("remove", "remote", {
       config: { mcpServers: { remote: { url: "https://example.test/mcp", auth: "bearer", bearerTokenStore: true } } },

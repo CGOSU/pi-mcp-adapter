@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { reconstructToolMetadata, serializeTools } from "../../../src/catalog/metadata-cache.ts";
-import { buildToolMetadata } from "../../../tool-metadata.ts";
-import { extractUiToolVisibility, isUiToolCallableByApp, isUiToolVisibleToModel } from "../../../ui-tool-visibility.ts";
+import { buildToolMetadata } from "../../../src/tools/tool-metadata.ts";
+import { extractUiToolVisibility, isUiToolCallableByApp, isUiToolVisibleToModel } from "../../../src/ui/tool-visibility.ts";
 import type { McpTool, ServerCacheEntry } from "../../../types.ts";
 
 const tools: McpTool[] = [

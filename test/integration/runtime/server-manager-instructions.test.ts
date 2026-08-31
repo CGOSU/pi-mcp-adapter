@@ -42,7 +42,7 @@ describe("McpServerManager instructions", () => {
 
   it("captures server instructions from the initialize result at connect time", async () => {
     mocks.instructions = "Use read_skill to load a skill before answering.";
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
 
     const connection = await manager.connect("demo", { command: "node", args: ["server.js"] });
@@ -51,7 +51,7 @@ describe("McpServerManager instructions", () => {
   });
 
   it("leaves instructions undefined when the server provides none", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
 
     const connection = await manager.connect("demo", { command: "node", args: ["server.js"] });

@@ -1,14 +1,14 @@
 {
   "name": "pi-mcp-adapter",
-  "version": "2.27.0",
+  "version": "2.27.1",
   "description": "MCP (Model Context Protocol) adapter extension for Pi coding agent",
   "type": "module",
-  "types": "./index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.ts",
-      "import": "./index.ts",
-      "default": "./index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./types": {
       "types": "./dist/types.d.ts",
@@ -16,9 +16,9 @@
       "default": "./dist/types.js"
     },
     "./oauth": {
-      "types": "./oauth.ts",
-      "import": "./oauth.ts",
-      "default": "./oauth.ts"
+      "types": "./dist/oauth.d.ts",
+      "import": "./dist/oauth.js",
+      "default": "./dist/oauth.js"
     },
     "./config": {
       "types": "./dist/config.d.ts",
@@ -37,15 +37,15 @@
     "node": ">=20"
   },
   "bin": {
-    "pi-mcp-adapter": "cli.js"
+    "pi-mcp-adapter": "dist/cli.js"
   },
   "scripts": {
-    "build:public": "tsc -p tsconfig.public.json",
+    "build:public": "node scripts/build-public.mjs",
     "prepack": "npm run build:public",
     "typecheck": "tsc --noEmit",
     "test": "node test-runner.mjs",
     "test:vitest": "vitest run",
-    "test:public-exports": "npm run build:public && node --test test/node/package/public-exports.test.mjs",
+    "test:public-exports": "npm run build:public && node --test test/node/package/public-exports.test.mjs test/node/package/build-artifacts.test.mjs test/node/package/package-tarball.test.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:oauth": "node test/node/run-auth-tests.mjs",
@@ -71,7 +71,7 @@
   ],
   "pi": {
     "extensions": [
-      "./index.ts"
+      "./dist/index.js"
     ],
     "skills": [
       "./skills"
@@ -79,19 +79,12 @@
     "video": "https://github.com/nicobailon/pi-mcp-adapter/raw/refs/heads/main/pi-mcp.mp4"
   },
   "files": [
-    "cli.js",
-    "index.ts",
-    "src",
-    "config.ts",
-    "metadata-cache.ts",
-    "types.ts",
-    "oauth.ts",
+    "dist",
     "banner.png",
     "skills",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE",
-    "dist"
+    "LICENSE"
   ],
   "dependencies": {
     "@modelcontextprotocol/client": "2.0.0",
@@ -133,6 +126,7 @@
     "@types/cross-spawn": "6.0.6",
     "@types/node": "20.19.43",
     "@types/open": "^6.2.1",
+    "esbuild": "0.28.1",
     "tsx": "^4.21.0",
     "typebox": "1.3.3",
     "typescript": "5.9.3",

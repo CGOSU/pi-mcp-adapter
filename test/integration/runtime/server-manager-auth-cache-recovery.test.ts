@@ -55,7 +55,7 @@ describe("auth cache recovery on 401", () => {
   afterEach(() => vi.clearAllMocks());
 
   it("invalidates once for terminal transport and post-handshake 401s", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     mocks.connectErrors.push(unauthorized());
     const manager = new McpServerManager();
     const transport = await manager.connect("transport", OAUTH_SERVER);
@@ -70,7 +70,7 @@ describe("auth cache recovery on 401", () => {
 
 
   it("invalidates on capability-advertised resources and prompts 401s", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
 
     mocks.capabilities = { resources: {} };
@@ -86,7 +86,7 @@ describe("auth cache recovery on 401", () => {
 
 
   it("keeps non-401 optional discovery failures non-fatal", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
 
     mocks.capabilities = { resources: {}, prompts: {} };
@@ -98,7 +98,7 @@ describe("auth cache recovery on 401", () => {
   });
 
   it("does not invalidate on the initial implicit challenge", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     mocks.connectErrors.push(unauthorized());
     const connection = await new McpServerManager().connect("implicit", { url: "https://example.test/mcp" });
     expect(connection.status).toBe("connected");
@@ -106,7 +106,7 @@ describe("auth cache recovery on 401", () => {
   });
 
   it("invalidates once on the terminal provider-backed implicit OAuth 401", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     mocks.connectErrors.push(unauthorized(), unauthorized());
 
     const connection = await new McpServerManager().connect("implicit-terminal", { url: "https://example.test/mcp" });
@@ -116,7 +116,7 @@ describe("auth cache recovery on 401", () => {
   });
 
   it("keeps concurrent terminal recovery connects single-flight", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     let release!: () => void;
     let entered!: () => void;
     const blocked = new Promise<void>(resolve => { release = resolve; });
@@ -140,7 +140,7 @@ describe("auth cache recovery on 401", () => {
   });
 
   it("bounds health-check reconnects and resets after explicit close", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
     for (let pass = 0; pass < 3; pass++) {
       mocks.connectErrors.push(unauthorized());
@@ -154,7 +154,7 @@ describe("auth cache recovery on 401", () => {
   });
 
   it("does not invalidate non-OAuth servers", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     mocks.connectErrors.push(unauthorized());
     await expect(new McpServerManager().connect("plain", { url: "https://example.test/mcp", auth: false })).rejects.toThrow("HTTP 401");
     expect(mocks.invalidated).toEqual([]);

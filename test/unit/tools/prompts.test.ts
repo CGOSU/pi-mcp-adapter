@@ -8,7 +8,7 @@ import {
   parsePromptArgs,
   resolvePromptArgs,
 } from "../../../src/tools/prompts.ts";
-import type { McpExtensionState } from "../../../state.ts";
+import type { McpExtensionState } from "../../../src/extension/state.ts";
 import type { PromptMetadata } from "../../../types.ts";
 import { formatPromptCommandName, sanitizePromptName } from "../../../types.ts";
 

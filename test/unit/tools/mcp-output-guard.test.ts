@@ -2,7 +2,7 @@ import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { guardMcpOutput, resolveMcpOutputGuardOptions, type McpResultSummary } from "../../../mcp-output-guard.ts";
+import { guardMcpOutput, resolveMcpOutputGuardOptions, type McpResultSummary } from "../../../src/tools/mcp-output-guard.ts";
 
 describe("guardMcpOutput", () => {
   it("leaves small MCP output unchanged and keeps the raw result in details", async () => {

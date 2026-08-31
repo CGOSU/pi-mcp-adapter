@@ -5,7 +5,7 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   cleanupMaterializedBinaryResources,
   resolveMcpResultContent,
-} from "../../../tool-registrar.ts";
+} from "../../../src/tools/tool-registrar.ts";
 
 describe("resolveMcpResultContent", () => {
   afterEach(() => cleanupMaterializedBinaryResources());

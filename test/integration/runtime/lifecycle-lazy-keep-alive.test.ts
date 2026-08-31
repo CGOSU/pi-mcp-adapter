@@ -3,11 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SdkErrorCode, SdkHttpError } from "@modelcontextprotocol/client";
-import { lazyConnect } from "../../../init.ts";
-import { McpLifecycleManager } from "../../../lifecycle.ts";
-import { executeCall } from "../../../proxy-modes.ts";
-import { reconnectServers } from "../../../commands.ts";
-import type { ToolRefreshResult } from "../../../server-manager.ts";
+import { lazyConnect } from "../../../src/extension/initialization.ts";
+import { McpLifecycleManager } from "../../../src/runtime/lifecycle.ts";
+import { executeCall } from "../../../src/tools/proxy/dispatcher.ts";
+import { reconnectServers } from "../../../src/commands/handlers.ts";
+import type { ToolRefreshResult } from "../../../src/runtime/server-manager.ts";
 import type { ServerDefinition } from "../../../types.ts";
 
 interface FakeConnection {

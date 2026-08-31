@@ -49,7 +49,7 @@ describe("structuredContent fallback — direct tool executor", () => {
   });
 
   it("surfaces structuredContent to the model when content is empty", async () => {
-    const { createDirectToolExecutor } = await import("../../../direct-tools.ts");
+    const { createDirectToolExecutor } = await import("../../../src/tools/direct-tools.ts");
     const structured = { status: "available", summary: "## Notes" };
     const state = makeState({ isError: false, content: [], structuredContent: structured });
 
@@ -66,7 +66,7 @@ describe("structuredContent fallback — direct tool executor", () => {
   });
 
   it("still shows (empty result) when both content and structuredContent are empty", async () => {
-    const { createDirectToolExecutor } = await import("../../../direct-tools.ts");
+    const { createDirectToolExecutor } = await import("../../../src/tools/direct-tools.ts");
     const state = makeState({ isError: false, content: [] });
 
     const executor = createDirectToolExecutor(
@@ -89,7 +89,7 @@ describe("structuredContent fallback — proxy executeCall", () => {
   });
 
   it("surfaces structuredContent to the model when content is empty", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
     const structured = { status: "available", summary: "## Notes" };
     const state = makeState({ isError: false, content: [], structuredContent: structured }, "get-summary");
 
@@ -100,7 +100,7 @@ describe("structuredContent fallback — proxy executeCall", () => {
   });
 
   it("still shows (empty result) when both content and structuredContent are empty", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
     const state = makeState({ isError: false, content: [] }, "noop");
 
     const result = await executeCall(state, "demo_noop", {}, "demo");

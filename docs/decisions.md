@@ -8,6 +8,12 @@
 
 ## 已确认决策
 
+### 2026-08-23：公共 npm 包采用五入口 ESM code splitting
+
+- 决定：包根、`types`、`config`、`metadata-cache`、`oauth` 五个公共入口分别构建为 ESM，并在各自入口内部保留 native `dynamic import()` 与延迟 chunks；发布 `dist`、`dist/cli.js` 及 script worker、keyring helper、AppBridge 三项独立运行资源。
+- 原因：将源码直接聚合成单 JS 会提升 MCP runtime、OAuth、命令和 UI 的启动导入成本，破坏已有 Lazy Load；分别构建入口又能避免某个公共 subpath 的共享依赖被提升到 Pi 扩展入口。
+- 约束：依赖和 Pi host peer 保持 external；禁止 `inlineDynamicImports`；构建必须由 `npm run build:public` 可重复生成，`prepack` 可更新 npm 发布物但 production-only 安装不得编译；发布 tarball 不超过 60 个文件且不包含 `src/**`、`test/**` 或 source map。
+
 ### 2026-08-23：以动态模块边界降低 Pi 扩展启动成本
 
 - 决定：把 metadata cache、Schema 和注册所需代码留在 `index.ts` 启动闭包；把 MCP runtime、连接、OAuth、命令、脚本、proxy/direct 执行和 UI runtime 改为缓存的原生 `dynamic import()`，由共享初始化 Promise 在首次需要时加载。

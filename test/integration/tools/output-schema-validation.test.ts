@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
-import { createDirectToolExecutor } from "../../../direct-tools.ts";
-import { executeCall } from "../../../proxy-modes.ts";
-import { McpServerManager } from "../../../server-manager.ts";
-import type { McpExtensionState } from "../../../state.ts";
+import { createDirectToolExecutor } from "../../../src/tools/direct-tools.ts";
+import { executeCall } from "../../../src/tools/proxy/dispatcher.ts";
+import { McpServerManager } from "../../../src/runtime/server-manager.ts";
+import type { McpExtensionState } from "../../../src/extension/state.ts";
 import type { DirectToolSpec, ToolMetadata } from "../../../types.ts";
-import { UiResourceHandler } from "../../../ui-resource-handler.ts";
+import { UiResourceHandler } from "../../../src/ui/resource-handler.ts";
 
 const fixture = fileURLToPath(new URL("../../fixtures/output-schema-server.mjs", import.meta.url));
 const definition = { command: process.execPath, args: [fixture] };

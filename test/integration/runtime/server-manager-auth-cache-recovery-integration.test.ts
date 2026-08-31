@@ -95,7 +95,7 @@ describe("auth cache recovery with the real OAuth provider", () => {
   });
 
   it("evicts after an explicit OAuth 401 so the provider reloads an external rotation", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     saveAuthEntry("explicit", { tokens: { accessToken: "old" } }, SERVER_URL);
     expect(getAuthEntry("explicit")?.tokens?.accessToken).toBe("old");
     writeBehindTheCache("explicit", "new");
@@ -107,7 +107,7 @@ describe("auth cache recovery with the real OAuth provider", () => {
   });
 
   it("evicts only after the second, provider-backed implicit OAuth 401", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     saveAuthEntry("implicit", { tokens: { accessToken: "old" } }, SERVER_URL);
     expect(getAuthEntry("implicit")?.tokens?.accessToken).toBe("old");
     writeBehindTheCache("implicit", "new");
@@ -125,7 +125,7 @@ describe("auth cache recovery with the real OAuth provider", () => {
   });
 
   it("keeps concurrent recovery connects single-flight", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     saveAuthEntry("shared", { tokens: { accessToken: "old" } }, SERVER_URL);
     expect(getAuthEntry("shared")?.tokens?.accessToken).toBe("old");
     writeBehindTheCache("shared", "new");

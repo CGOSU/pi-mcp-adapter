@@ -62,7 +62,7 @@ describe("McpServerManager stderr capture", () => {
   });
 
   it("pipes stderr for normal stdio servers and preserves inherit for debug", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
 
     await manager.connect("demo", { command: "node", args: ["server.js"] });
@@ -74,7 +74,7 @@ describe("McpServerManager stderr capture", () => {
 
   it("interpolates environment placeholders in stdio arguments", async () => {
     process.env.MCP_TEST_STDIO_ARG = "interpolated";
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
 
     await manager.connect("demo", {
@@ -87,7 +87,7 @@ describe("McpServerManager stderr capture", () => {
 
   it("passes interpolated npx arguments to the resolver", async () => {
     process.env.MCP_TEST_STDIO_ARG = "interpolated";
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
 
     await manager.connect("demo", {
@@ -107,7 +107,7 @@ describe("McpServerManager stderr capture", () => {
   });
 
   it("appends captured stderr to the connection error", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
     mocks.connectImpl = async (transport) => {
       transport.stderr.write("Cannot connect to the Docker daemon at unix:///var/run/docker.sock.\n");
@@ -121,7 +121,7 @@ describe("McpServerManager stderr capture", () => {
   });
 
   it("bounds oversized string stderr chunks before retaining their tail", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
     const connectionError = new Error("connection failed");
     mocks.connectImpl = async (transport) => {
@@ -145,7 +145,7 @@ describe("McpServerManager stderr capture", () => {
       status: 404,
       headers: { "content-type": "text/html" },
     })));
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
     mocks.connectImpl = async () => {
       throw new Error("MCP error -32000: Connection closed");
@@ -158,7 +158,7 @@ describe("McpServerManager stderr capture", () => {
   });
 
   it("bounds captured stderr and keeps only its final three lines", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
     const connectionError = new Error("connection failed");
     mocks.connectImpl = async (transport) => {

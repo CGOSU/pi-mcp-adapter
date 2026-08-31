@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createToolSelectorCandidateIndex } from "../../../src/catalog/tool-selectors.ts";
 import type { MetadataCache, McpConfig, ServerCacheEntry, ServerEntry } from "../../../types.ts";
-import { buildProxyDescription, resolveDirectTools } from "../../../direct-tools.ts";
+import { buildProxyDescription, resolveDirectTools } from "../../../src/tools/direct-tools.ts";
 import { computeServerHash, createCachedToolSelectorCandidateIndex, reconstructToolMetadata } from "../../../src/catalog/metadata-cache.ts";
-import { buildToolMetadata } from "../../../tool-metadata.ts";
+import { buildToolMetadata } from "../../../src/tools/tool-metadata.ts";
 
 // Intercept index construction so filtered paths prove they build one shared
 // candidate index instead of rebuilding it once per server or per tool.

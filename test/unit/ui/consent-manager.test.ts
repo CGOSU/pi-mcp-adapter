@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { ConsentManager, type ToolConsentMode } from "../../../consent-manager.ts";
+import { ConsentManager, type ToolConsentMode } from "../../../src/ui/consent-manager.ts";
 
 describe("ConsentManager", () => {
   describe("mode: never", () => {

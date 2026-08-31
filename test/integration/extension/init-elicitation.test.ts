@@ -67,8 +67,8 @@ describe("initializeMcp elicitation config", () => {
       settings: { sampling: false as const },
     };
     const api = extensionApi();
-    const { initializeMcp } = await import("../../../init.ts");
-    const { createMcpRuntimeOwner } = await import("../../../runtime-owner.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
+    const { createMcpRuntimeOwner } = await import("../../../src/extension/owner.ts");
     const state = await initializeMcp(api, context({ hasUI: false }), createMcpRuntimeOwner(), { config });
 
     expect(api.getFlag).not.toHaveBeenCalled();
@@ -79,7 +79,7 @@ describe("initializeMcp elicitation config", () => {
   });
 
   it("enables form and URL elicitation in TUI mode", async () => {
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
     const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const ctx = context();
 
@@ -94,7 +94,7 @@ describe("initializeMcp elicitation config", () => {
 
   it("binds oauthDir storage to the active context cwd", async () => {
     mocks.loadMcpConfig.mockReturnValue({ mcpServers: {}, settings: { oauthDir: ".pi/oauth" } });
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
     const ctx = context();
 
     await initializeMcp(extensionApi(), ctx);
@@ -105,7 +105,7 @@ describe("initializeMcp elicitation config", () => {
   });
 
   it("keeps RPC elicitation form-only so the backend never opens a browser", async () => {
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
     const ctx = context({ mode: "rpc" });
 
     await initializeMcp(extensionApi(), ctx);
@@ -117,7 +117,7 @@ describe("initializeMcp elicitation config", () => {
   });
 
   it("keeps sampling bound to the current model and turn signal while the runtime is active", async () => {
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
     const ctx = context() as ExtensionContext & { model: unknown; signal: AbortSignal | undefined };
     const firstSignal = new AbortController();
     const secondSignal = new AbortController();
@@ -141,7 +141,7 @@ describe("initializeMcp elicitation config", () => {
   });
 
   it("does not enable elicitation without UI or when disabled", async () => {
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
 
     await initializeMcp(extensionApi(), context({ hasUI: false }));
     expect(mocks.managers[0].setElicitationConfig).not.toHaveBeenCalled();

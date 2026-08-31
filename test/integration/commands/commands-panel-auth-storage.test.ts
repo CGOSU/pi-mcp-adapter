@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { openMcpAuthPanel, openMcpPanel } from "../../../commands.ts";
+import { openMcpAuthPanel, openMcpPanel } from "../../../src/commands/handlers.ts";
 
 const previousAuthStore = process.env.PI_MCP_ADAPTER_TEST_AUTH_STORE;
 

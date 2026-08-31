@@ -49,7 +49,7 @@ describe("Pi agent dir paths", () => {
     const { getAgentDir } = await import("../../../src/config/agent-dir.ts");
     const { getPiGlobalConfigPath } = await import("../../../config.ts");
     const { getMetadataCachePath } = await import("../../../src/catalog/metadata-cache.ts");
-    const { getOnboardingStatePath } = await import("../../../onboarding-state.ts");
+    const { getOnboardingStatePath } = await import("../../../src/commands/onboarding-state.ts");
     const { getAuthEntryFilePath, saveAuthEntry } = await import("../../../src/auth/mcp-auth.ts");
 
     expect(getAgentDir()).toBe(agentDir);

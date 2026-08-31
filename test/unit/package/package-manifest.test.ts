@@ -8,11 +8,13 @@ const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   files?: string[];
+  bin?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   peerDependenciesMeta?: Record<string, { optional?: boolean }>;
   scripts?: Record<string, string>;
   exports?: Record<string, unknown>;
   types?: string;
+  pi?: { extensions?: string[] };
 };
 
 const hostPeerPackages = {
@@ -27,23 +29,39 @@ describe("package.json files", () => {
     expect(packageJson.scripts?.prepack).toBe("npm run build:public");
   });
 
-  it("includes built files for public exports", () => {
+  it("includes only built public entries and runtime resources", () => {
     const publishedFiles = new Set(packageJson.files ?? []);
 
     expect(publishedFiles.has("dist")).toBe(true);
-    expect(publishedFiles.has("src")).toBe(true);
-    for (const file of ["dist/types.js", "dist/config.js", "dist/metadata-cache.js", "dist/src/config/load.js", "dist/src/catalog/metadata-cache.js", "dist/src/config/agent-dir.js", "dist/src/config/agent-plugin-loader.js", "dist/src/config/package-mcp-loader.js", "dist/src/utils.js", "src/runtime/server-manager.ts", "src/auth/mcp-auth.ts", "src/auth/mcp-keyring-helper.cjs", "src/tools/mcp-code.ts", "src/tools/mcp-script-worker.mjs", "src/tools/proxy/dispatcher.ts", "src/tools/proxy/call.ts", "src/commands/handlers.ts", "src/commands/onboarding-state.ts", "src/ui/server.ts", "src/ui/session.ts", "src/ui/resource-handler.ts", "src/ui/stream-types.ts", "src/ui/app-bridge.bundle.js", "src/extension/install.ts", "src/extension/initialization.ts", "src/extension/session.ts", "src/extension/tool-surface.ts", "src/extension/state.ts", "src/extension/owner.ts", "src/extension/status.ts", "src/extension/failure-backoff.ts", "src/catalog/metadata-cache.ts", "src/config/agent-dir.ts", "src/config/agent-plugin-loader.ts", "src/config/package-mcp-loader.ts", "src/tools/prompts.ts", "src/errors.ts", "src/logger.ts", "src/utils.ts", "oauth.ts"]) {
+    expect(publishedFiles.has("src")).toBe(false);
+    expect(publishedFiles.has("cli.js")).toBe(false);
+    for (const file of [
+      "dist/index.js",
+      "dist/index.d.ts",
+      "dist/types.js",
+      "dist/types.d.ts",
+      "dist/config.js",
+      "dist/config.d.ts",
+      "dist/metadata-cache.js",
+      "dist/metadata-cache.d.ts",
+      "dist/oauth.js",
+      "dist/oauth.d.ts",
+      "dist/cli.js",
+      "dist/mcp-keyring-helper.cjs",
+    ]) {
       expect(existsSync(join(repoRoot, file))).toBe(true);
     }
   });
 
-  it("exports source entry points and plain Node host helpers", () => {
-    expect(packageJson.types).toBe("./index.ts");
+  it("exports built entry points and plain Node host helpers", () => {
+    expect(packageJson.types).toBe("./dist/index.d.ts");
+    expect(packageJson.pi?.extensions).toEqual(["./dist/index.js"]);
+    expect(packageJson.bin).toEqual({ "pi-mcp-adapter": "dist/cli.js" });
     expect(packageJson.exports).toMatchObject({
       ".": {
-        types: "./index.ts",
-        import: "./index.ts",
-        default: "./index.ts",
+        types: "./dist/index.d.ts",
+        import: "./dist/index.js",
+        default: "./dist/index.js",
       },
       "./types": {
         types: "./dist/types.d.ts",
@@ -60,15 +78,18 @@ describe("package.json files", () => {
         import: "./dist/metadata-cache.js",
         default: "./dist/metadata-cache.js",
       },
+      "./oauth": {
+        types: "./dist/oauth.d.ts",
+        import: "./dist/oauth.js",
+        default: "./dist/oauth.js",
+      },
     });
   });
 
-  it("publishes public facades and source domains without enumerating internals", () => {
+  it("publishes bundled entries without enumerating source internals", () => {
     const publishedFiles = new Set(packageJson.files ?? []);
-    for (const facade of ["index.ts", "config.ts", "metadata-cache.ts", "types.ts", "oauth.ts", "cli.js"]) {
-      expect(publishedFiles.has(facade)).toBe(true);
-    }
-    expect(publishedFiles.has("src")).toBe(true);
+    expect(publishedFiles.has("dist")).toBe(true);
+    expect(publishedFiles.has("src")).toBe(false);
     expect([...publishedFiles].some((entry) => entry.endsWith(".test.ts"))).toBe(false);
     expect(publishedFiles.has("agent-dir.ts")).toBe(false);
     expect(publishedFiles.has("prompts.ts")).toBe(false);

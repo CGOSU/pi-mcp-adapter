@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderTsShape } from "../../../ts-shape.ts";
+import { renderTsShape } from "../../../src/tools/ts-shape.ts";
 
 describe("renderTsShape", () => {
   it("renders required and optional object properties", () => {

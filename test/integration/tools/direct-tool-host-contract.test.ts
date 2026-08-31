@@ -21,7 +21,7 @@ describe("direct tool host contracts", () => {
   });
 
   it("recovers one JSON layer for schema-declared containers and validates the result", async () => {
-    const { prepareDirectToolArguments } = await import("../../../direct-tools.ts");
+    const { prepareDirectToolArguments } = await import("../../../src/tools/direct-tools.ts");
     const schema = {
       type: "object",
       required: ["filter", "columns"],
@@ -75,7 +75,7 @@ describe("direct tool host contracts", () => {
       failureTracker: new Map(),
       completedUiSessions: [],
     } as any;
-    const { createDirectToolExecutor } = await import("../../../direct-tools.ts");
+    const { createDirectToolExecutor } = await import("../../../src/tools/direct-tools.ts");
     const execute = createDirectToolExecutor(() => state, () => null, {
       serverName: "demo",
       originalName: "commit",
@@ -114,7 +114,7 @@ describe("direct tool host contracts", () => {
       failureTracker: new Map(),
       completedUiSessions: [],
     } as any;
-    const { createDirectToolExecutor } = await import("../../../direct-tools.ts");
+    const { createDirectToolExecutor } = await import("../../../src/tools/direct-tools.ts");
     const execute = createDirectToolExecutor(() => state, () => null, {
       serverName: "demo",
       originalName: "commit",
@@ -153,7 +153,7 @@ describe("direct tool host contracts", () => {
       failureTracker: new Map(),
       completedUiSessions: [],
     } as any;
-    const { createDirectToolExecutor } = await import("../../../direct-tools.ts");
+    const { createDirectToolExecutor } = await import("../../../src/tools/direct-tools.ts");
     const execute = createDirectToolExecutor(() => state, () => null, {
       serverName: "demo",
       originalName: "handbook",

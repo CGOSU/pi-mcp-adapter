@@ -10,8 +10,8 @@ vi.mock("../../../src/auth/mcp-auth.ts", async importOriginal => ({
   invalidateAuthEntryCache: authCacheMocks.invalidate,
 }));
 
-import { SessionRecoveryAuthRequiredError, isTerminatedSession, withSessionRecovery } from "../../../session-recovery.ts";
-import type { ServerConnection } from "../../../server-manager.ts";
+import { SessionRecoveryAuthRequiredError, isTerminatedSession, withSessionRecovery } from "../../../src/runtime/session-recovery.ts";
+import type { ServerConnection } from "../../../src/runtime/server-manager.ts";
 import type { McpConfig } from "../../../types.ts";
 
 function httpError(status: number, message: string): SdkHttpError {

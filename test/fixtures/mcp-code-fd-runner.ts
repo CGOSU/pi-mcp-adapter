@@ -1,5 +1,5 @@
-import { runMcpScript } from "../../mcp-code.ts";
-import type { McpExtensionState } from "../../state.ts";
+import { runMcpScript } from "../../src/tools/mcp-code.ts";
+import type { McpExtensionState } from "../../src/extension/state.ts";
 
 const state = {
   owner: undefined,

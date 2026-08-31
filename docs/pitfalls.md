@@ -24,13 +24,13 @@
   现象：Windows 宿主的完整 Vitest 仍可能出现全局配置污染、Linux keyring、taskkill、Unix socket、symlink 或文件 mode 失败；本次针对性行为集合中唯一失败是期望 POSIX `0600`、实际 Windows mode `0666`；
   根因：部分测试断言 Unix 权限/进程语义，另有测试读取宿主 HOME 下的 Codex/OpenCode/Penpot 配置；这些不是源码目录迁移造成的失败；
   修复：Node runner 改用 npm 的真实 `npm_execpath`，public export fixture 改为复制布局，避免 Windows `.cmd`/symlink 限制；其余平台差异保留为测试环境边界，使用针对性 Vitest、typecheck、public build、静态导入图和独立 benchmark 验证代码；
-  验证：`npm run test:oauth` 141 个测试通过，`npm run test:public-exports` 通过；行为集合 508 个测试通过、1 个 mode 限制失败，完整结果记录于 [`docs/session-log.md`](session-log.md)。
+  验证：`npm run test:oauth` 141 个测试通过，`npm run test:public-exports` 通过；最终 tarball 回归为 51 个文件，行为集合和完整结果记录于 [`docs/session-log.md`](session-log.md)。
 
 - 日期：2026-08-23；
   现象：通过 Git 安装 Pi 包时，`npm install --omit=dev` 在 `npm run build:public` 处失败，并报告大量缺少 Node/Pi 类型的 TypeScript 错误；
   根因：npm 会对 Git 依赖执行 `prepare`，但 production-only 安装不会安装 TypeScript、`@types/node` 或 Pi 开发类型包；
   修复：删除安装期 `prepare`，改用 `prepack`，并将公共 `dist` 构建纳入仓库；CI 增加生成物一致性和 Windows production-only 安装验证。发布测试同时必须检查 tarball 不含 `test/` 或 `__tests__/`；
-  验证：最终 tarball 含 180 个文件且无测试文件；临时干净副本执行 `npm install --omit=dev --no-audit --no-fund` 成功，并成功导入三个公共 Node exports。
+  验证：最终 tarball 回归为 51 个文件且无 `src/**`/`test/**`；临时干净副本执行 `npm install --omit=dev --no-audit --no-fund` 成功，并成功导入四个独立公共 Node subpaths；包根入口由带 Pi peer 的 public exports 测试覆盖。
 
 - 日期：2026-08-23；
   现象：原生 keyring fallback 测试在 Windows 上把 POSIX `/tmp/...` 字符串与实现生成的 Windows 路径比较，导致平台无关的 fallback 逻辑被误报失败；

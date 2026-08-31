@@ -2,7 +2,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { createRequestHeadersCommandFetch } from "../../../request-headers-command.ts";
+import { createRequestHeadersCommandFetch } from "../../../src/runtime/request-headers-command.ts";
 
 function commandScript(source: string): string {
   const dir = mkdtempSync(join(tmpdir(), "pi-mcp-request-headers-"));

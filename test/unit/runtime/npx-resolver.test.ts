@@ -39,7 +39,7 @@ describe("npx-resolver", () => {
 
     writeCachedPackage(npmCache, "demo-pkg");
 
-    const { resolveNpxBinary } = await import("../../../npx-resolver.ts");
+    const { resolveNpxBinary } = await import("../../../src/runtime/npx-resolver.ts");
     const result = await resolveNpxBinary("npx", ["-y", "demo-pkg", "--token=secret-value"]);
     const cache = readFileSync(join(agentDir, "mcp-npx-cache.json"), "utf-8");
 
@@ -68,7 +68,7 @@ describe("npx-resolver", () => {
       }),
       "utf-8",
     );
-    await import("../../../npx-resolver.ts");
+    await import("../../../src/runtime/npx-resolver.ts");
 
     expect(existsSync(join(agentDir, "mcp-npx-cache.json"))).toBe(false);
   });
@@ -98,7 +98,7 @@ describe("npx-resolver", () => {
       }),
     }));
 
-    const { resolveNpxBinary } = await import("../../../npx-resolver.ts");
+    const { resolveNpxBinary } = await import("../../../src/runtime/npx-resolver.ts");
     await expect(resolveNpxBinary("npx", ["-y", "missing-pkg"])).resolves.toBeNull();
 
     expect(existsSync(cachePath)).toBe(true);
@@ -131,7 +131,7 @@ describe("npx-resolver", () => {
       };
     });
 
-    const { resolveNpxBinary } = await import("../../../npx-resolver.ts");
+    const { resolveNpxBinary } = await import("../../../src/runtime/npx-resolver.ts");
     expect(readFileSync(cachePath, "utf-8")).not.toContain("secret-value");
 
     await expect(resolveNpxBinary("npx", ["-y", "demo-pkg", "--runtime=value"])).resolves.toEqual({
@@ -163,7 +163,7 @@ describe("npx-resolver", () => {
     }), "utf-8");
     const binPath = writeCachedPackage(npmCache, "demo-pkg");
 
-    const { resolveNpxBinary } = await import("../../../npx-resolver.ts");
+    const { resolveNpxBinary } = await import("../../../src/runtime/npx-resolver.ts");
     const result = await resolveNpxBinary("npx", ["-y", "demo-pkg"]);
 
     expect(result?.binPath).toBe(binPath);
@@ -192,7 +192,7 @@ describe("npx-resolver", () => {
       }
     }`, "utf-8");
 
-    const { resolveNpxBinary } = await import("../../../npx-resolver.ts");
+    const { resolveNpxBinary } = await import("../../../src/runtime/npx-resolver.ts");
     const result = await resolveNpxBinary("npx", ["-y", "demo-pkg"]);
 
     expect(result?.binPath).toBe(demoBin);
@@ -213,7 +213,7 @@ describe("npx-resolver", () => {
     Object.assign(crossSpawn, { sync });
     vi.doMock("cross-spawn", () => ({ default: crossSpawn }));
 
-    const { resolveNpxBinary } = await import("../../../npx-resolver.ts");
+    const { resolveNpxBinary } = await import("../../../src/runtime/npx-resolver.ts");
     const result = await resolveNpxBinary("npx", ["-y", "demo-pkg"]);
 
     expect(sync).toHaveBeenCalledWith("npm", ["config", "get", "cache"], { encoding: "utf-8" });
@@ -245,7 +245,7 @@ describe("npx-resolver", () => {
     Object.assign(crossSpawn, { sync });
     vi.doMock("cross-spawn", () => ({ default: crossSpawn }));
 
-    const { resolveNpxBinary } = await import("../../../npx-resolver.ts");
+    const { resolveNpxBinary } = await import("../../../src/runtime/npx-resolver.ts");
     const result = await resolveNpxBinary("npx", ["-y", "demo-pkg"]);
 
     expect(crossSpawn).toHaveBeenCalledWith(
@@ -267,7 +267,7 @@ describe("npx-resolver", () => {
 
     writeCachedPackage(npmCache, "dotenv-cli");
 
-    const { resolveNpxBinary } = await import("../../../npx-resolver.ts");
+    const { resolveNpxBinary } = await import("../../../src/runtime/npx-resolver.ts");
     const result = await resolveNpxBinary("npx", [
       "--yes",
       "dotenv-cli",
@@ -291,7 +291,7 @@ describe("npx-resolver", () => {
 
     writeCachedPackage(npmCache, "dotenv-cli");
 
-    const { resolveNpxBinary } = await import("../../../npx-resolver.ts");
+    const { resolveNpxBinary } = await import("../../../src/runtime/npx-resolver.ts");
     const result = await resolveNpxBinary("npx", [
       "--yes",
       "dotenv-cli",
@@ -316,7 +316,7 @@ describe("npx-resolver", () => {
     const newer = new Date(Date.now() + 10_000);
     utimesSync(join(npmCache, "_npx", "old"), newer, newer);
 
-    const { resolveNpxBinary } = await import("../../../npx-resolver.ts");
+    const { resolveNpxBinary } = await import("../../../src/runtime/npx-resolver.ts");
     const result = await resolveNpxBinary("npx", ["-y", "@scope/pkg@2.0.0"]);
 
     expect(result?.binPath).toBe(correctBin);
@@ -336,7 +336,7 @@ describe("npx-resolver", () => {
     const newer = new Date(Date.now() + 10_000);
     utimesSync(join(npmCache, "_npx", "old"), newer, newer);
 
-    const { resolveNpxBinary } = await import("../../../npx-resolver.ts");
+    const { resolveNpxBinary } = await import("../../../src/runtime/npx-resolver.ts");
     const result = await resolveNpxBinary("npx", ["-y", "plainpkg@2.0.0"]);
 
     expect(result?.binPath).toBe(correctBin);
@@ -358,7 +358,7 @@ describe("npx-resolver", () => {
       const newer = new Date(Date.now() + 10_000);
       utimesSync(join(npmCache, "_npx", "old"), newer, newer);
 
-      const { resolveNpxBinary } = await import("../../../npx-resolver.ts");
+      const { resolveNpxBinary } = await import("../../../src/runtime/npx-resolver.ts");
       const result = await resolveNpxBinary("npx", ["-y", packageSpec]);
 
       expect(result?.binPath).toBe(correctBin);
@@ -392,7 +392,7 @@ describe("npx-resolver", () => {
       "utf-8",
     );
 
-    const { resolveNpxBinary } = await import("../../../npx-resolver.ts");
+    const { resolveNpxBinary } = await import("../../../src/runtime/npx-resolver.ts");
     const result = await resolveNpxBinary("npx", ["-y", "plainpkg@2.0.0"]);
     const cache = JSON.parse(readFileSync(join(agentDir, "mcp-npx-cache.json"), "utf-8"));
 

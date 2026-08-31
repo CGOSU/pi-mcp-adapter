@@ -63,7 +63,7 @@ describe("initializeMcp vs. a ctx invalidated mid-connect", () => {
       () => new Promise((resolve) => { resolveConnect = resolve; })
     );
 
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
 
     const armed = { value: false };
     const ctx = contextThatGoesStale(armed);
@@ -100,7 +100,7 @@ describe("initializeMcp vs. a ctx invalidated mid-connect", () => {
       () => new Promise((resolve) => { resolveConnect = resolve; })
     );
 
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
 
     const armed = { value: false };
     const ctx = contextThatGoesStale(armed, "unexpected ui failure");

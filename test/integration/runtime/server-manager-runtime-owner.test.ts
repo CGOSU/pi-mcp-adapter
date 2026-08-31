@@ -54,8 +54,8 @@ describe("MCP manager owner races", () => {
   });
 
   it("closes a connection that finishes after owner shutdown before insertion", async () => {
-    const { createMcpRuntimeOwner } = await import("../../../runtime-owner.ts");
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { createMcpRuntimeOwner } = await import("../../../src/extension/owner.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const connectGate = gate();
     mocks.connectGate = connectGate;
     const owner = createMcpRuntimeOwner();
@@ -74,7 +74,7 @@ describe("MCP manager owner races", () => {
   });
 
   it("close aborts an in-flight connect and prevents late insertion", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const connectGate = gate();
     mocks.connectGate = connectGate;
     const manager = new McpServerManager("/tmp/session");
@@ -88,7 +88,7 @@ describe("MCP manager owner races", () => {
   });
 
   it("closeAll aborts pending connects and settles without late insertion", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const connectGate = gate();
     mocks.connectGate = connectGate;
     const manager = new McpServerManager("/tmp/session");
@@ -102,7 +102,7 @@ describe("MCP manager owner races", () => {
   });
 
   it("surfaces transport cleanup failures from an aborted pending connect", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const connectGate = gate();
     mocks.connectGate = connectGate;
     const manager = new McpServerManager("/tmp/session");
@@ -118,7 +118,7 @@ describe("MCP manager owner races", () => {
   });
 
   it("surfaces client cleanup failures after a non-abort setup error", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     mocks.connectError = new Error("connect failed");
     const manager = new McpServerManager("/tmp/session");
     const connecting = manager.connect("demo", { command: "node", args: ["server.js"] });
@@ -129,7 +129,7 @@ describe("MCP manager owner races", () => {
   });
 
   it("rejects connections after terminal manager shutdown", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager("/tmp/session");
 
     await manager.closeAll();
@@ -141,8 +141,8 @@ describe("MCP manager owner races", () => {
   });
 
   it("does not create a stdio transport when npx resolution is cancelled", async () => {
-    const { createMcpRuntimeOwner } = await import("../../../runtime-owner.ts");
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { createMcpRuntimeOwner } = await import("../../../src/extension/owner.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const resolveGate = gate();
     mocks.resolveGate = resolveGate;
     const owner = createMcpRuntimeOwner();

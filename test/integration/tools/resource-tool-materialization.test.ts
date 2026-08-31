@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { createDirectToolExecutor } from "../../../direct-tools.ts";
-import { executeCall } from "../../../proxy-modes.ts";
-import { cleanupMaterializedBinaryResources } from "../../../tool-registrar.ts";
+import { createDirectToolExecutor } from "../../../src/tools/direct-tools.ts";
+import { executeCall } from "../../../src/tools/proxy/dispatcher.ts";
+import { cleanupMaterializedBinaryResources } from "../../../src/tools/tool-registrar.ts";
 import type { DirectToolSpec, ToolMetadata } from "../../../types.ts";
 
 const initMocks = vi.hoisted(() => ({

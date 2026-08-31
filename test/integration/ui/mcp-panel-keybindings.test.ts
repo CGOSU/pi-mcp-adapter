@@ -3,9 +3,9 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { createMcpPanel } from "../../../mcp-panel.ts";
-import { createMcpSetupPanel, type SetupPanelCallbacks } from "../../../mcp-setup-panel.ts";
-import { createPanelKeys } from "../../../panel-keys.ts";
+import { createMcpPanel } from "../../../src/ui/mcp-panel.ts";
+import { createMcpSetupPanel, type SetupPanelCallbacks } from "../../../src/ui/mcp-setup-panel.ts";
+import { createPanelKeys } from "../../../src/ui/panel-keys.ts";
 import type { McpDiscoverySummary } from "../../../config.ts";
 import type { McpConfig, McpPanelCallbacks } from "../../../types.ts";
 

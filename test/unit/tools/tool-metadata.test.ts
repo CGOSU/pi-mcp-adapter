@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatSchema } from "../../../tool-metadata.ts";
+import { formatSchema } from "../../../src/tools/tool-metadata.ts";
 
 describe("formatSchema", () => {
   it("keeps simple object schemas compact", () => {

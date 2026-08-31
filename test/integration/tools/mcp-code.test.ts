@@ -3,9 +3,9 @@ import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fileURLToPath } from "node:url";
 import { createMcpAdapter } from "../../../index.ts";
-import { runMcpScript } from "../../../mcp-code.ts";
-import { McpServerManager } from "../../../server-manager.ts";
-import type { McpExtensionState } from "../../../state.ts";
+import { runMcpScript } from "../../../src/tools/mcp-code.ts";
+import { McpServerManager } from "../../../src/runtime/server-manager.ts";
+import type { McpExtensionState } from "../../../src/extension/state.ts";
 import { MCP_TOOL_APPROVAL_REQUEST_EVENT, type McpToolApprovalRequest } from "../../../types.ts";
 
 const execFileAsync = promisify(execFile);

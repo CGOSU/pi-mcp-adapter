@@ -26,7 +26,7 @@ import {
   type ServerStreamResultPatchNotification,
 } from "../ui/stream-types.ts";
 import { resolveNpxBinary } from "./npx-resolver.ts";
-import { createJsonSchemaValidator } from "../../json-schema-validator.ts";
+import { createJsonSchemaValidator } from "../tools/json-schema-validator.ts";
 import { logger } from "../logger.ts";
 import { McpOAuthProvider } from "../auth/mcp-oauth-provider.ts";
 import { extractOAuthConfig, supportsOAuth, type McpOAuthRuntime } from "../auth/mcp-auth-flow.ts";

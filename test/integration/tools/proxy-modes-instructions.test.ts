@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { executeInstructions, executeList } from "../../../proxy-modes.ts";
-import type { McpExtensionState } from "../../../state.ts";
+import { executeInstructions, executeList } from "../../../src/tools/proxy/dispatcher.ts";
+import type { McpExtensionState } from "../../../src/extension/state.ts";
 
 const SHORT_INSTRUCTIONS = "Call read_skill with a skill name before answering.";
 const LONG_INSTRUCTIONS = `Available skills: ${Array.from({ length: 40 }, (_, i) => `skill-${i}`).join(", ")}. Call read_skill with a skill name to load one.`;

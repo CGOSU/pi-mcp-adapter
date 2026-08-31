@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { createDirectToolExecutor } from "../../../direct-tools.ts";
-import { executeCall, executeDescribe, executeSearch } from "../../../proxy-modes.ts";
-import type { McpExtensionState } from "../../../state.ts";
-import { ensureToolCallApproved, isToolCallApprovalRequired } from "../../../tool-approval.ts";
+import { createDirectToolExecutor } from "../../../src/tools/direct-tools.ts";
+import { executeCall, executeDescribe, executeSearch } from "../../../src/tools/proxy/dispatcher.ts";
+import type { McpExtensionState } from "../../../src/extension/state.ts";
+import { ensureToolCallApproved, isToolCallApprovalRequired } from "../../../src/tools/tool-approval.ts";
 import {
   MCP_TOOL_APPROVAL_REQUEST_EVENT,
   type McpConfig,

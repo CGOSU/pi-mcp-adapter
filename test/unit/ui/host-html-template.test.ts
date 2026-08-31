@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildHostHtmlTemplate, type HostHtmlTemplateInput } from "../../../host-html-template.ts";
+import { buildHostHtmlTemplate, type HostHtmlTemplateInput } from "../../../src/ui/host-html-template.ts";
 
 function createMinimalInput(overrides: Partial<HostHtmlTemplateInput> = {}): HostHtmlTemplateInput {
   return {
@@ -196,7 +196,7 @@ describe("buildHostHtmlTemplate", () => {
 
   describe("CSP handling", () => {
     it("maps standard resourceDomains to static resource directives", async () => {
-      const { buildCspMetaContent } = await import("../../../host-html-template.ts");
+      const { buildCspMetaContent } = await import("../../../src/ui/host-html-template.ts");
 
       const csp = buildCspMetaContent({
         resourceDomains: ["https://esm.sh"],
@@ -221,7 +221,7 @@ describe("buildHostHtmlTemplate", () => {
     });
 
     it("rejects CSP source expressions that can inject directives", async () => {
-      const { buildCspMetaContent } = await import("../../../host-html-template.ts");
+      const { buildCspMetaContent } = await import("../../../src/ui/host-html-template.ts");
 
       const csp = buildCspMetaContent({
         resourceDomains: [
@@ -251,7 +251,7 @@ describe("buildHostHtmlTemplate", () => {
     });
 
     it("rejects all control characters and non-ASCII CSP sources before serialization", async () => {
-      const { buildCspMetaContent } = await import("../../../host-html-template.ts");
+      const { buildCspMetaContent } = await import("../../../src/ui/host-html-template.ts");
       const rejectedSources = [
         "https://vertical-tab.example.com\vimg-src",
         "https://unit-separator.example.com\x1Fimg-src",
@@ -272,7 +272,7 @@ describe("buildHostHtmlTemplate", () => {
     });
 
     it("fails closed for malformed CSP domain containers", async () => {
-      const { buildCspMetaContent } = await import("../../../host-html-template.ts");
+      const { buildCspMetaContent } = await import("../../../src/ui/host-html-template.ts");
 
       const csp = buildCspMetaContent({
         resourceDomains: {} as unknown as string[],
@@ -296,7 +296,7 @@ describe("buildHostHtmlTemplate", () => {
     });
 
     it("deduplicates frame and base URI domains", async () => {
-      const { buildCspMetaContent } = await import("../../../host-html-template.ts");
+      const { buildCspMetaContent } = await import("../../../src/ui/host-html-template.ts");
 
       const csp = buildCspMetaContent({
         frameDomains: ["https://frames.example.com", "https://frames.example.com"],
@@ -310,7 +310,7 @@ describe("buildHostHtmlTemplate", () => {
     });
 
     it("returns a restrictive default when the app declares no CSP metadata", async () => {
-      const { buildCspMetaContent } = await import("../../../host-html-template.ts");
+      const { buildCspMetaContent } = await import("../../../src/ui/host-html-template.ts");
 
       expect(buildCspMetaContent(undefined)).toBe([
         "default-src 'none'",

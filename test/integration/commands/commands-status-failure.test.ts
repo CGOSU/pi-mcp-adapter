@@ -14,7 +14,7 @@ vi.mock("../../../src/extension/initialization.ts", () => ({
 
 describe("MCP status failure reasons", () => {
   it("includes the bounded failure reason as a safe single-line status", async () => {
-    const { showStatus } = await import("../../../commands.ts");
+    const { showStatus } = await import("../../../src/commands/handlers.ts");
     const ui = { notify: vi.fn() };
     await showStatus({
       config: { mcpServers: { demo: { command: "node" } } },
@@ -31,7 +31,7 @@ describe("MCP status failure reasons", () => {
   });
 
   it("uses known metadata during reconnect filtering", async () => {
-    const { reconnectServer } = await import("../../../commands.ts");
+    const { reconnectServer } = await import("../../../src/commands/handlers.ts");
     const connection = {
       status: "connected",
       tools: [{ name: "search-records", description: "Search" }],
@@ -59,7 +59,7 @@ describe("MCP status failure reasons", () => {
   });
 
   it("sanitizes captured diagnostics in reconnect notifications", async () => {
-    const { reconnectServer } = await import("../../../commands.ts");
+    const { reconnectServer } = await import("../../../src/commands/handlers.ts");
     const ui = { notify: vi.fn() };
     await reconnectServer({
       config: { settings: {}, mcpServers: { demo: { command: "node" } } },

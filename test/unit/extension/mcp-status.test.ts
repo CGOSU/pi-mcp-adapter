@@ -4,8 +4,8 @@ import {
   createMcpStatusSnapshot,
   publishMcpStatusShutdown,
   publishMcpStatusSnapshot,
-} from "../../../mcp-status.ts";
-import { executeStatus } from "../../../proxy-modes.ts";
+} from "../../../src/extension/status.ts";
+import { executeStatus } from "../../../src/tools/proxy/dispatcher.ts";
 
 function createState() {
   const manager = {

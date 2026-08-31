@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { updateStatusBar } from "../../../init.ts";
+import { updateStatusBar } from "../../../src/extension/initialization.ts";
 import { formatMcpStatus } from "../../../src/utils.ts";
 import type { McpSettings } from "../../../types.ts";
 

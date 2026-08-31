@@ -32,7 +32,7 @@ function makePi() {
 }
 
 async function importSync() {
-  const mod = await import("../../../namespace-tools.ts");
+  const mod = await import("../../../src/tools/namespace-tools.ts");
   return {
     syncNamespaceProxyTools: mod.syncNamespaceProxyTools,
     namespaceProxyName: mod.namespaceProxyName,

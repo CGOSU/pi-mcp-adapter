@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { ReadBuffer, serializeMessage } from "@modelcontextprotocol/client";
 import type { JSONRPCMessage } from "@modelcontextprotocol/client";
 import { afterEach, describe, expect, it } from "vitest";
-import { McpServerManager } from "../../../server-manager.ts";
+import { McpServerManager } from "../../../src/runtime/server-manager.ts";
 
 const managers: McpServerManager[] = [];
 const servers: Server[] = [];

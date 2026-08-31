@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
 import { computeServerHash, type MetadataCache } from "../src/catalog/metadata-cache.ts";
-import { resolveDirectTools } from "../direct-tool-catalog.ts";
-import { buildToolMetadata } from "../tool-metadata.ts";
+import { resolveDirectTools } from "../src/tools/direct-tool-catalog.ts";
+import { buildToolMetadata } from "../src/tools/tool-metadata.ts";
 import { createLiveToolSelectorCandidateIndex } from "../src/catalog/tool-selectors.ts";
 import type { McpConfig, ToolMetadata } from "../src/contracts/core.ts";
 

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { UiResourceHandler } from "../../../ui-resource-handler.ts";
-import { buildCspMetaContent } from "../../../host-html-template.ts";
+import { UiResourceHandler } from "../../../src/ui/resource-handler.ts";
+import { buildCspMetaContent } from "../../../src/ui/host-html-template.ts";
 import { SdkErrorCode, SdkHttpError, UrlElicitationRequiredError } from "@modelcontextprotocol/client";
-import type { McpServerManager } from "../../../server-manager.ts";
+import type { McpServerManager } from "../../../src/runtime/server-manager.ts";
 
 function httpError(status: number, message: string): SdkHttpError {
   return new SdkHttpError(SdkErrorCode.ClientHttpNotImplemented, message, { status });

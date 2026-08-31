@@ -64,7 +64,7 @@ describe("manual OAuth proxy actions", () => {
   });
 
   it("returns copyable instructions and authorization URL", async () => {
-    const { executeAuthStart } = await import("../../../proxy-modes.ts");
+    const { executeAuthStart } = await import("../../../src/tools/proxy/dispatcher.ts");
     const state = createState();
 
     const result = await executeAuthStart(state, "demo");
@@ -85,7 +85,7 @@ describe("manual OAuth proxy actions", () => {
   });
 
   it("rejects auth-start for non-OAuth servers", async () => {
-    const { executeAuthStart } = await import("../../../proxy-modes.ts");
+    const { executeAuthStart } = await import("../../../src/tools/proxy/dispatcher.ts");
 
     const result = await executeAuthStart(createState(), "bearer");
 
@@ -95,7 +95,7 @@ describe("manual OAuth proxy actions", () => {
   });
 
   it("completes auth from a copied redirect URL and resets connection state", async () => {
-    const { executeAuthComplete } = await import("../../../proxy-modes.ts");
+    const { executeAuthComplete } = await import("../../../src/tools/proxy/dispatcher.ts");
     const state = createState();
 
     const result = await executeAuthComplete(state, "demo", "http://localhost:19876/callback?code=abc&state=state");

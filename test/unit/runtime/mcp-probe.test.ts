@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { probeMcpEndpoint } from "../../../mcp-probe.ts";
+import { probeMcpEndpoint } from "../../../src/runtime/mcp-probe.ts";
 
 const fetchMock = vi.fn();
 

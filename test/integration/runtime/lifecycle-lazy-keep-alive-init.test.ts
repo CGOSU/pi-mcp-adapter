@@ -155,7 +155,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
       })),
       getAllConnections: vi.fn(() => new Map()),
     };
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
 
     await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
       cwd: tempDir,
@@ -199,7 +199,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
       })),
       getAllConnections: vi.fn(() => new Map()),
     };
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
 
     await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
       cwd: tempDir,
@@ -225,7 +225,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
       settings: { toolPrefix: "server" },
       mcpServers: { srv: { command: "demo", includeTools: ["*"] } },
     };
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
 
     await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
       cwd: tempDir,
@@ -238,7 +238,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
 
   it("marks no-cache bootstrap spawns for health-check reconnects", async () => {
     mocks.cache = null;
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
 
     const state = await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
       cwd: tempDir,
@@ -262,7 +262,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
     };
     mocks.getMissingConfiguredDirectToolServers.mockReturnValue(["srv"]);
     mocks.manager.connect.mockRejectedValueOnce(new Error("bootstrap failed"));
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
 
     const state = await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
       cwd: tempDir,
@@ -284,7 +284,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
     };
     mocks.getMissingConfiguredDirectToolServers.mockReturnValue(["srv"]);
     mocks.manager.connect.mockRejectedValueOnce(new Error("startup failed"));
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
 
     const state = await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
       cwd: tempDir,
@@ -307,7 +307,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
     };
     mocks.manager.connect.mockRejectedValueOnce(new Error("stderr \x1b]52;c;clipboard-secret\x07startup failed"));
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
     const ui = { setStatus: vi.fn(), notify: vi.fn() };
 
     const state = await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
@@ -330,7 +330,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
       settings: { showStatusIcon: false },
       mcpServers: { srv: { command: "demo", lifecycle: "eager" } },
     };
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
     const ui = { setStatus: vi.fn(), notify: vi.fn() };
 
     await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
@@ -350,7 +350,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
       settings: { notifyOnStartupConnect: false },
       mcpServers: { srv: { command: "demo", lifecycle: "eager" } },
     };
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
     const ui = { setStatus: vi.fn(), notify: vi.fn() };
 
     await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
@@ -370,7 +370,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
       settings: { mcpFooterStatus: "off" },
       mcpServers: { srv: { command: "demo", lifecycle: "eager" } },
     };
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
     const ui = { setStatus: vi.fn(), notify: vi.fn() };
 
     await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
@@ -393,7 +393,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
     };
     mocks.manager.connect.mockRejectedValueOnce(new Error("startup failed"));
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
     const ui = { setStatus: vi.fn(), notify: vi.fn() };
 
     await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
@@ -419,7 +419,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
       controller.abort(new Error("startup cancelled"));
       throw new Error("startup cancelled");
     });
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
     const ui = { setStatus: vi.fn(), notify: vi.fn() };
 
     const state = await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
@@ -436,7 +436,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
   });
 
   it("does not preserve stale cached resources after authoritative list-change removal", async () => {
-    const { initializeMcp, updateMetadataCache } = await import("../../../init.ts");
+    const { initializeMcp, updateMetadataCache } = await import("../../../src/extension/initialization.ts");
 
     const state = await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
       cwd: tempDir,
@@ -468,7 +468,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
     mkdirSync(tempDir, { recursive: true });
     writeFileSync(mocks.cachePath, JSON.stringify({ version: 1, servers: {} }));
     mocks.getMissingConfiguredDirectToolServers.mockReturnValue(["srv"]);
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
 
     const state = await initializeMcp({ getFlag: vi.fn(() => undefined) } as any, {
       cwd: tempDir,
@@ -484,7 +484,7 @@ describe("lazy-keep-alive initializeMcp integration", () => {
   });
 
   it("waits for keep-alive convergence before adapter-triggered model turns", async () => {
-    const { initializeMcp } = await import("../../../init.ts");
+    const { initializeMcp } = await import("../../../src/extension/initialization.ts");
     const sendMessage = vi.fn();
     const state = await initializeMcp({
       getFlag: vi.fn(() => undefined),

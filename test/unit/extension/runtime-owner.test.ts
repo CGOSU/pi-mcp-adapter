@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { combineAbortSignals, createMcpRuntimeOwner, createOwnedUi } from "../../../runtime-owner.ts";
+import { combineAbortSignals, createMcpRuntimeOwner, createOwnedUi } from "../../../src/extension/owner.ts";
 
 describe("MCP runtime ownership", () => {
   it("contains synchronous and asynchronous cleanup failures and is idempotent", async () => {

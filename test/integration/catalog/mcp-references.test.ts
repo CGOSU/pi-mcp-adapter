@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeServerHash, createMetadataCatalogSnapshot } from "../../../src/catalog/metadata-cache.ts";
 import type { CachedTool, McpConfig, ServerEntry } from "../../../types.ts";
-import { namespaceProxyName, parseMcpReference, resolveMcpToolReferences } from "../../../mcp-references.ts";
+import { namespaceProxyName, parseMcpReference, resolveMcpToolReferences } from "../../../src/tools/mcp-references.ts";
 
 const cacheFor = (entries: Array<[string, { definition: ServerEntry; tools: CachedTool[]; cachedAt?: number; configHash?: string }]>) => ({
   version: 1,

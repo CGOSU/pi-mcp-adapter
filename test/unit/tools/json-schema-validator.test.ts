@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JsonSchemaType } from "@modelcontextprotocol/client";
-import { createJsonSchemaValidator } from "../../../json-schema-validator.ts";
+import { createJsonSchemaValidator } from "../../../src/tools/json-schema-validator.ts";
 
 const draft07 = "http://json-schema.org/draft-07/schema#";
 const draft07Https = "https://json-schema.org/draft-07/schema#";

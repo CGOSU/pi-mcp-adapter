@@ -36,3 +36,11 @@
 - Catalog/search：`npm run benchmark:catalog -- --runs 5` 的 direct/live shared median 为 5×100 `4.72ms`/`4.45ms`、20×100 `18.73ms`/`17.43ms`、50×100 `45.07ms`/`45.05ms`；旧 per-server 50×100 对照为 `989.27ms`。10,000 工具搜索 cold `50.28ms`、5 次 warm median `5.73ms`，结果正确。
 - 通过：相关 catalog/package/startup/direct/namespace/proxy 行为集合 10 个文件、111 个测试；`npm run typecheck`；`npm run test:public-exports`；`npm run test:oauth` 的 141 个 Node tests；`npm pack --dry-run --json` 的 180 个文件且无测试文件；production-only tarball 安装、public subpath imports、CLI smoke test；`node --check`；`git diff --check` 与 trailing-whitespace 检查。
 - 环境遗留：完整 Windows Vitest 仍可能因全局配置、Linux keyring、`taskkill`、symlink、Unix socket/file mode 和 CLI shebang 假设失败；针对性验证通过。`AGENTS.md` 与 `docs/clean-code.md` 继续保持未跟踪排除。
+
+### 2026-08-23：五入口分块发布物最终交付检查
+
+- 完成：删除 53 个未发布根 forwarding facade 后，公共 npm 发布边界改为五个 `dist` ESM 入口；保留每个入口的 dynamic import 分块，发布 `dist/cli.js` 以及 `mcp-script-worker.mjs`、`mcp-keyring-helper.cjs`、`app-bridge.bundle.js` 三项独立资源。版本保持 `2.27.0`，未执行 commit/push。
+- 通过：`npm run build:public` 生成 45 个文件；重复构建 SHA-256 快照比较为 `deterministic=True`；`npm run typecheck`；`npm run test:public-exports` 的 5 个 Node tests；`npm run test:oauth` 的 141 个测试；生产 tarball 临时 `npm install --omit=dev`、四个独立 Node subpath imports 和 `dist/cli.js --help`；声明消费者 `tsc --noEmit`；相关 `node --check` 与 `git diff --check`。
+- 发布边界：`npm pack --dry-run --json`/tarball 回归为 51 个文件，低于 60，且无 `src/**`、`test/**`、source map 或已删除 facade；动态 chunk 与三项资源的相对 URL 产物检查通过。包根入口在带开发期 Pi `typebox` peer 的 public exports 检查中通过；production-only 子路径不依赖 devDependencies。
+- Lazy Load：`node scripts/benchmark-startup.mjs --runs 3` 的 source module/main/wall 中位数为 `437ms`/`475ms`/`1128ms`，bundle 为 `199ms`/`228ms`/`754ms`，未超过 15% 回退；静态启动导入图通过。
+- 环境遗留：最终 `npm run test:vitest` 为 96 个文件通过、13 个文件失败（1183 个测试通过、137 个失败、12 个跳过）；失败仍集中于 Windows 全局 host 配置污染、`taskkill`/进程清理、symlink 权限、缺少 interactive visualizer 构建产物、keyring 与 POSIX 文件 mode 等既有环境限制，未发现本次发布 bundle 的模块解析失败。

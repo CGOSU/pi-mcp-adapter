@@ -101,7 +101,7 @@ describe("proxy auto auth", () => {
   });
 
   it("refreshes an already connected server instead of reusing stale metadata", async () => {
-    const { executeConnect } = await import("../../../proxy-modes.ts");
+    const { executeConnect } = await import("../../../src/tools/proxy/dispatcher.ts");
 
     const stale = {
       status: "connected",
@@ -141,7 +141,7 @@ describe("proxy auto auth", () => {
   });
 
   it("keeps a same-server tool when another current sibling matches the selector", async () => {
-    const { executeConnect } = await import("../../../proxy-modes.ts");
+    const { executeConnect } = await import("../../../src/tools/proxy/dispatcher.ts");
     const connection = {
       status: "connected",
       tools: [
@@ -165,7 +165,7 @@ describe("proxy auto auth", () => {
   });
 
   it("ignores stale same-server metadata during executeConnect", async () => {
-    const { executeConnect } = await import("../../../proxy-modes.ts");
+    const { executeConnect } = await import("../../../src/tools/proxy/dispatcher.ts");
     const definition = { command: "demo", excludeTools: ["demo_search_records"] };
     const state = {
       config: { settings: { toolPrefix: "server" }, mcpServers: { demo: definition } },
@@ -184,7 +184,7 @@ describe("proxy auto auth", () => {
   });
 
   it("uses known metadata during executeConnect filtering", async () => {
-    const { executeConnect } = await import("../../../proxy-modes.ts");
+    const { executeConnect } = await import("../../../src/tools/proxy/dispatcher.ts");
     const connection = {
       status: "connected",
       tools: [{ name: "search-records", description: "Search" }],
@@ -214,7 +214,7 @@ describe("proxy auto auth", () => {
   });
 
   it("auto-authenticates and retries executeConnect once", async () => {
-    const { executeConnect } = await import("../../../proxy-modes.ts");
+    const { executeConnect } = await import("../../../src/tools/proxy/dispatcher.ts");
 
     let current: any;
     const connected = {
@@ -275,7 +275,7 @@ describe("proxy auto auth", () => {
   });
 
   it("fails fast for non-ui browser auth when autoAuth is enabled", async () => {
-    const { executeConnect } = await import("../../../proxy-modes.ts");
+    const { executeConnect } = await import("../../../src/tools/proxy/dispatcher.ts");
 
     const manager = {
       connect: vi.fn(async () => ({ status: "needs-auth" })),
@@ -304,7 +304,7 @@ describe("proxy auto auth", () => {
   });
 
   it("uses custom authRequiredMessage for non-ui autoAuth failures", async () => {
-    const { executeConnect } = await import("../../../proxy-modes.ts");
+    const { executeConnect } = await import("../../../src/tools/proxy/dispatcher.ts");
 
     const state = {
       config: {
@@ -334,7 +334,7 @@ describe("proxy auto auth", () => {
 
   it("runs URL elicitations returned by proxy tool calls", async () => {
     const { UrlElicitationRequiredError } = await import("@modelcontextprotocol/client");
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
     const error = new UrlElicitationRequiredError([{
       mode: "url",
       message: "Connect your account",
@@ -372,7 +372,7 @@ describe("proxy auto auth", () => {
   });
 
   it("auto-authenticates and retries executeCall once", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
 
     let current: any = { status: "needs-auth" };
     const connected = {
@@ -450,7 +450,7 @@ describe("proxy auto auth", () => {
   });
 
   it("rethrows proxy auto-auth cancellation", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
     const controller = new AbortController();
     const reason = new Error("request cancelled");
     reason.name = "AbortError";
@@ -482,7 +482,7 @@ describe("proxy auto auth", () => {
   });
 
   it("surfaces aborted proxy tool calls via the forwarded AbortSignal", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
     const controller = new AbortController();
 
     const requestOptions = { signal: controller.signal, timeout: 1234 };
@@ -525,7 +525,7 @@ describe("proxy auto auth", () => {
   });
 
   it("preserves owner cancellation during a proxy tool call", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
     const owner = new AbortController();
     const connection = {
       status: "connected",
@@ -555,7 +555,7 @@ describe("proxy auto auth", () => {
   });
 
   it("fails closed when lazy metadata has duplicate exact tool names", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
     const firstCall = vi.fn();
     const secondCall = vi.fn();
     mocks.lazyConnect.mockImplementation(async (state: any, serverName: string) => {
@@ -586,7 +586,7 @@ describe("proxy auto auth", () => {
   });
 
   it("prefers a lazy exact match over a normalized fallback", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
     const exactCall = vi.fn(async () => ({ content: [{ type: "text", text: "exact" }] }));
     const fallbackCall = vi.fn();
     mocks.lazyConnect.mockImplementation(async (state: any, serverName: string) => {
@@ -619,7 +619,7 @@ describe("proxy auto auth", () => {
   });
 
   it("fails closed when lazy metadata has duplicate normalized tool names", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
     const callTool = vi.fn();
     mocks.lazyConnect.mockImplementation(async (state: any, serverName: string) => {
       state.toolMetadata.set(serverName, [
@@ -647,8 +647,8 @@ describe("proxy auto auth", () => {
   });
 
   it("shares one cold connect across concurrent proxy calls and applies timeout during bootstrap", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
 
     const pause = () => new Promise((resolve) => setTimeout(resolve, 10));
     mocks.connectImpl.mockImplementation(async () => {

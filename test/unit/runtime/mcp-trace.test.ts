@@ -5,7 +5,7 @@ import {
   isMcpTraceEnabled,
   McpTraceWriter,
   wrapTransportWithMcpTrace,
-} from "../../../mcp-trace.ts";
+} from "../../../src/runtime/mcp-trace.ts";
 
 function fakeTransport(overrides: Partial<Transport> = {}): Transport {
   return {

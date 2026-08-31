@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { resolveDirectTools } from "../../../direct-tool-catalog.ts";
+import { resolveDirectTools } from "../../../src/tools/direct-tool-catalog.ts";
 import { computeServerHash, type MetadataCache } from "../../../src/catalog/metadata-cache.ts";
-import { buildToolMetadata } from "../../../tool-metadata.ts";
+import { buildToolMetadata } from "../../../src/tools/tool-metadata.ts";
 import { createLiveToolSelectorCandidateIndex, type McpConfig, type ToolMetadata } from "../../../types.ts";
 
 function cacheEntry(definition: McpConfig["mcpServers"][string], tools: Array<{ name: string }>) {

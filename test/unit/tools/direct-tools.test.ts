@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { DIRECT_TOOLS_ADVISORY_THRESHOLD, buildProxyDescription, prepareDirectToolArguments, resolveDirectTools } from "../../../direct-tools.ts";
+import { DIRECT_TOOLS_ADVISORY_THRESHOLD, buildProxyDescription, prepareDirectToolArguments, resolveDirectTools } from "../../../src/tools/direct-tools.ts";
 import {
   computeServerHash,
   createMetadataCatalogSnapshot,
@@ -9,11 +9,11 @@ import {
   isServerCacheValid,
   type MetadataCache,
 } from "../../../src/catalog/metadata-cache.ts";
-import { buildToolMetadata } from "../../../tool-metadata.ts";
+import { buildToolMetadata } from "../../../src/tools/tool-metadata.ts";
 import { formatToolName } from "../../../types.ts";
 import type { McpConfig } from "../../../types.ts";
 import { reconstructToolMetadata } from "../../../src/catalog/metadata-cache.ts";
-import { updateServerMetadata } from "../../../init.ts";
+import { updateServerMetadata } from "../../../src/extension/initialization.ts";
 import { resolveCachedPrompts } from "../../../src/tools/prompts.ts";
 
 const originalHashEnv = {
@@ -37,7 +37,7 @@ afterEach(() => {
 
 describe("direct-tool catalog compatibility", () => {
   it("re-exports startup helpers from the lightweight catalog module", async () => {
-    const catalog = await import("../../../direct-tool-catalog.ts");
+    const catalog = await import("../../../src/tools/direct-tool-catalog.ts");
 
     expect(DIRECT_TOOLS_ADVISORY_THRESHOLD).toBe(catalog.DIRECT_TOOLS_ADVISORY_THRESHOLD);
     expect(buildProxyDescription).toBe(catalog.buildProxyDescription);
@@ -1176,7 +1176,7 @@ describe("excludeTools filtering", () => {
 
     updateServerMetadata(state, "my-server");
     expect(state.toolMetadata.get("my-server").map((tool: any) => tool.name)).toEqual(["my-server_search-records"]);
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
     await expect(executeCall(state, "my-server_search-records", {})).resolves.toMatchObject({ details: { server: "my-server", tool: "search-records" } });
     expect(callTool).toHaveBeenCalledOnce();
     await expect(executeCall(state, "my-server_search-records", { token: undefined })).rejects.toThrow(

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { join, dirname } from "node:path";
-import { McpServerManager } from "../../../server-manager.ts";
+import { McpServerManager } from "../../../src/runtime/server-manager.ts";
 import { fileURLToPath } from "node:url";
 
 const fixture = fileURLToPath(new URL("../../fixtures/delayed-mcp-server.mjs", import.meta.url));

@@ -2,13 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createDirectToolExecutor, getMissingConfiguredDirectToolServers, resolveDirectTools } from "../../../direct-tools.ts";
-import { executeAuthStart, executeCall, executeConnect, executeDescribe, executeInstructions, executeList, executeSearch, executeStatus } from "../../../proxy-modes.ts";
-import { initializeMcp, updateStatusBar } from "../../../init.ts";
+import { createDirectToolExecutor, getMissingConfiguredDirectToolServers, resolveDirectTools } from "../../../src/tools/direct-tools.ts";
+import { executeAuthStart, executeCall, executeConnect, executeDescribe, executeInstructions, executeList, executeSearch, executeStatus } from "../../../src/tools/proxy/dispatcher.ts";
+import { initializeMcp, updateStatusBar } from "../../../src/extension/initialization.ts";
 import { loadMcpConfig, writeProjectServerDisabledOverride } from "../../../config.ts";
 import { computeServerHash, type MetadataCache } from "../../../src/catalog/metadata-cache.ts";
-import { McpServerManager } from "../../../server-manager.ts";
-import { UiResourceHandler } from "../../../ui-resource-handler.ts";
+import { McpServerManager } from "../../../src/runtime/server-manager.ts";
+import { UiResourceHandler } from "../../../src/ui/resource-handler.ts";
 
 const cache: MetadataCache = {
   version: 1,

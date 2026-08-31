@@ -51,7 +51,9 @@ jobs:
       - name: Load public exports without devDependencies
         run: >-
           node --input-type=module --eval
-          "for (const name of ['config', 'metadata-cache', 'types']) await import('pi-mcp-adapter/' + name)"
+          "for (const name of ['config', 'metadata-cache', 'types', 'oauth']) await import('pi-mcp-adapter/' + name)"
+      - name: Smoke test the published CLI bundle
+        run: node node_modules/pi-mcp-adapter/dist/cli.js --help
 
   node24-worker-fds:
     runs-on: ubuntu-latest

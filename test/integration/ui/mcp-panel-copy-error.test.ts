@@ -18,7 +18,7 @@ describe("mcp-panel failure copy", () => {
   afterEach(() => vi.clearAllMocks());
 
   it("copies a sanitized selected failure reason and shows a notice", async () => {
-    const { createMcpPanel } = await import("../../../mcp-panel.ts");
+    const { createMcpPanel } = await import("../../../src/ui/mcp-panel.ts");
     const { computeServerHash } = await import("../../../src/catalog/metadata-cache.ts");
     const config = { mcpServers: { demo: { command: "node", args: ["server.js"] } } };
     const cache = {
@@ -54,7 +54,7 @@ describe("mcp-panel failure copy", () => {
   });
 
   it("does nothing when the selected server has no failure reason", async () => {
-    const { createMcpPanel } = await import("../../../mcp-panel.ts");
+    const { createMcpPanel } = await import("../../../src/ui/mcp-panel.ts");
     const config = { mcpServers: { demo: { command: "node" } } };
     const panel = createMcpPanel(
       config as any,

@@ -42,7 +42,7 @@ const withTimeout = <T>(promise: Promise<T>, label: string) =>
 
 describe("MCP panels outside the terminal UI", () => {
   it("/mcp falls back to the text status instead of hanging on an overlay", async () => {
-    const { openMcpPanel } = await import("../../../commands.ts");
+    const { openMcpPanel } = await import("../../../src/commands/handlers.ts");
     const { ui, notify, custom } = nonTuiUi();
 
     const result = await withTimeout(
@@ -56,7 +56,7 @@ describe("MCP panels outside the terminal UI", () => {
   });
 
   it("/mcp setup explains where the panel is available", async () => {
-    const { openMcpSetup } = await import("../../../commands.ts");
+    const { openMcpSetup } = await import("../../../src/commands/handlers.ts");
     const { ui, notify, custom } = nonTuiUi();
 
     const result = await withTimeout(
@@ -70,7 +70,7 @@ describe("MCP panels outside the terminal UI", () => {
   });
 
   it("/mcp-auth points at the per-server command", async () => {
-    const { openMcpAuthPanel } = await import("../../../commands.ts");
+    const { openMcpAuthPanel } = await import("../../../src/commands/handlers.ts");
     const { ui, notify, custom } = nonTuiUi();
 
     const result = await withTimeout(
@@ -84,7 +84,7 @@ describe("MCP panels outside the terminal UI", () => {
   });
 
   it("still renders the overlay in the terminal UI", async () => {
-    const { openMcpSetup } = await import("../../../commands.ts");
+    const { openMcpSetup } = await import("../../../src/commands/handlers.ts");
     const { ui, custom } = nonTuiUi();
 
     // `custom` never settles, so poll for the call rather than awaiting the

@@ -11,7 +11,7 @@ import {
   formatMcpToolResultLines,
   renderMcpProxyToolCall,
   renderMcpToolResult,
-} from "../../../tool-result-renderer.ts";
+} from "../../../src/tools/tool-result-renderer.ts";
 
 type TestDetails = Record<string, unknown> & { error?: unknown };
 type TestResult = AgentToolResult<TestDetails>;

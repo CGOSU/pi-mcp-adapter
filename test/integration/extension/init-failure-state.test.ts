@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearFailure, getFailureAgeSeconds, getFailureMessage, recordFailure } from "../../../init.ts";
-import { createMcpRuntimeOwner } from "../../../runtime-owner.ts";
+import { clearFailure, getFailureAgeSeconds, getFailureMessage, recordFailure } from "../../../src/extension/initialization.ts";
+import { createMcpRuntimeOwner } from "../../../src/extension/owner.ts";
 
 describe("MCP failure state", () => {
   afterEach(() => vi.useRealTimers());

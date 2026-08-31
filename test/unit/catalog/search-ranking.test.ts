@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { paginate, rankToolMatches, resolveSearchKeywords, scoreToolMatch } from "../../../search-ranking.ts";
-import type { McpExtensionState } from "../../../state.ts";
+import { paginate, rankToolMatches, resolveSearchKeywords, scoreToolMatch } from "../../../src/tools/search-ranking.ts";
+import type { McpExtensionState } from "../../../src/extension/state.ts";
 import type { ServerEntry, ToolMetadata } from "../../../types.ts";
 
 const tool = (name: string, description: string) => ({

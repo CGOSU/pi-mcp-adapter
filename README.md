@@ -32,6 +32,18 @@ Git-based Pi installs do not compile TypeScript during the production-only depen
 
 Restart Pi after installation.
 
+### Published package layout
+
+The repository keeps the modular implementation under `src/**`; the npm package publishes the reproducible `dist/` build instead of the source tree. The build has five compatible ESM public entries:
+
+- `pi-mcp-adapter` — the Pi extension and SDK API
+- `pi-mcp-adapter/types`
+- `pi-mcp-adapter/config`
+- `pi-mcp-adapter/metadata-cache`
+- `pi-mcp-adapter/oauth`
+
+The entries retain native `dynamic import()` boundaries and are emitted as code-splitting chunks, so the extension does not eagerly load the MCP connection runtime, OAuth, commands, script worker, or UI runtime. The package also carries the independently loaded `mcp-script-worker.mjs`, `mcp-keyring-helper.cjs`, and `app-bridge.bundle.js` resources beside the chunks that resolve them. `npm run build:public` reproduces `dist/`; `prepack` runs that build before npm packaging. The published CLI is `dist/cli.js`.
+
 ## What happens on first run
 
 The adapter reads standard MCP files automatically. No extra setup needed if you already have them.
@@ -193,7 +205,7 @@ const extension = createMcpAdapter({
 // Register `extension` with the host SDK.
 ```
 
-The package ships TypeScript source for Pi's source-loader and SDK integrations. Use a TypeScript-capable loader/toolchain (for example `node --import tsx`) when importing the package from a standalone Node process; raw Node ESM does not execute the `.ts` entry directly.
+The published package exposes built ESM entries, so standalone Node consumers can import the public helpers without a TypeScript loader. The repository's root `.ts` files remain source-compatibility entries for local development; the Pi package and npm exports resolve to `dist/`.
 
 A supplied `config` is a complete, isolated snapshot. It is not merged with files, imports, global config, project config, or `--mcp-config`, and it is never mutated. Each adapter factory and session receives its own clone, so separate integrations can use different servers and settings safely. In this mode, server status, reconnect, explicit `/mcp-auth <server>`, proxy calls, and direct tools continue to work; setup and no-argument auth/status panels report the limitation instead of discovering or writing ambient config.
 
@@ -802,7 +814,7 @@ Implementation is organized by responsibility:
 
 Startup statically loads only configuration reads, cached metadata, lightweight schemas, registration helpers, and the tool surface. MCP runtime connections, OAuth flow/storage, command handlers, gateway/direct execution, script workers, and UI runtime stay behind cached native `dynamic import()` boundaries. A valid all-lazy metadata cache can therefore skip full runtime initialization at `session_start`; eager, keep-alive, cold-cache, and explicit direct-tool behavior retain their existing semantics.
 
-Tests mirror these domains under `test/unit` and `test/integration`; native Node/public-package checks live under `test/node`, and reusable process fixtures live under `test/fixtures`. The package publishes `src`, the root compatibility facades, generated `dist`, CLI files, skills, and UI assets, while excluding tests.
+Tests mirror these domains under `test/unit` and `test/integration`; native Node/public-package checks live under `test/node`, and reusable process fixtures live under `test/fixtures`. The repository keeps the root source compatibility entries, while the npm package publishes generated `dist`, CLI files, skills, and UI assets and excludes `src/**` and tests.
 
 ## How It Works
 

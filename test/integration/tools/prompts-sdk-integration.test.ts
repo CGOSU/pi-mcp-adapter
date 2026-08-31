@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { McpServerManager } from "../../../server-manager.ts";
+import { McpServerManager } from "../../../src/runtime/server-manager.ts";
 import { createPromptCommand } from "../../../src/tools/prompts.ts";
 import { reconstructPromptMetadata } from "../../../src/catalog/metadata-cache.ts";
-import type { McpExtensionState } from "../../../state.ts";
+import type { McpExtensionState } from "../../../src/extension/state.ts";
 import type { PromptMetadata } from "../../../types.ts";
 import { formatPromptCommandName } from "../../../types.ts";
 

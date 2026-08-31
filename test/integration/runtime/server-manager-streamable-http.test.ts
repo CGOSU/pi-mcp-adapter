@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { McpServerManager } from "../../../server-manager.ts";
+import { McpServerManager } from "../../../src/runtime/server-manager.ts";
 
 const servers: http.Server[] = [];
 const temporaryDirectories: string[] = [];

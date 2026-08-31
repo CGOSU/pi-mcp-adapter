@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { execFile } from "node:child_process";
-import { ConsentManager } from "../../../consent-manager.ts";
-import { createDirectToolExecutor } from "../../../direct-tools.ts";
-import { executeCall } from "../../../proxy-modes.ts";
-import { maybeStartUiSession } from "../../../ui-session.ts";
+import { ConsentManager } from "../../../src/ui/consent-manager.ts";
+import { createDirectToolExecutor } from "../../../src/tools/direct-tools.ts";
+import { executeCall } from "../../../src/tools/proxy/dispatcher.ts";
+import { maybeStartUiSession } from "../../../src/ui/session.ts";
 
 const glimpseMocks = vi.hoisted(() => ({
   isGlimpseAvailable: vi.fn(() => true),

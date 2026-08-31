@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { executeCall, executeDescribe, executeList, executeSearch, executeStatus } from "../../../proxy-modes.ts";
-import type { McpExtensionState } from "../../../state.ts";
+import { executeCall, executeDescribe, executeList, executeSearch, executeStatus } from "../../../src/tools/proxy/dispatcher.ts";
+import type { McpExtensionState } from "../../../src/extension/state.ts";
 
 function createState(): McpExtensionState {
   return {

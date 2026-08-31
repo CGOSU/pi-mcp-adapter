@@ -1,9 +1,9 @@
 import { SdkErrorCode, SdkHttpError } from "@modelcontextprotocol/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import http from "node:http";
-import { startUiServer, type UiServerHandle, type UiServerOptions } from "../../../ui-server.ts";
-import type { McpServerManager, ServerConnection } from "../../../server-manager.ts";
-import type { ConsentManager } from "../../../consent-manager.ts";
+import { startUiServer, type UiServerHandle, type UiServerOptions } from "../../../src/ui/server.ts";
+import type { McpServerManager, ServerConnection } from "../../../src/runtime/server-manager.ts";
+import type { ConsentManager } from "../../../src/ui/consent-manager.ts";
 import type { UiResourceContent, McpConfig } from "../../../types.ts";
 
 function httpError(status: number, message: string): SdkHttpError {

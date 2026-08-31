@@ -6,10 +6,10 @@
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import http from "node:http";
-import { startUiServer, type UiServerHandle } from "../../../ui-server.ts";
-import { UiResourceHandler } from "../../../ui-resource-handler.ts";
-import { ConsentManager } from "../../../consent-manager.ts";
-import type { McpServerManager } from "../../../server-manager.ts";
+import { startUiServer, type UiServerHandle } from "../../../src/ui/server.ts";
+import { UiResourceHandler } from "../../../src/ui/resource-handler.ts";
+import { ConsentManager } from "../../../src/ui/consent-manager.ts";
+import type { McpServerManager } from "../../../src/runtime/server-manager.ts";
 import type { UiResourceContent, UiSessionMessages } from "../../../types.ts";
 
 // Helper to make HTTP requests

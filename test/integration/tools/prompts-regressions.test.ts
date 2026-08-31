@@ -4,10 +4,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { createPromptCommand, formatPromptResult, resolveCachedPrompts } from "../../../src/tools/prompts.ts";
-import { showPrompts } from "../../../commands.ts";
+import { showPrompts } from "../../../src/commands/handlers.ts";
 import { computeServerHash, saveMetadataCache } from "../../../src/catalog/metadata-cache.ts";
-import { updateMetadataCache } from "../../../init.ts";
-import type { McpExtensionState } from "../../../state.ts";
+import { updateMetadataCache } from "../../../src/extension/initialization.ts";
+import type { McpExtensionState } from "../../../src/extension/state.ts";
 import type { PromptMetadata } from "../../../types.ts";
 
 const definition = { command: "demo" };

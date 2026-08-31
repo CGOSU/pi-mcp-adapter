@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { McpServerManager } from "../../../server-manager.ts";
+import { McpServerManager } from "../../../src/runtime/server-manager.ts";
 
 const managers: McpServerManager[] = [];
 

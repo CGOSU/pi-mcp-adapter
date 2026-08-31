@@ -18,12 +18,16 @@ test("public metadata, config, and type helpers load in plain Node from node_mod
       "--input-type=module",
       "--eval",
       [
+        'const adapter = await import("pi-mcp-adapter");',
         'const metadata = await import("pi-mcp-adapter/metadata-cache");',
         'const config = await import("pi-mcp-adapter/config");',
+        'const oauth = await import("pi-mcp-adapter/oauth");',
         'const types = await import("pi-mcp-adapter/types");',
-        'if (typeof metadata.isServerCacheValid !== "function") process.exit(2);',
-        'if (typeof types.formatToolName !== "function") process.exit(3);',
-        'if (typeof config.loadMcpConfig !== "function") process.exit(4);'
+        'if (typeof adapter.default !== "function") process.exit(2);',
+        'if (typeof metadata.isServerCacheValid !== "function") process.exit(3);',
+        'if (typeof types.formatToolName !== "function") process.exit(4);',
+        'if (typeof config.loadMcpConfig !== "function") process.exit(5);',
+        'if (typeof oauth.getMcpOAuthTokensForUrl !== "function") process.exit(6);'
       ].join("\n")
     ], {
       cwd: fixtureRoot,

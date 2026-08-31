@@ -105,7 +105,7 @@ describe("McpServerManager HTTP bearer auth", () => {
 
 
   it("interpolates ${VAR} URL placeholders", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     process.env.MCP_TEST_URL = "https://example.test/mcp";
 
     const manager = new McpServerManager();
@@ -117,7 +117,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("interpolates $env:VAR URL placeholders", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     process.env.MCP_TEST_URL = "https://example.test/mcp";
 
     const manager = new McpServerManager();
@@ -129,7 +129,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("interpolates {env:VAR} URL and header placeholders", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     process.env.MCP_TEST_URL = "https://example.test/mcp";
     process.env.MCP_TEST_BEARER_TOKEN = "brace-token";
 
@@ -144,7 +144,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("fails closed when URL placeholders are missing", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     delete process.env.MCP_TEST_URL;
 
     const manager = new McpServerManager();
@@ -159,7 +159,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("interpolates ${VAR} bearerToken placeholders", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     process.env.MCP_TEST_BEARER_TOKEN = "placeholder-token";
 
     const manager = new McpServerManager();
@@ -173,7 +173,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("interpolates $env:VAR bearerToken placeholders", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     process.env.MCP_TEST_BEARER_TOKEN = "env-prefix-token";
 
     const manager = new McpServerManager();
@@ -187,7 +187,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("keeps bearerTokenEnv support", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     process.env.MCP_TEST_BEARER_TOKEN_ENV = "named-env-token";
 
     const manager = new McpServerManager();
@@ -202,7 +202,7 @@ describe("McpServerManager HTTP bearer auth", () => {
 
   it("uses an adapter-owned stored bearer token only when explicit sources are absent", async () => {
     const { resetTestBearerTokenStore, saveBearerTokenForUrl } = await import("../../../src/auth/mcp-bearer-store.ts");
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     resetTestBearerTokenStore();
     saveBearerTokenForUrl("remote", "stored-token", "https://example.test/mcp");
 
@@ -218,7 +218,7 @@ describe("McpServerManager HTTP bearer auth", () => {
 
   it("keeps literal and environment bearer tokens ahead of the stored token", async () => {
     const { resetTestBearerTokenStore, saveBearerTokenForUrl } = await import("../../../src/auth/mcp-bearer-store.ts");
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     resetTestBearerTokenStore();
     saveBearerTokenForUrl("literal", "stored-token", "https://example.test/mcp");
     saveBearerTokenForUrl("env", "stored-token", "https://example.test/mcp");
@@ -244,7 +244,7 @@ describe("McpServerManager HTTP bearer auth", () => {
 
   it("does not send Authorization when the stored bearer record is missing or URL-bound elsewhere", async () => {
     const { resetTestBearerTokenStore, saveBearerTokenForUrl } = await import("../../../src/auth/mcp-bearer-store.ts");
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     resetTestBearerTokenStore();
     saveBearerTokenForUrl("mismatch", "stored-token", "https://other.test/mcp");
 
@@ -266,7 +266,7 @@ describe("McpServerManager HTTP bearer auth", () => {
 
   it("fails closed before transport when the bearer token store is unavailable", async () => {
     const { resetTestBearerTokenStore } = await import("../../../src/auth/mcp-bearer-store.ts");
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     resetTestBearerTokenStore();
     process.env.PI_MCP_ADAPTER_TEST_AUTH_STORE = "unavailable";
 
@@ -281,7 +281,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("uses configured headers without implicit OAuth", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
 
     const manager = new McpServerManager();
     await manager.connect("remote", {
@@ -294,7 +294,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("passes the per-request header command fetch to Streamable HTTP and SSE", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     mocks.connectErrors.push(new SdkHttpError(
       SdkErrorCode.ClientHttpNotImplemented,
       "POST is not supported",
@@ -314,7 +314,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("preserves OAuth redirect URI, client metadata, and issuer opt-out for HTTP transports", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
 
     const manager = new McpServerManager();
     await manager.connect("remote", {
@@ -337,7 +337,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("closes the HTTP transport when cancellation lands as connect resolves", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const controller = new AbortController();
     const reason = new Error("cancel after connect");
     mocks.afterConnect = () => controller.abort(reason);
@@ -353,7 +353,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("falls back to SSE only for a definitive Streamable HTTP endpoint mismatch", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     mocks.connectErrors.push(new SdkHttpError(
       SdkErrorCode.ClientHttpNotImplemented,
       "POST is not supported",
@@ -372,7 +372,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it.each([401, 403, 500])("does not fall back to SSE for HTTP %s", async status => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     mocks.connectErrors.push(new SdkHttpError(
       status === 401 ? SdkErrorCode.ClientHttpAuthentication : SdkErrorCode.ClientHttpNotImplemented,
       `HTTP ${status}`,
@@ -390,7 +390,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("does not fall back to SSE when 2026-07-28 is pinned", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     mocks.connectErrors.push(new SdkHttpError(
       SdkErrorCode.ClientHttpNotImplemented,
       "HTTP 405",
@@ -407,7 +407,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("passes the configured protocol mode to the SDK client", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
     const manager = new McpServerManager();
 
     await manager.connect("auto", {
@@ -424,7 +424,7 @@ describe("McpServerManager HTTP bearer auth", () => {
   });
 
   it("applies the configured timeout to the HTTP connection", async () => {
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
 
     const manager = new McpServerManager();
     manager.setDefaultRequestTimeoutMs(2500);

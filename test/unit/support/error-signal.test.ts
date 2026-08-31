@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toolErrorOverride } from "../../../error-signal.ts";
+import { toolErrorOverride } from "../../../src/tools/error-signal.ts";
 
 describe("toolErrorOverride", () => {
   it("flags tool-execution failures (tool_error, call_failed)", () => {

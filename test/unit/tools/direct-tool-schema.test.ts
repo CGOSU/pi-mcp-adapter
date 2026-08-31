@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { normalizeDirectToolInputSchema } from "../../../src/utils.ts";
 import { computeServerHash, type MetadataCache } from "../../../src/catalog/metadata-cache.ts";
-import { resolveDirectTools } from "../../../direct-tools.ts";
+import { resolveDirectTools } from "../../../src/tools/direct-tools.ts";
 
 describe("normalizeDirectToolInputSchema", () => {
   it("removes top-level draft metadata and strict additional properties", () => {

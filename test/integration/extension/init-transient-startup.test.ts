@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SdkErrorCode, SdkHttpError } from "@modelcontextprotocol/client";
-import { isTransientHttpConnectError, McpServerManager } from "../../../server-manager.ts";
-import { initializeMcp } from "../../../init.ts";
+import { isTransientHttpConnectError, McpServerManager } from "../../../src/runtime/server-manager.ts";
+import { initializeMcp } from "../../../src/extension/initialization.ts";
 
 const mocks = vi.hoisted(() => ({
   cache: null as { version: 1; servers: Record<string, unknown> } | null,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMcpPanel } from "../../../mcp-panel.ts";
+import { createMcpPanel } from "../../../src/ui/mcp-panel.ts";
 import { computeServerHash, type MetadataCache } from "../../../src/catalog/metadata-cache.ts";
 import type { McpConfig, McpPanelCallbacks } from "../../../types.ts";
 

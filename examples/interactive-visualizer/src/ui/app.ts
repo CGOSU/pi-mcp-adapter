@@ -1,6 +1,6 @@
 import { App, PostMessageTransport } from "@modelcontextprotocol/ext-apps";
 import Chart from "chart.js/auto";
-import { uiStreamResultPatchNotificationSchema } from "../../../../ui-stream-types.ts";
+import { uiStreamResultPatchNotificationSchema } from "../../../../src/ui/stream-types.ts";
 
 const app = new App({ name: "interactive-visualizer", version: "0.1.0" });
 const root = document.getElementById("app")!;

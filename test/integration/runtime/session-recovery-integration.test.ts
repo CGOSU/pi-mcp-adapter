@@ -20,8 +20,8 @@ vi.mock("../../../src/extension/initialization.ts", () => ({
 describe("session recovery — Streamable HTTP wire path", () => {
   it("recovers a JSON-RPC server-not-initialized response from the SDK transport", async () => {
     const { createServer } = await import("node:http");
-    const { McpServerManager } = await import("../../../server-manager.ts");
-    const { withSessionRecovery } = await import("../../../session-recovery.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
+    const { withSessionRecovery } = await import("../../../src/runtime/session-recovery.ts");
 
     let sessionCount = 0;
     let toolCalls = 0;
@@ -153,8 +153,8 @@ describe("session recovery — Streamable HTTP wire path", () => {
 
   it("polls without a notification stream and reconnects when that session later expires", async () => {
     const { createServer } = await import("node:http");
-    const { McpLifecycleManager } = await import("../../../lifecycle.ts");
-    const { McpServerManager } = await import("../../../server-manager.ts");
+    const { McpLifecycleManager } = await import("../../../src/runtime/lifecycle.ts");
+    const { McpServerManager } = await import("../../../src/runtime/server-manager.ts");
 
     let generation = 1;
     let rejectStaleSession = false;
@@ -279,7 +279,7 @@ describe("session recovery — Streamable HTTP wire path", () => {
 
 describe("session recovery — proxy path (proxy-modes.ts executeCall)", () => {
   it("recovers a terminated Streamable HTTP session transparently mid tool-call", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
 
 
     const stale = {
@@ -326,7 +326,7 @@ describe("session recovery — proxy path (proxy-modes.ts executeCall)", () => {
   });
 
   it("recovers a server-not-initialized MCP error transparently mid tool-call", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
 
 
     const stale = {
@@ -373,7 +373,7 @@ describe("session recovery — proxy path (proxy-modes.ts executeCall)", () => {
   });
 
   it("gives up after one reconnect attempt: a second server-not-initialized MCP error propagates as call_failed", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
 
 
     const stale = {
@@ -415,7 +415,7 @@ describe("session recovery — proxy path (proxy-modes.ts executeCall)", () => {
   });
 
   it("gives up after one reconnect attempt: a second terminated session propagates as call_failed", async () => {
-    const { executeCall } = await import("../../../proxy-modes.ts");
+    const { executeCall } = await import("../../../src/tools/proxy/dispatcher.ts");
 
 
     const stale = {
@@ -464,7 +464,7 @@ describe("session recovery — direct-tools path (direct-tools.ts createDirectTo
   });
 
   it("recovers a terminated Streamable HTTP session transparently for a direct tool call", async () => {
-    const { createDirectToolExecutor } = await import("../../../direct-tools.ts");
+    const { createDirectToolExecutor } = await import("../../../src/tools/direct-tools.ts");
 
 
     const stale = {
@@ -515,7 +515,7 @@ describe("session recovery — direct-tools path (direct-tools.ts createDirectTo
   });
 
   it("recovers a server-not-initialized MCP error transparently for a direct tool call", async () => {
-    const { createDirectToolExecutor } = await import("../../../direct-tools.ts");
+    const { createDirectToolExecutor } = await import("../../../src/tools/direct-tools.ts");
 
 
     const stale = {
@@ -566,7 +566,7 @@ describe("session recovery — direct-tools path (direct-tools.ts createDirectTo
   });
 
   it("gives up after one reconnect attempt: a second terminated session propagates as call_failed", async () => {
-    const { createDirectToolExecutor } = await import("../../../direct-tools.ts");
+    const { createDirectToolExecutor } = await import("../../../src/tools/direct-tools.ts");
 
 
     const stale = {

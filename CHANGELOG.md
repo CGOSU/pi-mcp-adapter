@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.27.1] - 2026-08-31
 
 ### Added
 - Added a pure `mcp:` reference resolver API for consumers that validate adapter tool names from explicit config and cache inputs. Thanks to [@abdwhb-png](https://github.com/abdwhb-png) for PR #420.
@@ -17,8 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Reduced Pi extension import work by keeping cached metadata, schemas, and registration on the startup path while dynamically loading MCP connection and execution runtime modules. A valid all-lazy metadata cache now defers that runtime import and connection until first MCP use; eager, keep-alive, and cold-cache behavior still initializes as before.
-- Reorganized implementation into `src/contracts`, `src/catalog`, `src/config`, `src/runtime`, `src/auth`, `src/tools`, `src/ui`, `src/commands`, and `src/extension`, while retaining root compatibility facades and publishing tracked public `dist` output.
+- Reorganized implementation into `src/contracts`, `src/catalog`, `src/config`, `src/runtime`, `src/auth`, `src/tools`, `src/ui`, `src/commands`, and `src/extension`; removed 53 unpublished root forwarding facades while retaining the five public source entry files.
 - Reorganized tests into `test/unit`, `test/integration`, `test/node`, and `test/fixtures`; package manifests and runners now keep test assets outside the published tarball.
+- Public npm entries are reproducible ESM code-splitting builds in `dist/`, preserving native lazy-load boundaries instead of aggregating the runtime into one JS file. The package carries the independent script worker, keyring helper, and AppBridge resources, and publishes the CLI as `dist/cli.js`.
 - Git-based Pi package installs no longer compile the public TypeScript helpers during production-only dependency installation; the committed public build is rebuilt at `prepack` time for npm packaging.
 
 ### Fixed

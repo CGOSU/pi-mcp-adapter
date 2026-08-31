@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const extensionPath = resolve(repoRoot, "index.ts");
+const sourceExtensionPath = resolve(repoRoot, "index.ts");
+const bundledExtensionPath = resolve(repoRoot, "dist/index.js");
 const piCommand = process.env.PI_BIN?.trim() || (process.platform === "win32" ? "pi.cmd" : "pi");
 const rpcRequest = '{"id":"commands","type":"get_commands"}\n';
 
@@ -42,7 +43,7 @@ function createIsolatedEnvironment(root) {
   return env;
 }
 
-function runPi({ env, extension = false }) {
+function runPi({ env, extensionPath }) {
   const args = [
     "--no-session",
     "--no-extensions",
@@ -50,7 +51,7 @@ function runPi({ env, extension = false }) {
     "--no-prompt-templates",
     "--no-context-files",
   ];
-  if (extension) args.push("-e", extensionPath);
+  if (extensionPath) args.push("-e", extensionPath);
   args.push("--mode", "rpc");
 
   const started = performance.now();
@@ -145,23 +146,37 @@ function formatMetric(value) {
   return value === undefined ? "n/a" : `${value}ms`;
 }
 
+function assertNoStartupRegression(metric, baseline, candidate, select) {
+  const baselineValues = baseline.map(select).filter(value => value !== undefined);
+  const candidateValues = candidate.map(select).filter(value => value !== undefined);
+  if (baselineValues.length === 0 || candidateValues.length === 0) return;
+  const baselineMedian = median(baselineValues);
+  const candidateMedian = median(candidateValues);
+  if (baselineMedian > 0 && candidateMedian > baselineMedian * 1.15) {
+    throw new Error(`${metric} regression exceeds 15%: source ${baselineMedian}ms, bundle ${candidateMedian}ms`);
+  }
+}
+
 const { runs } = parseArgs(process.argv.slice(2));
 const isolatedHome = mkdtempSync(join(tmpdir(), "pi-mcp-startup-benchmark-"));
 try {
   const baseEnv = createIsolatedEnvironment(isolatedHome);
   const baseline = Array.from({ length: runs }, () => runPi({ env: baseEnv }));
-  const coldEnv = { ...baseEnv, JITI_FS_CACHE: "0" };
-  const coldExtension = Array.from({ length: runs }, () => runPi({ env: coldEnv, extension: true }));
-  const warmEnv = { ...baseEnv };
-  delete warmEnv.JITI_FS_CACHE;
-  const warmExtension = Array.from({ length: runs }, () => runPi({ env: warmEnv, extension: true }));
+  const sourceEnv = { ...baseEnv, JITI_FS_CACHE: "0" };
+  const source = Array.from({ length: runs }, () => runPi({ env: sourceEnv, extensionPath: sourceExtensionPath }));
+  const bundled = Array.from({ length: runs }, () => runPi({ env: baseEnv, extensionPath: bundledExtensionPath }));
 
   console.log(`Pi startup benchmark (${runs} fresh RPC run${runs === 1 ? "" : "s"})`);
   console.log(`binary: ${piCommand}`);
-  console.log(`extension: ${extensionPath}`);
+  console.log(`source extension: ${sourceExtensionPath}`);
+  console.log(`bundled extension: ${bundledExtensionPath}`);
   printSamples("baseline", baseline);
-  printSamples("extension (JITI_FS_CACHE=0)", coldExtension);
-  printSamples("extension (Jiti cache)", warmExtension);
+  printSamples("source extension (JITI_FS_CACHE=0)", source);
+  printSamples("bundled extension", bundled);
+
+  assertNoStartupRegression("module import", source, bundled, sample => sample.moduleImport);
+  assertNoStartupRegression("main TOTAL", source, bundled, sample => sample.mainTotal);
+  assertNoStartupRegression("wall", source, bundled, sample => sample.wallMs);
 } finally {
   rmSync(isolatedHome, { recursive: true, force: true });
 }

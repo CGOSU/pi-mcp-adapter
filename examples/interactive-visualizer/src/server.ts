@@ -7,7 +7,7 @@ import { z } from "zod";
 import {
   SERVER_STREAM_RESULT_PATCH_METHOD,
   UI_STREAM_STRUCTURED_CONTENT_KEY,
-} from "../../../ui-stream-types.ts";
+} from "../../../src/ui/stream-types.ts";
 
 type StreamNotification = {
   method: typeof SERVER_STREAM_RESULT_PATCH_METHOD;
