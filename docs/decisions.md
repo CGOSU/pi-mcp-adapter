@@ -49,3 +49,9 @@
 - 决定：不为未达到 `300ms` 的绝对冷启动目标引入额外懒加载或聚合优化；以同一 Windows/Pi 0.84.2 宿主、同一 3-run fresh RPC benchmark 与 `HEAD` 临时归档进行 A/B 判定。
 - 原因：当前工作树 cold module import median `398ms`、warm `65ms`，HEAD 基线分别为 `398ms` 和 `60ms`；5-run 当前 cold `465ms` 且样本为 `401–691ms`，说明 fresh Jiti/进程启动噪声显著。当前结果未显示本轮领域迁移造成可归因回退。
 - 约束：文档必须保留未达到历史 `365ms`/`300ms` 目标的真实结果；后续性能优化须先有同机 A/B 证据，不得为绝对门禁改变已确认的启动边界。
+
+### 2026-09-01：使用标准 extensions 入口隐藏 dist 路径
+
+- 决定：将 `package.json` 的 Pi 扩展入口改为 `extensions/index.js`，由该入口转发到已构建的 `dist/index.js`，并将 wrapper 纳入发布文件。
+- 原因：Pi 对位于包根 `dist/` 下的 `index.js` 会在紧凑扩展标签中追加 `:dist`；`extensions/index.js` 是 Pi 约定的入口布局，可保留 `CGOSU/pi-mcp-adapter` 的显示名称。
+- 约束：不改变 npm 公共 exports、CLI 入口或 `dist` 的构建与懒加载边界；wrapper 必须在 Git 安装和 npm tarball 中同时可用。

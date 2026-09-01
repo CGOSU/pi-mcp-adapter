@@ -71,7 +71,7 @@
   ],
   "pi": {
     "extensions": [
-      "./dist/index.js"
+      "./extensions/index.js"
     ],
     "skills": [
       "./skills"
@@ -80,6 +80,7 @@
   },
   "files": [
     "dist",
+    "extensions",
     "banner.png",
     "skills",
     "README.md",

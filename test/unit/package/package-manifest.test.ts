@@ -33,9 +33,11 @@ describe("package.json files", () => {
     const publishedFiles = new Set(packageJson.files ?? []);
 
     expect(publishedFiles.has("dist")).toBe(true);
+    expect(publishedFiles.has("extensions")).toBe(true);
     expect(publishedFiles.has("src")).toBe(false);
     expect(publishedFiles.has("cli.js")).toBe(false);
     for (const file of [
+      "extensions/index.js",
       "dist/index.js",
       "dist/index.d.ts",
       "dist/types.js",
@@ -55,7 +57,7 @@ describe("package.json files", () => {
 
   it("exports built entry points and plain Node host helpers", () => {
     expect(packageJson.types).toBe("./dist/index.d.ts");
-    expect(packageJson.pi?.extensions).toEqual(["./dist/index.js"]);
+    expect(packageJson.pi?.extensions).toEqual(["./extensions/index.js"]);
     expect(packageJson.bin).toEqual({ "pi-mcp-adapter": "dist/cli.js" });
     expect(packageJson.exports).toMatchObject({
       ".": {

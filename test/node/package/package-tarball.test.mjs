@@ -88,6 +88,7 @@ test("npm pack publishes a small built-only package", () => {
   assert.equal(files.some(file => file.endsWith(".map")), false);
   assert.equal(files.some(file => removedRootFacades.has(file)), false);
   for (const file of [
+    "extensions/index.js",
     "dist/index.js",
     "dist/config.js",
     "dist/metadata-cache.js",

@@ -50,3 +50,9 @@
 - 完成：删除配置层的宿主专属 MCP 探测、兼容 imports、setup 采用 UI 和 CLI `init`/`--discover-host-configs`；`imports` 与 `settings.hostConfigDiscovery` 遗留字段不再生效。保留标准共享配置路径、Pi override、provenance、setup scaffold/known server/RepoPrompt/path inspection、`directTools` 写回和 token CLI；移除 `smol-toml`。
 - 通过：`npm run typecheck`；`npx vitest run test/integration/commands/commands-onboarding.test.ts test/integration/ui/mcp-panel-keybindings.test.ts test/unit/support/cli.test.ts`（27 个测试）；`npx vitest run test/unit/config/config-loading-snapshot.test.ts test/integration/config/exclusive-config.test.ts test/integration/support/disabled-server.test.ts`（13 个测试）；`node cli.js --help`、`node cli.js init`、`node cli.js --discover-host-configs`（帮助与删除命令边界符合预期）；`git diff --check`。
 - 通过：`npm run build:public` 生成 45 个 tracked public 文件；`npm run test:public-exports` 的 5 个 Node tests；`npm.cmd pack --dry-run --json --ignore-scripts` 发布边界为 51 个文件且不含 `src/`、`test/` 或 source map；`git diff --check`。完整相关配置测试未运行；未执行 git commit/push。
+
+### 2026-09-01：优化 Pi 扩展显示名称
+
+- 完成：新增 `extensions/index.js` wrapper 转发到 `dist/index.js`，并将 `package.json` 的 Pi 扩展入口和发布文件清单切换到该标准目录；更新 package manifest 与 tarball 回归断言。
+- 通过：`npm run typecheck`；`npm run test:vitest -- test/unit/package/package-manifest.test.ts`（8 个测试）；`node --check extensions/index.js`；Pi 0.84.4 的紧凑扩展标签检查输出 `CGOSU/pi-mcp-adapter`；`npm run test:public-exports`（5 个 Node tests）。
+- 遗留：未执行 git commit/push。

@@ -17,8 +17,8 @@
 ## 测试与发布布局
 
 - Vitest 测试按 `test/unit`、`test/integration` 分域；Node 原生测试和 package/export runner 位于 `test/node`；共享 server/worker fixture 位于 `test/fixtures`。根目录不再保留测试文件或 `__tests__` 目录。
-- `package.json` 只发布构建后的 `dist`、CLI、skills 和 UI 资源，不发布 `src/**` 或测试目录。`prepack` 执行 `build:public`；tracked `dist` 可由同一脚本复现。
-- 包根及 `types`、`config`、`metadata-cache`、`oauth` 五个公共入口均解析到 ESM `dist` 文件；入口内部保留 native `dynamic import()` code-splitting。Pi 扩展默认入口和 CLI 分别为 `dist/index.js` 与 `dist/cli.js`。
+- `package.json` 只发布 Pi extension wrapper、构建后的 `dist`、CLI、skills 和 UI 资源，不发布 `src/**` 或测试目录。`prepack` 执行 `build:public`；tracked `dist` 可由同一脚本复现。
+- 包根及 `types`、`config`、`metadata-cache`、`oauth` 五个公共入口均解析到 ESM `dist` 文件；入口内部保留 native `dynamic import()` code-splitting。Pi 扩展默认加载 `extensions/index.js` 转发到 `dist/index.js`；CLI 仍为 `dist/cli.js`。该目录布局让 Pi 的紧凑扩展标签显示为包源名称，不再追加 `:dist`。
 
 ## 最终验证状态
 

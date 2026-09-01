@@ -37,3 +37,9 @@
   根因：测试 stub 的 `require.resolve` 返回值和 native binding 路径没有使用宿主路径规则；
   修复：使用 `join(tmpdir(), ...)` 构造 package.json 与 native binding 路径，保留 fallback 分支和错误链断言不变；
   验证：`npm run test:oauth` 的 141 个 Node tests 全部通过。
+
+- 日期：2026-09-01；
+  现象：Pi 的包扩展紧凑标签显示为 `包源:dist`，而不是包源名称；
+  根因：Pi 会把包根下 `dist/index.js` 的父目录作为扩展标识的一部分；
+  修复：使用 `extensions/index.js` 作为 manifest 入口，并由 wrapper 转发到构建产物；
+  验证：Pi 0.84.4 紧凑标签检查输出 `CGOSU/pi-mcp-adapter`，发布 tarball 包含 wrapper。
