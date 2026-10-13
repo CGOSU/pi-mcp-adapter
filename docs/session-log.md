@@ -56,3 +56,11 @@
 - 完成：新增 `extensions/index.js` wrapper 转发到 `dist/index.js`，并将 `package.json` 的 Pi 扩展入口和发布文件清单切换到该标准目录；更新 package manifest 与 tarball 回归断言。
 - 通过：`npm run typecheck`；`npm run test:vitest -- test/unit/package/package-manifest.test.ts`（8 个测试）；`node --check extensions/index.js`；Pi 0.84.4 的紧凑扩展标签检查输出 `CGOSU/pi-mcp-adapter`；`npm run test:public-exports`（5 个 Node tests）。
 - 遗留：未执行 git commit/push。
+
+### 2026-10-13：暂停 Pi 原生 MCP 管理迁移并保存 TODO
+
+- 完成：新增唯一详细待办 [`docs/todo.md`](todo.md)，记录已完成的 native-management-api 历史结果、五项未完成迁移任务、固定架构约束和跨电脑恢复检查；`docs/current-state.md` 增加简短索引。
+- 本轮实际检查：修改前 `git status --short --branch` 显示 `main...origin/main` 和既有未跟踪 `.pi-graph/`；本轮未修改或纳入该目录。本次 TODO 位置为 `docs/todo.md`。
+- 通过：`git diff --check`；文档静态核对确认 `docs/todo.md` 存在、列出 5 项后续任务，且 `current-state.md`/`session-log.md` 链接均指向该 TODO。命令提示 `docs/current-state.md` 的 LF 将在 Git 后续处理时转为 CRLF；检查退出码为 0。
+- 未运行代码测试、build 或真实 MCP 操作。
+- 遗留：本轮不提交、不 push。Pi 上游源码当前状态未重新核实；跨电脑继续前必须按 [`docs/todo.md`](todo.md) 检查源码/补丁是否安全可用。

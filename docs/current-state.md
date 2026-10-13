@@ -1,5 +1,9 @@
 # 当前状态
 
+## 暂停中的 Pi 原生 MCP 迁移
+
+迁移任务及恢复条件已保存于唯一详细待办 [`docs/todo.md`](todo.md)。`native-management-api` 有历史完成记录；后续五项仍未完成。本轮只保存待办，未恢复实现；跨电脑继续前须按 TODO 核实 Pi 上游源码是否已安全转移。
+
 ## 项目
 
 - 名称：`pi-mcp-adapter`

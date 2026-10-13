@@ -4,6 +4,7 @@ node_modules/
 conformance/results/
 *.log
 .DS_Store
+.pi-graph/
 
 # This package uses npm/package-lock.json.
 bun.lock
