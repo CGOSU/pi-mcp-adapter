@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - The `mcp-script-worker.mjs` and `app-bridge.bundle.js` runtime resources are no longer published. Related settings (`scriptMode`, `disableProxyTool`, `autoAuth`, `trace`, `oauthDir`, and the server-level `debug`/`trace` fields) are retained in configuration but are not activated by the native owner instead of being silently dropped.
 
+### Fixed
+- `npm run build:public` no longer deletes the committed `dist/` before it knows the build succeeds. JavaScript, declarations, and runtime resources are emitted into a temporary directory and only published over `dist/` once every step passes, so a failed build (for example on a stock Pi host that lacks the patched management API) leaves the existing artifacts untouched.
+
 ## [2.27.1] - 2026-08-31
 
 ### Added

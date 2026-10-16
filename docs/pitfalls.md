@@ -44,8 +44,8 @@
   修复：使用 `extensions/index.js` 作为 manifest 入口，并由 wrapper 转发到构建产物；
   验证：Pi 0.84.4 紧凑标签检查输出 `CGOSU/pi-mcp-adapter`，发布 tarball 包含 wrapper。
 
-- 日期：2026-10-16；
+- 日期：2026-10-16（当日已修复）；
   现象：在 adapter 根目录执行 `npm run build:public`（或经 `npm run test:public-exports` 间接执行）在 stock Pi 1.2.0 工作区失败，并丢失 `dist/` 中的生成文件；
-  根因：`scripts/build-public.mjs` 先 `rm -rf dist` 再重建，而 `src/native/*.ts` 引用 patched Pi 才有的管理 API 导出；在 stock 1.2.0 下声明发射阶段报 TS2305，且因为清空发生在失败之前，`dist/*.d.ts` 与 `mcp-keyring-helper.cjs` 被删除；
-  修复：不要用 stock Pi 工作区重建发布产物（生产代码已不从 `dist` 可达的旧模块反向依赖）；改用 `npm run test:public-types -- --pi-source <patched-Pi-checkout>`，它在临时副本中按 patched Pi 构建并仅在校验全部通过后同步 18 个生成文件。若已误执行，用该 runner 重新生成并用 `find dist -type f -exec shasum -a 256 {} +` 快照对比确认；
-  验证：2026-10-16 误执行后 `dist/` 只剩 12 个文件；运行上述 runner 后恢复为 18 个文件，且与事故前的全量 SHA-256 快照逐文件一致。
+  根因：`scripts/build-public.mjs` 曾在构建之前就 `rm -rf dist`，而 `src/native/*.ts` 引用 patched Pi 才有的管理 API 导出；在 stock 1.2.0 下声明发射阶段报 TS2305，且因为清空发生在失败之前，`dist/*.d.ts` 与 `mcp-keyring-helper.cjs` 被删除；
+  修复：构建脚本改为先在仓库内 `.tmp-public-build-*` 暂存目录完成 JS、声明与运行资源构建，全部成功后才用 `rename` 原子替换 `dist/`；替换失败会把旧目录还原，暂存目录在 `finally` 中清理；已加 `.gitignore` 条目。事故当时的恢复方式是改用 `npm run test:public-types -- --pi-source <patched-Pi-checkout>` 重新生成（它在临时副本中按 patched Pi 构建并仅在校验全部通过后同步生成文件）；该 runner 至今仍是重新生成发布产物的推荐途径；
+  验证：2026-10-16 修复后在同一 stock Pi 1.2.0 工作区重跑 `npm run build:public`，仍以 `has no exported member` 失败（exit 1），但 `dist/` 保持 18 个文件且逐个 SHA-256 与构建前快照完全一致，仓库根无 `.tmp-public-build-*` 残留；`npm run test:public-types -- --pi-source /Users/cgosu/code/JavaScript/pi-upstream-native` 仍成功构建并通过 5 项产物检查。

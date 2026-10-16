@@ -8,6 +8,12 @@
 
 ## 已确认决策
 
+### 2026-10-16：发布产物构建必须先成功后替换，失败不得破坏已提交 dist
+
+- 决定：`npm run build:public` 在仓库内 `.tmp-public-build-*` 暂存目录完成 JS、声明与运行资源构建，全部成功后才原子替换 `dist/`；发布失败时还原旧目录，暂存目录始终清理。
+- 原因：`dist/` 已纳入版本控制（见下条 2026-08-23 决定）。原先构建前直接 `rm -rf dist`，使任何构建失败都变成对已提交生成物的破坏，且失败原因（缺 patched Pi 类型）与后果（丢失 `dist`）无关。
+- 约束：后续修改构建脚本时必须保留该原子性，不得在任何可能失败的步骤之前破坏现有 `dist/`；失败必须非零退出且保留原生成物，不得伪装成功，也不得手工伪造生成物代替真实构建。恢复与验证方式见 [`docs/pitfalls.md`](pitfalls.md)。
+
 ### 2026-10-16：默认扩展入口切换为 native-only，不保留旧 runtime fallback
 
 - 决定：发布入口 `dist/index.js` 不再包含自包含的 adapter MCP 运行时；它经公开 `pi.mcp-management` v1 协议发现并协商 Pi 原生 MCP owner，作为 opt-in assembly + 面板接入，只注册 `/mcp-adapter` 一个命令，不注册自己的 tool。移除了 `mcp-script-worker.mjs` 与 `app-bridge.bundle.js` 运行资源及其构建检查。

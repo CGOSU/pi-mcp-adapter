@@ -38,7 +38,7 @@
 
 ## 未完成与交付边界
 
-- 本轮迁移的 adapter 改动已在工作区；提交与 push 结果见 [`docs/session-log.md`](session-log.md) 最新记录。tracked `dist` 由 `npm run build:public` 在 patched Pi 1.2.0 下同步；在 stock Pi 1.2.0 工作区直接运行该脚本会在声明发射阶段失败并已清空 `dist/`，必须改用 `npm run test:public-types -- --pi-source <patched checkout>` 重新生成。
+- 本轮迁移的 adapter 改动已在工作区；提交与 push 结果见 [`docs/session-log.md`](session-log.md) 最新记录。tracked `dist` 由 `npm run build:public` 在 patched Pi 1.2.0 下同步；该脚本现先在 `.tmp-public-build-*` 暂存目录完成构建、全部成功后才原子替换 `dist/`，因此失败不会再损失现有生成物，但 stock Pi 1.2.0 缺少管理 API 时仍会以声明发射错误失败，重新生成发布产物请用 `npm run test:public-types -- --pi-source <patched checkout>`。
 - 未激活的 adapter 设置（`scriptMode`、`disableProxyTool`、`autoAuth`、`trace`、`oauthDir` 及 server 级 `debug`/`trace`）仍保留在配置中但不由 native owner 生效，属于有意保留的边界；详见 README。
 - `AGENTS.md` 与 `docs/clean-code.md` 已在 commit `4b7f17c` 纳入版本控制，本任务未修改它们（`git status` 无变化），也不属于本次迁移改动。
 

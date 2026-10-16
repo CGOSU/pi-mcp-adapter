@@ -1,5 +1,6 @@
 node_modules/
 .tmp-public-exports-*
+.tmp-public-build-*
 .pi/
 conformance/results/
 *.log

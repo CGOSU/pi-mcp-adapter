@@ -138,7 +138,7 @@
 1. 打开 adapter 仓库，先核对当前分支、`git status --short --branch`、目标文档及其他协作者改动；保留 `.pi-graph/`，不 reset 或覆盖。
 2. 确认 `/Users/cgosu/code/JavaScript/pi-upstream-native` 仍位于固定基线且原生 MCP 改动完整、未被后续改动改变；若换电脑，核对原机器/安全备份。工作流记录不是补丁或源码文件的替代品。
 3. 优先用 adapter 中已交付的补丁与 manifest 在独立干净 checkout 重建：核对 `HEAD` 为 `06a466935536f8c9bcacb2d5efc0fc021be1bdff`、工作树干净、patch SHA-256 与 manifest 一致，再 `git apply` 与 `npm ci --ignore-scripts`（详见 [`docs/native-mcp-patch.md`](native-mcp-patch.md)）。不要因未知结果重放已完成操作。
-4. 如仍需重新生成发布产物，使用 `npm run test:public-types -- --pi-source <patched-Pi-checkout>`；不要在 stock Pi 1.2.0 工作区运行 `npm run build:public`（会先清空 `dist/` 再失败，见 [`docs/pitfalls.md`](pitfalls.md)）。
+4. 如仍需重新生成发布产物，使用 `npm run test:public-types -- --pi-source <patched-Pi-checkout>`；`npm run build:public` 现已改为在 `.tmp-public-build-*` 暂存目录构建、全部成功后才原子替换 `dist/`，失败不会破坏现有生成物，但它仍需 patched Pi 类型才能成功（见 [`docs/pitfalls.md`](pitfalls.md)）。
 5. 所有验证只记录本次真实执行结果；Pi 上游仍不提交、不推送。adapter commit/push 范围按授权边界核实。
 
 ## 最近一次记录

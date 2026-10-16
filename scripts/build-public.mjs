@@ -1,6 +1,6 @@
 import { build } from "esbuild";
 import * as ts from "typescript";
-import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -30,10 +30,7 @@ async function walkFiles(directory) {
   return files;
 }
 
-async function buildJavaScript() {
-  await rm(distRoot, { recursive: true, force: true });
-  await mkdir(distRoot, { recursive: true });
-
+async function buildJavaScript(outputRoot) {
   const baseOptions = {
     bundle: true,
     splitting: true,
@@ -41,7 +38,7 @@ async function buildJavaScript() {
     platform: "node",
     target: "node20",
     packages: "external",
-    outdir: distRoot,
+    outdir: outputRoot,
     entryNames: "[name]",
     chunkNames: "chunks/[name]-[hash]",
     sourcemap: false,
@@ -152,14 +149,14 @@ async function bundleDeclaration(entry, declarationRoot, outputPath, cache) {
   await writeFile(outputPath, content, "utf8");
 }
 
-async function buildDeclarations() {
+async function buildDeclarations(outputRoot) {
   const declarationRoot = await mkdtemp(join(tmpdir(), "pi-mcp-public-dts-"));
   try {
     await emitDeclarations(declarationRoot);
     const declarationFiles = new Set((await walkFiles(declarationRoot)).filter(file => extname(file) === ".ts" && file.endsWith(".d.ts")));
     for (const entry of publicEntries) {
       const sourceDeclaration = join(declarationRoot, entry.replace(/\.ts$/, ".d.ts"));
-      const outputDeclaration = join(distRoot, entry.replace(/\.ts$/, ".d.ts"));
+      const outputDeclaration = join(outputRoot, entry.replace(/\.ts$/, ".d.ts"));
       await bundleDeclaration(sourceDeclaration, declarationRoot, outputDeclaration, declarationFiles);
     }
   } finally {
@@ -167,8 +164,8 @@ async function buildDeclarations() {
   }
 }
 
-async function copyRuntimeResources() {
-  const generatedJavaScript = (await walkFiles(distRoot)).filter(file => extname(file) === ".js");
+async function copyRuntimeResources(outputRoot) {
+  const generatedJavaScript = (await walkFiles(outputRoot)).filter(file => extname(file) === ".js");
   for (const resource of runtimeResources) {
     const locations = new Set();
     for (const generatedFile of generatedJavaScript) {
@@ -181,9 +178,51 @@ async function copyRuntimeResources() {
   }
 }
 
-await buildJavaScript();
-await buildDeclarations();
-await copyRuntimeResources();
+async function publishBuild(stagingRoot) {
+  const previousRoot = `${stagingRoot}-previous`;
+  let previousBuildMoved = false;
+
+  try {
+    await rename(distRoot, previousRoot);
+    previousBuildMoved = true;
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+
+  try {
+    await rename(stagingRoot, distRoot);
+  } catch (error) {
+    if (previousBuildMoved) {
+      try {
+        await rename(previousRoot, distRoot);
+      } catch (restoreError) {
+        throw new AggregateError(
+          [error, restoreError],
+          `Failed to publish the new build; the previous output remains at ${previousRoot}`,
+        );
+      }
+    }
+    throw error;
+  }
+
+  if (previousBuildMoved) {
+    try {
+      await rm(previousRoot, { recursive: true, force: true });
+    } catch (error) {
+      console.warn(`Built dist/ successfully, but could not remove the previous output at ${previousRoot}: ${error.message}`);
+    }
+  }
+}
+
+const stagingRoot = await mkdtemp(join(repoRoot, ".tmp-public-build-"));
+try {
+  await buildJavaScript(stagingRoot);
+  await buildDeclarations(stagingRoot);
+  await copyRuntimeResources(stagingRoot);
+  await publishBuild(stagingRoot);
+} finally {
+  await rm(stagingRoot, { recursive: true, force: true });
+}
 
 const files = await walkFiles(distRoot);
 const relativeFiles = files.map(file => relative(distRoot, file)).sort();
