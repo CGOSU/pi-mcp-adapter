@@ -13,6 +13,7 @@ import {
 } from "../../../oauth.ts";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai/compat";
 import { createHarness, createTestUiContext, getMessageText, getToolResult } from "@pi-upstream-test-harness";
+import { startOAuthMcpServer } from "@pi-upstream-oauth-server";
 import nativeMcpExtension from "@pi-patched-native-mcp-extension";
 
 const fixturePath = fileURLToPath(new URL("../../fixtures/patched-native-session-mcp-server.mjs", import.meta.url));
@@ -45,8 +46,16 @@ function writeConfig(path, config) {
   writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`, "utf8");
 }
 
+function deferred() {
+  let resolve;
+  const promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe("patched Pi native MCP and adapter in one real session", () => {
-  it("uses the native owner for live catalog, execution, management, persistence, trust, and adapter status", async () => {
+  it("keeps the native owner and adapter aligned and rejects stale OAuth writes", async () => {
     const agentDir = process.env.PI_CODING_AGENT_DIR;
     if (!agentDir) throw new Error("The explicit regression runner must provide an isolated PI_CODING_AGENT_DIR.");
     if (process.env.PI_MCP_ADAPTER_TEST_AUTH_STORE !== "memory") {
@@ -55,16 +64,6 @@ describe("patched Pi native MCP and adapter in one real session", () => {
 
     const globalConfigPath = join(agentDir, "mcp.json");
     const logPath = join(agentDir, "native-session-fixture.log");
-    const globalConfig = {
-      mcpServers: {
-        [MCP_SERVER_NAME]: {
-          command: process.execPath,
-          args: [fixturePath, logPath, "global"],
-          directTools: true,
-        },
-      },
-    };
-    writeConfig(globalConfigPath, globalConfig);
 
     const statusEvents = [];
     const notifications = [];
@@ -73,6 +72,7 @@ describe("patched Pi native MCP and adapter in one real session", () => {
     let runtimeRegistration;
     let harness;
     let handle;
+    let oauthServer;
     let projectConfigFile;
     const statusConsumer = (pi) => {
       pi.events.on("pi-mcp-adapter/status/v1", (status) => statusEvents.push(status));
@@ -84,6 +84,21 @@ describe("patched Pi native MCP and adapter in one real session", () => {
 
     resetTestAuthSecretStore();
     try {
+      oauthServer = await startOAuthMcpServer();
+      writeConfig(globalConfigPath, {
+        mcpServers: {
+          [MCP_SERVER_NAME]: {
+            command: process.execPath,
+            args: [fixturePath, logPath, "global"],
+            directTools: true,
+          },
+          "oauth-stale": {
+            url: oauthServer.url,
+            auth: "oauth",
+            oauth: {},
+          },
+        },
+      });
       harness = await createHarness({
         extensionFactories: [statusConsumer, adapterFactory, nativeMcpExtension],
         withConfiguredAuth: true,
@@ -131,6 +146,9 @@ describe("patched Pi native MCP and adapter in one real session", () => {
           },
         });
       }, { timeout: 20_000 });
+      await vi.waitFor(() => expect(getServer(handle, "oauth-stale")?.connectionStatus).toBe("needs-auth"), {
+        timeout: 20_000,
+      });
 
       expect(fixtureLog(logPath).filter((line) => line === "start:global")).toHaveLength(1);
       expect(await handle.refreshCatalog(MCP_SERVER_NAME)).toEqual({ ok: true, value: undefined });
@@ -310,6 +328,60 @@ describe("patched Pi native MCP and adapter in one real session", () => {
       expect(oauthBackend.remove("oauth-fixture", oauthUrl)).toBe(true);
       expect(inspectMcpOAuthTokensForUrl("oauth-fixture", oauthUrl)).toEqual({ status: "absent" });
 
+      const originalFetch = globalThis.fetch;
+      const tokenRequestStarted = deferred();
+      const releaseTokenResponse = deferred();
+      globalThis.fetch = async (input, init) => {
+        const requestUrl = input instanceof Request ? input.url : String(input);
+        if (new URL(requestUrl).pathname === "/token") {
+          tokenRequestStarted.resolve();
+          await releaseTokenResponse.promise;
+          return originalFetch(input, { ...init, signal: undefined });
+        }
+        return originalFetch(input, init);
+      };
+      let pendingSignIn;
+      try {
+        let authorizationRedirectReady;
+        pendingSignIn = handle.signIn("oauth-stale", {
+          showAuthorizationUrl: (url) => {
+            authorizationRedirectReady = originalFetch(url, { redirect: "manual" }).then((response) => {
+              const redirect = response.headers.get("location");
+              if (!redirect) throw new Error("OAuth fixture did not return a redirect URL.");
+              return redirect;
+            });
+          },
+          promptForRedirectUrl: async () => {
+            if (!authorizationRedirectReady) throw new Error("OAuth authorization URL was not opened.");
+            return authorizationRedirectReady;
+          },
+        });
+        await withTimeout(tokenRequestStarted.promise, 10_000, "The local OAuth token request did not start.");
+
+        expect(await handle.setServerEnabled("oauth-stale", false)).toEqual({ ok: true, value: undefined });
+        updateMcpOAuthTokensForUrl("oauth-stale", oauthServer.url, {
+          accessToken: "replacement-access-token",
+          refreshToken: "replacement-refresh-token",
+          expiresAt: Math.floor(Date.now() / 1000) + 3_600,
+        });
+        releaseTokenResponse.resolve();
+
+        expect(await withTimeout(pendingSignIn, 10_000, "The invalidated OAuth sign-in did not settle.")).toMatchObject({
+          ok: false,
+          error: { code: "server-disabled" },
+        });
+        expect(getServer(handle, "oauth-stale")?.connectionStatus).toBe("disabled");
+        expect(await getMcpOAuthTokensForUrl("oauth-stale", oauthServer.url)).toMatchObject({
+          accessToken: "replacement-access-token",
+          refreshToken: "replacement-refresh-token",
+        });
+        expect(inspectMcpOAuthTokensForUrl("oauth-stale", oauthServer.url)).toMatchObject({ status: "present" });
+      } finally {
+        releaseTokenResponse.resolve();
+        if (pendingSignIn) await pendingSignIn.catch(() => undefined);
+        globalThis.fetch = originalFetch;
+      }
+
       const savedConfigBeforeShutdown = readFileSync(globalConfigPath, "utf8");
       await harness.session.reload();
       const staleWrite = await handle.setDirectTools(MCP_SERVER_NAME, false);
@@ -329,6 +401,7 @@ describe("patched Pi native MCP and adapter in one real session", () => {
         }
       }
       resetTestAuthSecretStore();
+      if (oauthServer) await oauthServer.close();
     }
   });
 });

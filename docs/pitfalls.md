@@ -38,8 +38,14 @@
   处理：将 `extensions/index.js` 设为清单入口，由它转发到构建产物；
   验证：Pi 0.84.4 的紧凑标签检查显示 `CGOSU/pi-mcp-adapter`，发布包包含该转发入口。
 
-- 日期：2026-10-16（数据损失问题已修复；未打补丁的 Pi 仍不能完成构建）；
-  现象：在适配器根目录执行 `npm run build:public`，或执行会间接触发它的 `npm run test:public-exports`，在未打补丁的 Pi 1.2.0 下会因缺少原生管理 API 类型而失败；旧构建脚本还会在失败前删除 `dist/` 中的文件；
-  原因：适配器的 `src/native/*.ts` 使用了仓库固定补丁新增的 Pi API，而 npm 发布版的 Pi 1.2.0 不含这些导出；原构建脚本先清空 `dist/`，再开始可能失败的步骤；
-  处理：`scripts/build-public.mjs` 现在先在 `.tmp-public-build-*` 暂存目录构建 JavaScript、声明和运行资源，全部成功后才替换 `dist/`；替换失败会尝试恢复旧目录，并在 `finally` 中清理暂存目录。恢复或更新产物时，使用 `npm run test:public-types -- --pi-source <已打补丁的 Pi 源码目录>`。持续集成必须检出固定 Pi 基线并应用仓库补丁后再构建；产物验证完成后，使用 `npm pack --ignore-scripts`，避免在未打补丁的宿主上触发 `prepack`；
-  验证：修复后在未打补丁的 Pi 1.2.0 下重跑 `npm run build:public`，命令仍因缺少导出而以非零状态退出，但 `dist/` 的 18 个文件 SHA-256 全部不变，且没有暂存目录残留。`npm run test:public-types -- --pi-source /Users/cgosu/code/JavaScript/pi-upstream-native` 通过，产物检查 5 项通过。后续持续集成已改为使用打过补丁的固定基线；远端 GitHub Actions 尚未运行。
+- 日期：2026-10-16（数据损失问题已修复；stock Pi 1.2.0/1.3.0 仍不满足 adapter build 前置条件）；
+  现象：在适配器根目录执行 `npm run build:public`，或执行会间接触发它的 `npm run test:public-exports`，在缺少补丁 API 的 Pi host 下会因原生管理 API 类型缺失而失败；旧构建脚本还会在失败前删除 `dist/` 中的文件；
+  原因：适配器的 `src/native/*.ts` 使用固定补丁新增的 Pi API，而 stock Pi 包不含这些导出；原构建脚本先清空 `dist/`，再开始可能失败的步骤；
+  处理：`scripts/build-public.mjs` 现在先在 `.tmp-public-build-*` 暂存目录构建 JavaScript、声明和运行资源，全部成功后才替换 `dist/`；替换失败会尝试恢复旧目录，并在 `finally` 中清理暂存目录。恢复或验证产物时，只对照 [`docs/native-mcp-patch.md`](native-mcp-patch.md) 中已应用对应版本补丁的固定 checkout，运行 `npm run test:public-types -- --pi-source <patched-Pi-checkout>`。持续集成必须检出固定 Pi 基线并应用对应仓库补丁后再构建；产物验证完成后，使用 `npm pack --ignore-scripts`，避免在 stock host 上触发 `prepack`；
+  验证：历史上在 stock Pi 1.2.0 下的 `npm run build:public` 因缺少导出以非零状态退出，但 `dist/` 的 18 个文件 SHA-256 全部不变，且没有暂存目录残留。之后在固定 patched Pi checkout 上运行 `npm run test:public-types` 通过；最新 1.2.0/1.3.0 固定 checkout 的公共产物验证见 [`docs/native-mcp-patch.md`](native-mcp-patch.md)。远端 GitHub Actions 尚未由本轮运行。
+
+- 日期：2026-10-16；
+  现象：将新版本的上游源码补丁作为 `*.patch` 交付文件暂存后，在 adapter 仓库执行普通 `git diff --cached --check` 会报告补丁内容中的空格缩进和尾随空白；
+  原因：Git 把补丁文件自身作为新增文本检查，补丁又逐字包含上游源文件格式，诊断针对的是 artifact 内容而非 adapter 的源码/文档/测试差量；直接格式化补丁会改变其 SHA-256 并破坏与固定基线的对应；
+  处理：不要规范化或重写已校验的上游 patch。对 adapter 其他 staged 文件运行 `git diff --cached --check -- . ':(exclude)patches/*.patch'`，并分别核对 patch hash、固定基线 `git apply --check` 及 apply 后上游源码差量；
+  验证：Pi 1.3 patch 的 adapter staged diff 出现上述 artifact 诊断；其 SHA-256 与 manifest 一致，固定 Pi 1.3.0 独立 checkout 的 apply 与上游 `git diff --check` 已通过。

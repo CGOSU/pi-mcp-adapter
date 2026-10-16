@@ -27,6 +27,10 @@ export default defineConfig({
         replacement: join(codingAgentRoot, "test", "suite", "harness.ts"),
       },
       {
+        find: "@pi-upstream-oauth-server",
+        replacement: join(codingAgentRoot, "test", "suite", "mcp-oauth-server.ts"),
+      },
+      {
         find: /^@earendil-works\/pi-ai\/compat$/,
         replacement: join(piAiPackageRoot, "compat.js"),
       },

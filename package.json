@@ -48,6 +48,7 @@
     "test:public-exports": "npm run build:public && node --test test/node/package/public-exports.test.mjs test/node/package/build-artifacts.test.mjs test/node/package/package-tarball.test.mjs",
     "test:public-types": "node scripts/test-patched-public-types.mjs",
     "test:patched-native-session": "node scripts/test-patched-native-session.mjs",
+    "test:patched-pi-runners": "node --test test/node/package/patched-pi-runners.test.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:oauth": "node test/node/run-auth-tests.mjs",
@@ -85,6 +86,9 @@
     "extensions",
     "banner.png",
     "skills",
+    "docs/native-mcp-patch.md",
+    "docs/native-mcp-protocol.md",
+    "patches",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"

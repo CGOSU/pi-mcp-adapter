@@ -1,6 +1,6 @@
 # Pi 原生 MCP 管理协议
 
-> 状态：版本 1 协议在固定 Pi 1.2.0 源码基线上实现；新增 `directTools` 持久化能力已收入版本化补丁，并在独立干净基线上完成 apply、定向 native 测试、真实同会话回归及 adapter public types/exports 验证。补丁与可复现命令见 [`docs/native-mcp-patch.md`](native-mcp-patch.md)，manifest 见 [`patches/pi-1.2.0-native-mcp-management.json`](../patches/pi-1.2.0-native-mcp-management.json)。历史实现未恢复。本协议不重做；剩余迁移顺序与依赖见 [`docs/todo.md`](todo.md)，已确认的 trust、keyring/OAuth 与 directTools 持久化决定见 [`docs/decisions.md`](decisions.md)。
+> 状态：`pi.mcp-management` v1 及 `directTools` 持久化能力已分别移植到固定 Pi 1.2.0 和 1.3.0 源码基线，并在独立 checkout 完成 apply 与对应定向验证。协议契约相同，版本化补丁、精确支持范围及验证边界见 [`docs/native-mcp-patch.md`](native-mcp-patch.md) 和其中分别链接的两个 manifest。历史实现未恢复。本协议不重做；迁移记录见 [`docs/todo.md`](todo.md)，trust、keyring/OAuth 与 directTools 持久化决定见 [`docs/decisions.md`](decisions.md)。
 
 ## 重建依据与边界
 
@@ -94,7 +94,7 @@ OAuth sign-in 的 prompt 仅通过回调临时交互：展示 authorization URL�
 
 协议 v1 通过可协商能力 `server.set-direct-tools` 暴露 native-owned 的 direct 选择持久化。`McpManagementDirectTools` 为 `boolean | readonly string[]`；`McpManagementServerSnapshot.directTools` 只在 winning native config source 明确配置该值时提供。管理 handle 的 `setDirectTools(name, directTools)` 经原生配置更新与安全写入路径，沿用来源 provenance、现有 override 和 trust 规则；成功后更新当前 session policy 与快照。server 不存在/撤回、trust 不足、配置来源不可写、输入非法、写入失败及 session/attempt 失效均以结构化 Result 表达，失败不伪装成功、不自动重放。
 
-`setExecutionPolicy` 仍然只改变当前 session 的有效策略，不写配置；`setToolExposure` 仍写入 `toolExposure`，不会代替 `directTools` 的持久化选择。两者的既有语义不变。持久化能力实现位于固定基线补丁 [`patches/pi-1.2.0-native-mcp-management.patch`](../patches/pi-1.2.0-native-mcp-management.patch)，manifest 与可复现 apply/consumer 验证见 [`patches/pi-1.2.0-native-mcp-management.json`](../patches/pi-1.2.0-native-mcp-management.json) 和 [`docs/native-mcp-patch.md`](native-mcp-patch.md)。
+`setExecutionPolicy` 仍然只改变当前 session 的有效策略，不写配置；`setToolExposure` 仍写入 `toolExposure`，不会代替 `directTools` 的持久化选择。两者的既有语义不变。持久化能力分别位于 Pi 1.2.0/1.3.0 固定基线补丁中；准确 patch、manifest 与可复现 apply/consumer 验证见 [`docs/native-mcp-patch.md`](native-mcp-patch.md)。
 
 ## 快照与 freshness
 
@@ -130,7 +130,7 @@ OAuth sign-in 的 prompt 仅通过回调临时交互：展示 authorization URL�
 - Adapter `src/config/validation.ts` 对外部 MCP JSON 逐字段校验 `ServerEntry` 与 `McpSettings`，失败使用带 `code`、`path`、`message` 的结构化问题；错误信息不包含字段值。单个无效 server entry 会被排除并保留结构化诊断，整个文件仍可供既有配置读取兼容入口显示其他有效条目；写回和 native mapping 遇到此类诊断时拒绝继续。已发布 `config` 子路径函数签名不改。
 - `src/native/config-mapping.ts` 使用编译期穷尽的字段归属表，区分 native config/lifecycle、凭据适配、执行策略、adapter presentation/observability 与后续依赖。映射保留现有来源顺序、`PI_MCP_CONFIG_MODE=exclusive` 的 sources 结果、最终覆盖 entry 的 `scope`、原始 source path 和既有 `writePath`；项目 `.agents/mcp.json` 与 `.agents/mcp/mcp.json` 按 shared-project 之后、`.pi/mcp.json` 之前合并，均保留 project scope/source/write provenance；`mergeConfigs` 在 URL 变化时仍清除继承的 URL 绑定认证。字段标记为 deferred 时只列出字段名、将该 server 标为不可连接且不输出部分 native config，并保留原字段在 adapter 源配置中，不降级为相似 native 字段。
 - provenance 不含 `trusted`/`projectTrusted` 输入。`scope: "project"` 仅是来源身份，native owner 独立调用当前 `ExtensionContext.isProjectTrusted()` 门控连接、执行和配置写回；同时把位于当前 project cwd 内的配置来源路径视为 project，不能以传入 `scope: "global"` 降级。项目目录内 extension registration 也由 owner 按 extension path 归为 project；管理 API 的 exposure 写操作要求真实 trust。项目配置导入必须走带来源 provenance 的 native owner assembly/bridge，不得通过 `pi.registerMcpServer()` 把文件配置伪装成 `extension` scope。现有 `registerMcpServer` 只保留其已发布 helper 契约，不作为配置导入通道。
-- 本阶段尚未切换 adapter 入口。映射结果明确携带 `nativeEntrySwitchAllowed: false`、未完成任务 ID，以及 `pi-package-mcp-configs`/`agent-plugin-mcp-configs` 两类尚无来源级映射的派生配置源；`agentPluginPaths`、传输/凭据、执行策略、资源与展示等表中的 deferred 项仍是入口迁移阻塞依赖。映射计划不是 runtime，不允许部分字段映射结果触发 native server。
+- 历史审计状态（2026-10-14）：当时尚未切换 adapter 入口；映射结果携带 `nativeEntrySwitchAllowed: false`、未完成任务 ID，以及 `pi-package-mcp-configs`/`agent-plugin-mcp-configs` 两类尚无来源级映射的派生配置源；`agentPluginPaths`、传输/凭据、执行策略、资源与展示等表中的 deferred 项被视为入口迁移阻塞依赖。映射计划不是 runtime，不允许部分字段映射结果触发 native server。该状态后来已由当前迁移完成；现行宿主边界见 [`README.md`](../README.md) 与 [`current-state.md`](current-state.md)。
 
 ## 本轮重建与验证（2026-10-14）
 

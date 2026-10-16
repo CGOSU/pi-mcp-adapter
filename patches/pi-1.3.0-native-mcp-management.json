@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "target": {
+    "repository": "Pi upstream source",
+    "package": "@earendil-works/pi-coding-agent",
+    "version": "1.3.0",
+    "baseCommit": "71023aec1546d6d677a65669c5665c0927ce0dd0",
+    "nodeEngine": ">=22.19.0"
+  },
+  "patch": {
+    "path": "pi-1.3.0-native-mcp-management.patch",
+    "format": "git binary/full-index diff",
+    "sha256": "953d4911373cddaa133989515786e247369edb43aad438dfca5170d0a00d3d78",
+    "sizeBytes": 543194,
+    "fileCount": 48,
+    "paths": [
+      "packages/coding-agent/docs/extensions.md",
+      "packages/coding-agent/docs/mcp.md",
+      "packages/coding-agent/src/core/agent-session.ts",
+      "packages/coding-agent/src/core/extensions/types.ts",
+      "packages/coding-agent/src/core/mcp-management.ts",
+      "packages/coding-agent/src/core/mcp-servers.ts",
+      "packages/coding-agent/src/extensions/mcp/approval.ts",
+      "packages/coding-agent/src/extensions/mcp/apps.ts",
+      "packages/coding-agent/src/extensions/mcp/assembly.ts",
+      "packages/coding-agent/src/extensions/mcp/catalog-cache.ts",
+      "packages/coding-agent/src/extensions/mcp/cli.ts",
+      "packages/coding-agent/src/extensions/mcp/config.ts",
+      "packages/coding-agent/src/extensions/mcp/elicitation.ts",
+      "packages/coding-agent/src/extensions/mcp/execution-policy.ts",
+      "packages/coding-agent/src/extensions/mcp/index.ts",
+      "packages/coding-agent/src/extensions/mcp/lifecycle.ts",
+      "packages/coding-agent/src/extensions/mcp/oauth.ts",
+      "packages/coding-agent/src/extensions/mcp/request-headers-command.ts",
+      "packages/coding-agent/src/extensions/mcp/resources.ts",
+      "packages/coding-agent/src/extensions/mcp/runtime.ts",
+      "packages/coding-agent/src/extensions/mcp/sampling.ts",
+      "packages/coding-agent/src/extensions/mcp/tools.ts",
+      "packages/coding-agent/src/extensions/tool-search/tool.ts",
+      "packages/coding-agent/src/index.ts",
+      "packages/coding-agent/test/mcp-approval.test.ts",
+      "packages/coding-agent/test/mcp-catalog-cache.test.ts",
+      "packages/coding-agent/test/mcp-direct-tools-config.test.ts",
+      "packages/coding-agent/test/mcp-elicitation.test.ts",
+      "packages/coding-agent/test/mcp-execution-policy.test.ts",
+      "packages/coding-agent/test/mcp-extension.test.ts",
+      "packages/coding-agent/test/mcp-interaction-capabilities.test.ts",
+      "packages/coding-agent/test/mcp-lifecycle.test.ts",
+      "packages/coding-agent/test/mcp-management.test.ts",
+      "packages/coding-agent/test/mcp-oauth-refresh.test.ts",
+      "packages/coding-agent/test/mcp-oauth-store.test.ts",
+      "packages/coding-agent/test/mcp-owner-assembly.test.ts",
+      "packages/coding-agent/test/mcp-request-headers-command.test.ts",
+      "packages/coding-agent/test/mcp-resources-policy.test.ts",
+      "packages/coding-agent/test/mcp-sampling.test.ts",
+      "packages/coding-agent/test/mcp-tool-policy.test.ts",
+      "packages/coding-agent/test/mcp-transport-compatibility.test.ts",
+      "packages/coding-agent/test/suite/mcp-oauth-server.ts",
+      "packages/coding-agent/test/tool-search.test.ts",
+      "packages/mcp/src/index.ts",
+      "packages/mcp/src/oauth/flow.ts",
+      "packages/mcp/src/transports/sse.ts",
+      "packages/mcp/src/transports/streamable-http.ts",
+      "packages/mcp/src/transports/unix-socket.ts"
+    ]
+  },
+  "dependencies": {
+    "added": [],
+    "removed": [],
+    "installCommand": "npm ci --ignore-scripts --no-audit --no-fund",
+    "notes": "The patch does not change Pi workspace package manifests or lockfiles and reuses the fixed Pi 1.3.0 workspace dependencies."
+  },
+  "publicApi": {
+    "protocolId": "pi.mcp-management",
+    "protocolVersion": 1,
+    "discovery": "public pi.events protocol",
+    "capabilities": [
+      "server.snapshot",
+      "server.subscribe",
+      "server.enable",
+      "server.disable",
+      "server.reconnect",
+      "server.set-exposure",
+      "tool.set-exposure",
+      "catalog.refresh",
+      "catalog.resources",
+      "catalog.prompts",
+      "resource.read",
+      "resource.read-app",
+      "prompt.get",
+      "app.call-tool",
+      "oauth.sign-in",
+      "oauth.sign-out",
+      "server.set-direct-tools",
+      "execution.set-policy"
+    ],
+    "directToolsPersistence": {
+      "capability": "server.set-direct-tools",
+      "handleMethod": "McpManagementHandle.setDirectTools",
+      "configField": "directTools",
+      "executionPolicy": "session-only; setExecutionPolicy does not persist configuration"
+    },
+    "assemblyExport": "installMcpOwnerAssembly",
+    "compatibility": "The adapter requires every listed capability and fails explicitly on stock or incomplete Pi hosts; no legacy runtime fallback is provided."
+  },
+  "verification": {
+    "baseline": {
+      "commit": "71023aec1546d6d677a65669c5665c0927ce0dd0",
+      "packageVersion": "1.3.0",
+      "worktreeBeforeApply": "clean"
+    },
+    "applyCheck": "git apply --check passed on a clean isolated checkout at the fixed baseline.",
+    "apply": "git apply passed; the result matched all 48 manifest paths (22 modified, 26 added).",
+    "diffCheck": "git diff --check passed on the patched isolated checkout.",
+    "nativeTests": {
+      "files": [
+        "test/mcp-management.test.ts",
+        "test/mcp-extension.test.ts",
+        "test/mcp-direct-tools-config.test.ts",
+        "test/mcp-owner-assembly.test.ts",
+        "test/mcp-transport-compatibility.test.ts",
+        "test/mcp-request-headers-command.test.ts",
+        "test/mcp-oauth-refresh.test.ts",
+        "test/mcp-oauth-store.test.ts"
+      ],
+      "result": "8 test files passed; 89 tests passed in the isolated Pi 1.3.0 checkout."
+    }
+  }
+}

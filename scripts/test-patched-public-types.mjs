@@ -1,17 +1,19 @@
-import { cp, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { cp, lstat, mkdir, mkdtemp, readdir, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { parsePiSourceArgument, verifyPatchedPiSource } from "./patched-pi-source.mjs";
 
 const adapterRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const expectedPiCommit = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
-const expectedPiVersion = "1.2.0";
+const distRoot = join(adapterRoot, "dist");
 const workspacePackages = ["chord", "tui", "telemetry", "codemode", "mcp", "ai", "agent", "coding-agent"];
 const adapterBuildFiles = [
   "CHANGELOG.md",
   "LICENSE",
   "README.md",
+  "docs/native-mcp-patch.md",
+  "docs/native-mcp-protocol.md",
   "banner.png",
   "cli.js",
   "config.ts",
@@ -22,37 +24,7 @@ const adapterBuildFiles = [
   "tsconfig.json",
   "types.ts",
 ];
-const adapterBuildDirectories = ["extensions", "scripts/build-public.mjs", "skills", "src", "test/node/package"];
-
-function parsePiSourceArgument(args) {
-  let source;
-  for (let index = 0; index < args.length; index++) {
-    const argument = args[index];
-    if (argument === "--help" || argument === "-h") {
-      console.log("Usage: npm run test:public-types -- --pi-source <fixed Pi source checkout>");
-      process.exit(0);
-    }
-    if (argument === "--pi-source") {
-      if (source !== undefined || args[index + 1] === undefined) {
-        throw new Error("Pass exactly one path after --pi-source.");
-      }
-      source = args[++index];
-      continue;
-    }
-    if (argument.startsWith("--pi-source=")) {
-      if (source !== undefined || argument.length === "--pi-source=".length) {
-        throw new Error("Pass exactly one non-empty --pi-source path.");
-      }
-      source = argument.slice("--pi-source=".length);
-      continue;
-    }
-    throw new Error(`Unknown argument: ${argument}`);
-  }
-  if (!source) {
-    throw new Error("Provide a Pi checkout explicitly with --pi-source; no machine-local default is used.");
-  }
-  return resolve(source);
-}
+const adapterBuildDirectories = ["extensions", "patches", "scripts/build-public.mjs", "skills", "src", "test/node/package"];
 
 function run(command, args, cwd, { capture = false, env = process.env } = {}) {
   const result = spawnSync(command, args, {
@@ -68,10 +40,6 @@ function run(command, args, cwd, { capture = false, env = process.env } = {}) {
     throw new Error(`${command} ${args.join(" ")} failed in ${cwd} with exit code ${result.status}.${details ? `\n${details}` : ""}`);
   }
   return capture ? result.stdout : "";
-}
-
-function requireFile(path) {
-  return readFile(path, "utf8");
 }
 
 function npmCommand() {
@@ -96,32 +64,6 @@ async function extractPackage(tarball, destination) {
   await mkdir(destination, { recursive: true });
   run("tar", ["-xzf", tarball, "-C", destination], dirname(tarball));
   return join(destination, "package");
-}
-
-function verifyPatchedPiSource(sourceRoot) {
-  const packageRoot = join(sourceRoot, "packages", "coding-agent");
-  return Promise.all([
-    requireFile(join(packageRoot, "package.json")),
-    requireFile(join(packageRoot, "src", "index.ts")),
-    requireFile(join(packageRoot, "src", "core", "mcp-management.ts")),
-  ]).then(async ([packageJsonText, publicEntry, management]) => {
-    const packageJson = JSON.parse(packageJsonText);
-    if (packageJson.name !== "@earendil-works/pi-coding-agent" || packageJson.version !== expectedPiVersion) {
-      throw new Error(`Expected @earendil-works/pi-coding-agent ${expectedPiVersion} at ${packageRoot}.`);
-    }
-    const sourceHead = run("git", ["rev-parse", "HEAD"], sourceRoot, { capture: true }).trim();
-    if (sourceHead !== expectedPiCommit) {
-      throw new Error(`Expected fixed Pi baseline ${expectedPiCommit}; found ${sourceHead}.`);
-    }
-    for (const [content, marker, purpose] of [
-      [publicEntry, "installMcpOwnerAssembly", "public owner assembly export"],
-      [management, "MCP_MANAGEMENT_PROTOCOL_ID", "versioned public management protocol"],
-      [management, "setDirectTools", "persisted directTools management API"],
-    ]) {
-      if (!content.includes(marker)) throw new Error(`The selected Pi source is missing its ${purpose}.`);
-    }
-    return { packageRoot, sourceHead };
-  });
 }
 
 async function copyAdapterBuildInputs(stageRoot) {
@@ -203,6 +145,49 @@ async function addMissingNodeModules(sourceRoot, targetRoot) {
   }
 }
 
+async function synchronizeDist(sourceDistRoot) {
+  const stagingRoot = await mkdtemp(join(adapterRoot, ".tmp-public-build-"));
+  const stagedDistRoot = join(stagingRoot, "dist");
+  const previousRoot = `${stagingRoot}-previous`;
+  let previousDistMoved = false;
+
+  try {
+    await cp(sourceDistRoot, stagedDistRoot, { recursive: true });
+    try {
+      await rename(distRoot, previousRoot);
+      previousDistMoved = true;
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+
+    try {
+      await rename(stagedDistRoot, distRoot);
+    } catch (error) {
+      if (previousDistMoved) {
+        try {
+          await rename(previousRoot, distRoot);
+        } catch (restoreError) {
+          throw new AggregateError(
+            [error, restoreError],
+            `Failed to synchronize validated dist; the previous output remains at ${previousRoot}`,
+          );
+        }
+      }
+      throw error;
+    }
+
+    if (previousDistMoved) {
+      try {
+        await rm(previousRoot, { recursive: true, force: true });
+      } catch (error) {
+        console.warn(`Synchronized dist/ successfully, but could not remove the previous output at ${previousRoot}: ${error.message}`);
+      }
+    }
+  } finally {
+    await rm(stagingRoot, { recursive: true, force: true });
+  }
+}
+
 async function writeConsumerSource(consumerRoot) {
   await writeFile(join(consumerRoot, "package.json"), JSON.stringify({ private: true, type: "module" }, null, 2));
   await writeFile(join(consumerRoot, "consumer.ts"), `import adapter, { createMcpAdapter, registerMcpServer, type McpServerRegistration } from "pi-mcp-adapter";
@@ -233,8 +218,14 @@ void [adapter, extension, disposed, protocol, protocolVersion, capability, persi
 }
 
 async function main() {
-  const sourceRoot = parsePiSourceArgument(process.argv.slice(2));
-  const { packageRoot, sourceHead } = await verifyPatchedPiSource(sourceRoot);
+  const usage = "npm run test:public-types -- --pi-source <fixed Pi source checkout>";
+  const parsedSource = parsePiSourceArgument(process.argv.slice(2), usage);
+  if (parsedSource === null) {
+    console.log(`Usage: ${usage}`);
+    return;
+  }
+  const { sourceRoot } = parsedSource;
+  const { packageRoot, sourceHead, sourceVersion } = await verifyPatchedPiSource(sourceRoot, adapterRoot);
   const temporaryRoot = await mkdtemp(join(tmpdir(), "pi-mcp-public-types-"));
   const stagedAdapterRoot = join(temporaryRoot, "adapter-build");
   const piPackDirectory = join(temporaryRoot, "pi-package");
@@ -278,7 +269,7 @@ async function main() {
     );
     await addMissingNodeModules(join(sourceRoot, "node_modules"), piNodeModules);
 
-    console.log(`Building and checking adapter public artifacts against patched Pi ${expectedPiVersion} at ${sourceHead}.`);
+    console.log(`Building and checking adapter public artifacts against patched Pi ${sourceVersion} at ${sourceHead}.`);
     run(npmCommand(), ["run", "typecheck"], stagedAdapterRoot);
     run(npmCommand(), ["run", "test:public-exports"], stagedAdapterRoot);
 
@@ -306,8 +297,7 @@ async function main() {
       "consumer.ts",
     ], consumerRoot);
 
-    await rm(join(adapterRoot, "dist"), { recursive: true, force: true });
-    await cp(join(stagedAdapterRoot, "dist"), join(adapterRoot, "dist"), { recursive: true });
+    await synchronizeDist(join(stagedAdapterRoot, "dist"));
     const generatedFiles = [];
     async function collect(directory, prefix = "") {
       for (const entry of await readdir(directory, { withFileTypes: true })) {

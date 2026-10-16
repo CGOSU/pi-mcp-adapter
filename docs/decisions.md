@@ -33,6 +33,12 @@
 - 原因：暂停的 `native-panel-status-and-live-catalog` 核实到原生 `setExecutionPolicy` 只更新当前 session、不持久化，而持久化的 `setToolExposure` 写入 `toolExposure`，且现有 effective exposure 中 `directTools` 选择优先于普通 `toolExposure`；两者不等价。直接改用 `toolExposure` 会让既有 direct 选择继续生效或改变已发布配置语义，属于无法等价映射的契约变化。
 - 约束：不得以 `toolExposure`、session-only policy 或 adapter 自行写文件替代该持久化路径；不绕过 native owner 的 trust 检查、provenance 校验与安全写入；失败按结构化 Result 报告且不伪装成功；保留 `MCP_DIRECT_TOOLS` 的会话覆盖语义。新增能力按现有协议 v1 能力协商扩展，stock 或缺能力 host 继续显式失败、不 fallback。实施顺序见 [`todo.md`](todo.md)。
 
+### 2026-10-16：以独立版本化补丁增加 Pi 1.3.0 固定基线支持
+
+- 决定：保留已交付的 Pi 1.2.0 补丁与验证方案，另为 Pi 1.3.0 固定 commit `71023aec1546d6d677a65669c5665c0927ce0dd0` 交付独立 patch/manifest；本适配器对 Pi 的支持声明只覆盖已验证的两个固定 commit，不把 peer range `^1.2.0` 扩张解释为任意 Pi 1.2+ build 都兼容。
+- 原因：Pi 1.3.0 满足现有 peer range，无需改变最低 peer 版本；独立版本化 patch 和 clean-checkout 验证可以扩展到新的固定基线，同时保持原 Pi 1.2.0 artifact 与安全/owner 语义不变。
+- 约束：两份补丁不可互换；每份都须由各自固定干净基线验证 hash、路径和协议能力。stock/不完整 host 继续显式失败，不增加 legacy runtime/capability fallback。补丁 hash、manifest 和实际验证结果唯一维护于 [`docs/native-mcp-patch.md`](native-mcp-patch.md)。
+
 ### 2026-10-15：本次迁移暂不支持原生 2026-07-28 远程 MCP 协议
 
 - 决定：用户确认本轮迁移暂不实现原生 MCP client 对 `2026-07-28` wire protocol 的支持。保留 adapter 已发布 `ServerEntry.protocolVersion` 配置字段与公共类型；显式 `2026-07-28` pin 以及当前无法等价实现的 modern `auto` 协商，必须在连接/执行前返回具体、可区分的结构化"不支持"结果。

@@ -3,41 +3,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { parsePiSourceArgument, verifyPatchedPiSource } from "./patched-pi-source.mjs";
 
 const adapterRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const expectedPiCommit = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
-const expectedPiVersion = "1.2.0";
-
-function parsePiSourceArgument(args) {
-  let source;
-  for (let index = 0; index < args.length; index++) {
-    const argument = args[index];
-    if (argument === "--help" || argument === "-h") {
-      console.log("Usage: npm run test:patched-native-session -- --pi-source <fixed Pi source checkout>");
-      process.exit(0);
-    }
-    if (argument === "--pi-source") {
-      if (source !== undefined || args[index + 1] === undefined) {
-        throw new Error("Pass exactly one path after --pi-source.");
-      }
-      source = args[++index];
-      continue;
-    }
-    if (argument.startsWith("--pi-source=")) {
-      if (source !== undefined || argument.length === "--pi-source=".length) {
-        throw new Error("Pass exactly one non-empty --pi-source path.");
-      }
-      source = argument.slice("--pi-source=".length);
-      continue;
-    }
-    throw new Error(`Unknown argument: ${argument}`);
-  }
-  if (!source) {
-    throw new Error("A Pi checkout must be provided explicitly with --pi-source; no machine-local default is used.");
-  }
-  return realpathSync(resolve(source));
-}
-
 function run(command, args, cwd, env) {
   const result = spawnSync(command, args, { cwd, env, encoding: "utf8", stdio: "inherit" });
   if (result.error) throw result.error;
@@ -84,47 +52,13 @@ function installPublishedPiAiDependency(packageRoot) {
   };
 }
 
-function verifyPatchedPiSource(sourceRoot) {
-  const packageRoot = join(sourceRoot, "packages", "coding-agent");
-  const packageJson = readJson(join(packageRoot, "package.json"));
-  if (packageJson.name !== "@earendil-works/pi-coding-agent" || packageJson.version !== expectedPiVersion) {
-    throw new Error(`Expected @earendil-works/pi-coding-agent ${expectedPiVersion} at ${packageRoot}.`);
-  }
-
-  const sourceHead = runCapture("git", ["rev-parse", "HEAD"], sourceRoot);
-  if (sourceHead !== expectedPiCommit) {
-    throw new Error(`Expected fixed Pi baseline ${expectedPiCommit}; found ${sourceHead}.`);
-  }
-
-  const publicApiPath = join(packageRoot, "src", "index.ts");
-  const managementPath = join(packageRoot, "src", "core", "mcp-management.ts");
-  const ownerPath = join(packageRoot, "src", "extensions", "mcp", "index.ts");
-  const assemblyPath = join(packageRoot, "src", "extensions", "mcp", "assembly.ts");
-  for (const [path, purpose] of [
-    [publicApiPath, "Pi public source entry"],
-    [managementPath, "patched native management API"],
-    [ownerPath, "patched native MCP owner"],
-    [assemblyPath, "native owner assembly"],
-  ]) {
-    requireFile(path, purpose);
-  }
-
-  const publicApi = readFileSync(publicApiPath, "utf8");
-  const management = readFileSync(managementPath, "utf8");
-  const owner = readFileSync(ownerPath, "utf8");
-  for (const [content, marker, purpose] of [
-    [publicApi, "installMcpOwnerAssembly", "public owner assembly export"],
-    [management, "MCP_MANAGEMENT_PROTOCOL_ID", "versioned public management protocol"],
-    [management, "setDirectTools", "persisted directTools management capability"],
-    [owner, "createMcpExtensionInstance({}, true)", "built-in native MCP owner factory"],
-  ]) {
-    if (!content.includes(marker)) throw new Error(`The selected Pi source is missing its ${purpose}.`);
-  }
-
+function verifyNativeSessionRuntime(sourceRoot) {
   const piAiPackageRoot = join(adapterRoot, "node_modules", "@earendil-works", "pi-ai");
   const piAiPackage = readJson(join(piAiPackageRoot, "package.json"));
-  if (piAiPackage.name !== "@earendil-works/pi-ai" || piAiPackage.version !== expectedPiVersion) {
-    throw new Error(`Expected the published Pi AI ${expectedPiVersion} package at ${piAiPackageRoot}.`);
+  const adapterPackage = readJson(join(adapterRoot, "package.json"));
+  const expectedPiAiVersion = adapterPackage.devDependencies?.["@earendil-works/pi-ai"];
+  if (piAiPackage.name !== "@earendil-works/pi-ai" || piAiPackage.version !== expectedPiAiVersion) {
+    throw new Error(`Expected the adapter's pinned Pi AI test dependency ${expectedPiAiVersion} at ${piAiPackageRoot}.`);
   }
   const publicRuntimeFiles = [
     join(sourceRoot, "node_modules", "vitest", "vitest.mjs"),
@@ -135,17 +69,6 @@ function verifyPatchedPiSource(sourceRoot) {
     join(sourceRoot, "packages", "mcp", "dist", "index.js"),
   ];
   for (const path of publicRuntimeFiles) requireFile(path, "Installed Pi workspace dependency");
-
-  return { packageRoot, sourceHead };
-}
-
-function runCapture(command, args, cwd) {
-  const result = spawnSync(command, args, { cwd, encoding: "utf8", stdio: "pipe" });
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    throw new Error(`${command} ${args.join(" ")} failed in ${cwd}: ${result.stderr || result.stdout}`);
-  }
-  return result.stdout.trim();
 }
 
 function isolatedEnvironment(sourceRoot, isolatedRoot) {
@@ -173,9 +96,16 @@ function isolatedEnvironment(sourceRoot, isolatedRoot) {
   return { env, home, agentDir };
 }
 
-function main() {
-  const sourceRoot = parsePiSourceArgument(process.argv.slice(2));
-  const { packageRoot, sourceHead } = verifyPatchedPiSource(sourceRoot);
+async function main() {
+  const usage = "npm run test:patched-native-session -- --pi-source <fixed Pi source checkout>";
+  const parsedSource = parsePiSourceArgument(process.argv.slice(2), usage);
+  if (parsedSource === null) {
+    console.log(`Usage: ${usage}`);
+    return;
+  }
+  const { sourceRoot } = parsedSource;
+  const { packageRoot, sourceHead, sourceVersion } = await verifyPatchedPiSource(sourceRoot, adapterRoot);
+  verifyNativeSessionRuntime(sourceRoot);
   const temporaryRoot = mkdtempSync(join(tmpdir(), "pi-mcp-patched-session-"));
   const { env } = isolatedEnvironment(sourceRoot, temporaryRoot);
   const vitestPath = join(adapterRoot, "node_modules", "vitest", "vitest.mjs");
@@ -184,7 +114,7 @@ function main() {
   let removePublishedPiAiDependency = () => {};
   try {
     removePublishedPiAiDependency = installPublishedPiAiDependency(packageRoot);
-    console.log(`Running same-session native MCP regression against Pi ${expectedPiVersion} at ${sourceHead}.`);
+    console.log(`Running same-session native MCP regression against Pi ${sourceVersion} at ${sourceHead}.`);
     run(process.execPath, [
       vitestPath,
       "run",
@@ -200,7 +130,7 @@ function main() {
 }
 
 try {
-  main();
+  await main();
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;

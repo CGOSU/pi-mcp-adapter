@@ -113,6 +113,12 @@ test("npm pack publishes a small built-only package", () => {
   assert.equal(files.some(file => removedRootFacades.has(file)), false);
   for (const file of [
     "extensions/index.js",
+    "docs/native-mcp-patch.md",
+    "docs/native-mcp-protocol.md",
+    "patches/pi-1.2.0-native-mcp-management.json",
+    "patches/pi-1.2.0-native-mcp-management.patch",
+    "patches/pi-1.3.0-native-mcp-management.json",
+    "patches/pi-1.3.0-native-mcp-management.patch",
     "dist/index.js",
     "dist/config.js",
     "dist/metadata-cache.js",

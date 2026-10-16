@@ -8,11 +8,11 @@
 
 ## 运行与兼容边界
 
-- Pi 原生 MCP 运行时是唯一的连接、OAuth 和工具执行方。发布入口 `dist/index.js` 只接入原生管理方，不再启动第二套适配器运行时，也不回退到旧运行时；未打补丁的 Pi 1.2.0 缺少所需管理 API 时会明确失败。
+- Pi 原生 MCP 运行时是唯一的连接、OAuth 和工具执行方。发布入口 `dist/index.js` 只接入原生管理方，不再启动第二套适配器运行时，也不回退到旧运行时；Stock Pi 或缺少所需管理 API/能力的宿主会明确失败。
 - 原生入口只注册 `/mcp-adapter`；Pi 自带的 `/mcp` 仍由 Pi 原生 MCP 扩展负责。
 - 保留的旧适配器运行时源码仍位于 `src/**`，并由对应测试覆盖，但不会从 `dist/index.js` 加载，也不包含在发布包中。
 - `scriptMode`、`disableProxyTool`、`autoAuth`、`trace`、`oauthDir` 和服务器级 `debug`/`trace` 在原生管理方下不生效；配置仍予保留，不会静默删除。完整用户可见边界见 [`README.md`](../README.md) 中的 “必需的 Pi 宿主版本”和“原生管理方下的行为变化” 两节。
-- Pi 上游补丁以固定基线 `06a466935536f8c9bcacb2d5efc0fc021be1bdff` 和 Pi 1.2.0 为准；补丁、清单与复现方法见 [`docs/native-mcp-patch.md`](native-mcp-patch.md)。Pi 上游工作区未提交、未推送、未发布或打标签。
+- Pi 原生 MCP 补丁分别固定在 Pi 1.2.0 commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff` 与 Pi 1.3.0 commit `71023aec1546d6d677a65669c5665c0927ce0dd0`；只有这两个补丁后的固定基线完成本仓库验证。两个 patch、manifest、hash 与复现范围以 [`docs/native-mcp-patch.md`](native-mcp-patch.md) 为准。Pi 上游未提交、未推送、未发布或打标签。
 
 ## 源码、启动与发布布局
 
@@ -20,13 +20,13 @@
 - `index.ts` 的静态依赖包括配置读取、元数据缓存、JSON Schema、工具表面、注册代码，以及原生管理方所需的同步密钥环和 bearer 令牌凭据适配层（`src/auth/mcp-auth.ts`、`src/auth/mcp-bearer-store.ts`）。OAuth 流程与提供方、命令、旧运行时工具、脚本执行和 UI 运行时仍通过缓存的 `import()` 延迟加载。
 - 有效且完全采用延迟加载模式的元数据缓存可跳过 `session_start` 的完整运行时初始化；启动时连接、保持连接、冷缓存和 `MCP_DIRECT_TOOLS` 的既有语义保留。目录索引与 `MetadataCatalogSnapshot` 会在一次目录构建或同步中复用。
 - 发布包包含五个 ESM（ECMAScript 模块）入口：包根、`types`、`config`、`metadata-cache` 和 `oauth`；Pi 扩展由 `extensions/index.js` 转发到 `dist/index.js`，命令行入口为 `dist/cli.js`。`package.json` 不发布 `src/**` 或测试目录。
-- 最新 `npm pack --ignore-scripts --dry-run --json` 检查得到 25 个文件，包含构建后的 `dist`、`mcp-keyring-helper.cjs` 和扩展入口；不包含 `src/**`、`test/**`、源代码映射文件、`mcp-script-worker.mjs` 或 `app-bridge.bundle.js`。
+- 最新 `npm pack --dry-run --ignore-scripts --json` 检查得到 31 个文件，包含构建后的 `dist`、扩展入口、README 所链接的 native MCP 文档和 Pi 1.2.0/1.3.0 patch/manifest；不包含 `src/**`、`test/**` 或 source map。未发布 npm 包。
 
 ## 测试、发布与验证结果
 
 - 测试按 `test/unit`、`test/integration`、`test/node` 和 `test/fixtures` 分区；仓库根目录不保留测试文件或 `__tests__` 目录。
 - 本机 Node `v26.11.1`：构建 interactive-visualizer 示例后，`npm run test:vitest` 为 119 个测试文件、1,350 项全部通过；随后针对本轮修改的 5 个文件、34 项测试也全部通过。
-- 固定 Pi 补丁上的原生管理方定向测试为 4 个文件、57 项通过；`npm run test:public-types -- --pi-source <已打补丁的 Pi 源码目录>` 的适配器类型检查、公共产物与导出检查、声明消费者编译均通过，并同步了 18 个 `dist` 文件；`npm run test:patched-native-session -- --pi-source <已打补丁的 Pi 源码目录>` 的真实同会话测试 1 项通过。
+- Pi 1.3.0 固定补丁 checkout 的四个原生管理方定向测试文件、53 项通过；adapter public types/exports 与 packed consumer 检查通过并同步 18 个 `dist` 文件，真实 native/adapter 同会话回归 1 项通过。Pi 1.2.0 固定补丁 checkout 的 public types/exports、packed consumer 与真实同会话回归也通过。两版本 commit、patch hash 和确切验证命令见 [`docs/native-mcp-patch.md`](native-mcp-patch.md)。
 - `npm run test:oauth` 的 141 项测试曾全部通过；仅安装生产依赖后的临时安装、公共子路径导入和命令行冒烟检查也有通过记录。详细命令及当时的验证范围见 [`docs/session-log.md`](session-log.md)。
 - Pi 上游完整 `npm run check` 尚未通过：固定基线缺少生成的模型数据，另有与本次 MCP 改动无关的类型错误；不得把定向测试或 `--noCheck` 产物构建描述成完整上游检查通过。
 - 最终 3 次启动基准中，源码与发布包的模块导入/主流程/总耗时中位数分别为 `437/475/1128ms` 和 `199/228/754ms`，未出现可重复的 15% 以上回退；静态启动依赖检查通过。目录基准 `npm run benchmark:catalog -- --runs 5` 中，5×100、20×100、50×100 项时，direct 与 live 共用索引的测量值分别为 `4.72/4.45ms`、`18.73/17.43ms`、`45.07/45.05ms`；旧的逐服务器索引 50×100 项对照为 `989.27ms`。一万工具搜索冷启动为 `50.28ms`，5 次热运行中位数为 `5.73ms`，结果正确。
@@ -35,6 +35,6 @@
 
 ## 尚待完成的交付
 
-- 本地 `main` 有两个尚未推送的提交，较 `origin/main` 超前 2 个：`6dcb08316ee3428eecfec956ad914826acf08219`（持续集成验证调整）及其后的文档状态记录。迁移和构建安全修复的既有提交已推送。这两个新提交尚未推送，远端持续集成仍待触发。
-- 在已打补丁的 Pi 1.2.0 环境重新生成发布文件时，使用 `npm run test:public-types -- --pi-source <已打补丁的 Pi 源码目录>`。不要在未打补丁的 Pi 1.2.0 下直接执行 `npm run build:public`；它会因缺少原生管理 API 类型而失败。构建脚本现会保留旧 `dist/`，但不会把该失败伪装为成功。详见 [`docs/pitfalls.md`](pitfalls.md)。
+- 本轮只创建 adapter 本地中文提交，不 push、发布或打 tag；远端 CI 未由本轮触发。具体提交和验证记录见 [`docs/session-log.md`](session-log.md)。
+- 重新生成发布文件时，必须向 `npm run test:public-types -- --pi-source <已应用对应补丁的固定 Pi 源码目录>` 显式提供 Pi 1.2.0 或 1.3.0 checkout。Stock Pi 缺少原生管理 API 类型，不能用于 adapter 构建；构建脚本会保留旧 `dist/`，但不把缺 API 的失败伪装为成功。详见 [`docs/native-mcp-patch.md`](native-mcp-patch.md) 和 [`docs/pitfalls.md`](pitfalls.md)。
 - `AGENTS.md` 和 `docs/clean-code.md` 未在本轮修改。
