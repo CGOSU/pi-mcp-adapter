@@ -44,6 +44,7 @@
 
 ## 最近一次更新
 
+- 2026-10-16：修复 `build:public` 在构建失败时丢失已提交 `dist/` 生成物的隐患（`7f5cfe8`，已 push）。构建改为在 `.tmp-public-build-*` 暂存目录完成后原子替换 `dist/`，失败时还原旧目录；stock Pi 1.2.0 下构建仍以声明发射错误失败，但 `dist/` 18 个文件 SHA-256 不变。唯一决定见 [`docs/decisions.md`](decisions.md)，失败路径与恢复方式见 [`docs/pitfalls.md`](pitfalls.md)，实际命令见 [`docs/session-log.md`](session-log.md)。
 - 2026-10-16：迁移已提交并 push 到 adapter 主仓库 `main`：commit `05c4a3f1023f2d0ce7458515d1782fc72370ed69`（`迁移 MCP 扩展到 Pi 1.2.0 原生管理协议`，104 个文件，仓库本地身份 CGOSU/dev@cgosu.com），远端 `origin/main` 已与本地一致（无强推、未重放）。Pi 上游未提交、未 push、未发布。真实命令与结果见 [`docs/session-log.md`](session-log.md)。
 - 2026-10-16：完成最终文档与 adapter Git 交付准备。在独立干净 checkout（`git clone --no-hardlinks`，detached `06a466935536f8c9bcacb2d5efc0fc021be1bdff`，Pi `1.2.0`，apply 前 worktree clean）上重复验证：`git apply --check` 与真实 `git apply` 均成功且得到与 manifest 一致的 48 个路径，`npm ci --ignore-scripts` 装 299 个包，4 文件/57 项 native 测试通过，`test:public-types` 与 `test:patched-native-session` 均通过并同步 18 个 `dist` 文件；patch SHA-256 与 manifest 一致。用户文档新增 patched Pi 前置条件、`/mcp` 与 `/mcp-adapter` 分工、trust/keyring/生命周期/缓存与在 native owner 下保留/不激活的功能边界；详细命令、真实结果与限制见 [`docs/session-log.md`](session-log.md)。
 - 2026-10-16：真实 patched Pi native MCP extension 与 adapter 在同一 harness session 的回归 runner 已通过；覆盖本地 fixture 的 live tool/resource/prompt catalog、执行及失败、管理刷新/读取、持久化与 session-only 策略、未信任项目拒绝、runtime registration、session reload 后旧 handle 失效，以及 adapter status v1/命令状态。runner 与实际命令、限制和详细结果见 [`docs/session-log.md`](session-log.md)。
