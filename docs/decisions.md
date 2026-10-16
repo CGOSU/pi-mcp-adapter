@@ -19,7 +19,7 @@
 
 - 决定：迁移计划中第 7–11 项（`adapter-native-bridge-and-public-entry`、`native-direct-tools-persistence`、`native-panel-status-and-live-catalog`、`real-native-adapter-session-regression`、`versioned-patch-and-public-artifact-verification`）按原定目标与验收范围完成；旧被阻塞的 `native-panel-status-and-live-catalog` 任务不重试、不伪报完成，其澄清报告与副作用记录保留。
 - 约束：面板保存工具选择只走 native `setDirectTools` 持久化路径（不侧面写配置）；`setExecutionPolicy` 保持 session-only，不冒充持久化。
-- 交付：补齐的能力与可复现命令以 [`docs/native-mcp-protocol.md`](native-mcp-protocol.md)、[`docs/native-mcp-patch.md`](native-mcp-patch.md) 与 manifest 为唯一来源；旧 runtime 相关任务的完成声明、验证与副作用记录保留在 [`docs/session-log.md`](session-log.md)，不重写。
+- 交付：补齐的能力与可复现命令以 [`docs/native-mcp-protocol.md`](native-mcp-protocol.md)、[`docs/native-mcp-patch.md`](native-mcp-patch.md) 与 manifest 为唯一来源；旧 runtime 相关任务的完成声明、验证与副作用记录保留在 [`docs/session-log.md`](session-log.md)，不重写。commit `05c4a3f` 与 push 结果也已记录在那里。
 
 ### 2026-10-16：保留 directTools 选择语义并扩展原生管理 API 持久化
 

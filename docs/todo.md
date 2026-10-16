@@ -143,7 +143,7 @@
 
 ## 最近一次记录
 
-- 2026-10-16：十二项迁移任务全部完成，包括干净基线补丁/公共产物交付、文档与 adapter Git 收尾。在独立干净 checkout 上重复验证了 apply、4 文件/57 项 native 测试、public types/exports 与真实同会话回归；用户文档补齐 patched Pi 前置条件与保留/不激活边界。详细命令与结果见 [`docs/session-log.md`](session-log.md)；commit/push 结果也记录在那里。
+- 2026-10-16：十二项迁移任务全部完成，包括干净基线补丁/公共产物交付、文档与 adapter Git 收尾。在独立干净 checkout 上重复验证了 apply、4 文件/57 项 native 测试、public types/exports 与真实同会话回归；用户文档补齐 patched Pi 前置条件与保留/不激活边界。最终提交 `05c4a3f1023f2d0ce7458515d1782fc72370ed69` 已 push 到 `origin/main`（fast-forward，无强推）；详细命令、验证与 push 结果见 [`docs/session-log.md`](session-log.md)。
 - 2026-10-15：用户确认“先不支持”原生 `2026-07-28` 远程 MCP 协议；该边界已写入 [`docs/decisions.md`](decisions.md)，并把 `native-transport-auth-and-request-compatibility` 的协议验收改为结构化不支持（不降级、不删配置），其余传输/认证/安全要求不变。本轮只更新文档，未运行代码测试或上游命令，未提交、未 push。
 - 2026-10-14：用户确认 trust 与 OAuth 两项推荐方案；本轮将剩余迁移计划重排为“先补原生能力（生命周期→配置/trust→keyring→传输→执行策略→资源/Apps），再切 adapter 入口，随后面板/状态栏、同会话回归、补丁交付、Git 收尾”的 11 项任务，并把两项已确认决策写入 [`docs/decisions.md`](decisions.md)。已完成 `native-management-api` 不重做；本轮只更新文档，未运行代码测试或上游命令，未提交、未 push。
 

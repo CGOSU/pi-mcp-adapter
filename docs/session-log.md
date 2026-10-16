@@ -119,3 +119,10 @@
 - 副作用与恢复：本任务曾两次在 adapter 根目录运行 `npm run build:public`（一次直接、一次经 `npm run test:public-exports`），该脚本先 `rm -rf dist`，随后在 stock Pi 1.2.0 下因缺少管理 API 导出而在声明发射阶段失败，导致 6 个生成文件（`*.d.ts` 与 `mcp-keyring-helper.cjs`）被删除。未尝试手工重建，而是用文档化的 `npm run test:public-types -- --pi-source <patched checkout>` 重新生成；对 `dist/` 全部文件做 SHA-256 快照对比，结果与事故前完全一致（`DIST IDENTICAL`）。已在 [`docs/pitfalls.md`](pitfalls.md) 记录。没有 tracked 文件被误删、没有写入 Pi 上游、没有使用真实凭据或生产服务。
 - 限制：未运行全量上游 `npm test`/`npm run build`/`npm run check`（历史 model-data 阻塞不变，也不作为本轮结果）；stock Pi 1.2.0 下 adapter 的 `npm run typecheck` 仍然因缺少 patched 管理 API 导出而失败，这是预期的宿主前置条件，不是 patched 环境的结果。patch、manifest 与 `dist` 的上游/产物交付已完成；Pi 上游未提交、未推送、未发布、未打 tag。
 - 遗留：无已知未完成的迁移实现项；未激活的 adapter 设置（`scriptMode`、`disableProxyTool`、`autoAuth`、`trace`、`oauthDir`、server 级 `debug`/`trace`）按边界保留在配置中但不生效，已在 README 与 `current-state` 说明。
+
+### 2026-10-16：adapter 迁移提交与 push
+
+- 完成：按用户已记录的 adapter 主仓库 commit/push 授权，使用仓库本地身份 `CGOSU`/`dev@cgosu.com` 创建中文提交 `05c4a3f1023f2d0ce7458515d1782fc72370ed69`（`迁移 MCP 扩展到 Pi 1.2.0 原生管理协议`），包含 104 个文件：迁移源码与测试、`patches/` 补丁与 manifest、`docs/native-mcp-*.md`、验证 runner、tracked `dist` 生成物及本轮文档更新。只用显式路径暂存，未包含 `.pi-graph/`、`AGENTS.md`、`docs/clean-code.md` 或任何其他协作者改动；提交时工作区无未暂存/未跟踪的迁移外文件。
+- push 前核对：分支 `main` 跟踪 `origin/main`（`git@github.com:CGOSU/pi-mcp-adapter.git`），本地恰好领先 1 个提交，远端仍为 `98a3b79…`，属安全 fast-forward。
+- 通过：`git push origin main` 退出 0，输出 `98a3b79..05c4a3f  main -> main`；push 后 `git ls-remote origin refs/heads/main` 与本地 `HEAD` 同为 `05c4a3f…`，`git rev-list --left-right --count origin/main...main` 为 `0 0`。未使用强推，未重放。
+- 边界：Pi 上游工作区 `/Users/cgosu/code/JavaScript/pi-upstream-native` 保持 `06a466935536f8c9bcacb2d5efc0fc021be1bdff` 且改动路径集合与本任务开始时一致，未提交、未 push；未发布、未部署、未打 tag。
