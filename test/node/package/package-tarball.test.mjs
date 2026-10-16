@@ -4,6 +4,31 @@ import test from "node:test";
 
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 
+function parsePackReport(output) {
+  const starts = [output.indexOf("["), output.indexOf("{")].filter(index => index >= 0);
+  const start = Math.min(...starts);
+  assert.ok(Number.isFinite(start), output);
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < output.length; index++) {
+    const character = output[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') inString = true;
+    else if (character === "[" || character === "{") depth++;
+    else if (character === "]" || character === "}") {
+      depth--;
+      if (depth === 0) return JSON.parse(output.slice(start, index + 1));
+    }
+  }
+  throw new Error("npm pack did not return a complete JSON array.");
+}
+
 function runNpmPack() {
   if (process.platform !== "win32") {
     return spawnSync(npm, ["pack", "--dry-run", "--json"], {
@@ -78,10 +103,9 @@ const removedRootFacades = new Set([
 test("npm pack publishes a small built-only package", () => {
   const result = runNpmPack();
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}\n${result.error ?? ""}`);
-  const jsonStart = result.stdout.indexOf("[");
-  assert.ok(jsonStart >= 0, result.stdout);
-  const report = JSON.parse(result.stdout.slice(jsonStart));
-  const files = report[0]?.files?.map(file => file.path) ?? [];
+  const report = parsePackReport(result.stdout);
+  const metadata = Array.isArray(report) ? report[0] : Object.values(report)[0];
+  const files = metadata?.files?.map(file => file.path) ?? [];
 
   assert.ok(files.length <= 60, `published ${files.length} files`);
   assert.equal(files.some(file => file.startsWith("src/") || file.startsWith("test/")), false);

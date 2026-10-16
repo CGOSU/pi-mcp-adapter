@@ -8,6 +8,49 @@
 
 ## 已确认决策
 
+### 2026-10-16：默认扩展入口切换为 native-only，不保留旧 runtime fallback
+
+- 决定：发布入口 `dist/index.js` 不再包含自包含的 adapter MCP 运行时；它经公开 `pi.mcp-management` v1 协议发现并协商 Pi 原生 MCP owner，作为 opt-in assembly + 面板接入，只注册 `/mcp-adapter` 一个命令，不注册自己的 tool。移除了 `mcp-script-worker.mjs` 与 `app-bridge.bundle.js` 运行资源及其构建检查。
+- 原因：Pi 原生 runtime 是本迁移已确认的唯一连接、OAuth 与执行 owner；保留旧 proxy/script/UI runtime 会形成第二客户端，并使“stock host 缺能力就明确失败”的约定失效。
+- 约束：stock 或缺少必需能力的 host 必须返回结构化失败（`missing-public-api`/`missing-capabilities`/`unsupported-version`）并且不连接任何 MCP server、不回退到旧 runtime；不因为入口切换而改变已发布公共 exports、factory/register helper 签名或五个子路径。旧 `src/**` 运行时模块仍保留在仓库并由各自测试覆盖，不因入口切换而删除。
+- 边界：`scriptMode`、`disableProxyTool`、`autoAuth`、`trace`、`oauthDir` 及 server 级 `debug`/`trace` 不在 native owner 下激活，但保留在配置中且不静默丢弃；`oauthDir` 不激活是因为它可能触发明文凭据迁移。
+
+### 2026-10-16：directTools 持久化、面板与 bridge 迁移按原计划完成
+
+- 决定：迁移计划中第 7–11 项（`adapter-native-bridge-and-public-entry`、`native-direct-tools-persistence`、`native-panel-status-and-live-catalog`、`real-native-adapter-session-regression`、`versioned-patch-and-public-artifact-verification`）按原定目标与验收范围完成；旧被阻塞的 `native-panel-status-and-live-catalog` 任务不重试、不伪报完成，其澄清报告与副作用记录保留。
+- 约束：面板保存工具选择只走 native `setDirectTools` 持久化路径（不侧面写配置）；`setExecutionPolicy` 保持 session-only，不冒充持久化。
+- 交付：补齐的能力与可复现命令以 [`docs/native-mcp-protocol.md`](native-mcp-protocol.md)、[`docs/native-mcp-patch.md`](native-mcp-patch.md) 与 manifest 为唯一来源；旧 runtime 相关任务的完成声明、验证与副作用记录保留在 [`docs/session-log.md`](session-log.md)，不重写。
+
+### 2026-10-16：保留 directTools 选择语义并扩展原生管理 API 持久化
+
+- 决定：保留已发布管理面板的 `directTools` 工具选择与保存语义；由 Pi 唯一原生 owner 通过版本化、可协商的公开管理能力，在真实 project-trust 门控下按既有配置 provenance 持久化 `directTools` 选择，成功后同步当前会话执行策略与订阅快照。已获用户确认（2026-10-16）。
+- 原因：暂停的 `native-panel-status-and-live-catalog` 核实到原生 `setExecutionPolicy` 只更新当前 session、不持久化，而持久化的 `setToolExposure` 写入 `toolExposure`，且现有 effective exposure 中 `directTools` 选择优先于普通 `toolExposure`；两者不等价。直接改用 `toolExposure` 会让既有 direct 选择继续生效或改变已发布配置语义，属于无法等价映射的契约变化。
+- 约束：不得以 `toolExposure`、session-only policy 或 adapter 自行写文件替代该持久化路径；不绕过 native owner 的 trust 检查、provenance 校验与安全写入；失败按结构化 Result 报告且不伪装成功；保留 `MCP_DIRECT_TOOLS` 的会话覆盖语义。新增能力按现有协议 v1 能力协商扩展，stock 或缺能力 host 继续显式失败、不 fallback。实施顺序见 [`todo.md`](todo.md)。
+
+### 2026-10-15：本次迁移暂不支持原生 2026-07-28 远程 MCP 协议
+
+- 决定：用户确认本轮迁移暂不实现原生 MCP client 对 `2026-07-28` wire protocol 的支持。保留 adapter 已发布 `ServerEntry.protocolVersion` 配置字段与公共类型；显式 `2026-07-28` pin 以及当前无法等价实现的 modern `auto` 协商，必须在连接/执行前返回具体、可区分的结构化"不支持"结果。
+- 原因：固定 Pi 1.2.0 的 `@earendil-works/pi-mcp` client 只实现 pre-2026 `initialize` 握手（`packages/mcp/src/protocol/types.ts`、`client.ts`）。把该值映射到 native 默认或 legacy 会静默改变所选 wire protocol，比明确报不支持风险更高；实现完整 2026 协商需要独立的架构与范围评估。
+- 约束：不把 `2026-07-28` 加入 native 支持列表，不实现 2026 wire client，也不允许静默退回 legacy 或删除/改写用户配置；该限制不涉及请求方管理协议 v1；不以此为由放宽 trust、凭据或执行权限。未设置 `protocolVersion` 的 stock native server 行为不变。后续如需支持，作为独立架构任务评估。
+
+### 2026-10-14：项目级 MCP 配置统一受 Pi project-trust 控制
+
+- 决定：保留现有配置来源与 provenance，但共享 `.mcp.json`、项目 `.agents`/`.pi` 配置等所有项目级来源统一经过真实 Pi project-trust gate；未信任时只可脱敏展示来源与条目，不连接、不执行配置命令、不注册可执行缓存工具。这是相对旧 adapter 行为的有意收紧，已获用户确认。
+- 原因：adapter 现有读取路径不传 Pi trust 决策，而原生 owner 只在 trusted 项目读取项目配置（差异见 [`native-mcp-evidence.md`](native-mcp-evidence.md) C1）；维持旧行为会让迁移后的执行路径绕过宿主信任。
+- 约束：不得通过 extension registration、调用方自报 trusted、项目来源转写 global 或配置 override 绕过信任；不删除来源、不静默丢弃字段；字段级归属与实现见 [`todo.md`](todo.md) 的 `native-config-provenance-and-trust`；原生既有额外权限限制不变。
+
+### 2026-10-14：保留 keyring 存储与既有 OAuth 登录连续性
+
+- 决定：保留 adapter 的 OS keyring 存储和既有 OAuth 登录连续性，由原生 owner 消费一条安全适配路径；不自动把旧凭据复制到明文文件，也不输出 token。已获用户确认。
+- 原因：原生 `McpOAuthCredentialStore` 默认写 agent-dir `mcp-auth.json` 明文文件 backend，与 adapter keyring 不是同一契约（差异见 [`native-mcp-evidence.md`](native-mcp-evidence.md) C2）；直接切换到原生默认会使既有登录失效或迫使凭据明文落盘。
+- 约束：未参与迁移的 stock native server 保持原生默认存储；若无法安全复用 keyring，先报告具体冲突并澄清，不默认为已授权重新登录或明文迁移；不读取真实用户凭据做测试。实现见 [`todo.md`](todo.md) 的 `native-keyring-and-oauth-continuity`。
+
+### 2026-10-14：在固定 Pi 1.2.0 基线上重建原生 MCP 管理协议
+
+- 决定：历史 `native-management-api` 实现源码未出现在固定上游工作区；按用户明确授权，从 Pi 1.2.0 基线 `06a466935536f8c9bcacb2d5efc0fc021be1bdff` 重新实现。`docs/todo.md` 中此前记录的是历史完成声明与历史验证，不能当成本轮源代码、补丁或验证成果；本次重建协议以 [`native-mcp-protocol.md`](native-mcp-protocol.md) 为唯一细节来源。
+- 原因：已核实的独立工作区是干净的精确上游基线，没有旧 native-management-api 改动；使用工作流历史文本重放会把未验证内容冒充源码。
+- 约束：Pi 原生 MCP 扩展继续持有唯一连接、OAuth 与执行权；只经公开 `pi.events` 发现并协商版本/必需能力，导出 session-scoped、脱敏、不可变管理快照及 Result API。不得泄露 client、原始配置、凭据、URL/header/env、传输错误，不创建第二 runtime 或代理执行。保留 `/mcp`、project trust、权限 pipeline、OAuth 和工具撤回语义；禁用保留最近成功目录为 cached，但不可执行。shutdown 后旧 handle/异步结果必须失效，不重放可能有副作用的操作。遇到后续 adapter 已发布契约或权限/数据规则无法安全映射时先澄清。
+
 ### 2026-08-31：仅保留标准 MCP 配置来源
 
 - 决定：删除宿主专属 MCP 配置探测、兼容导入、setup 采用流程和 CLI `init`；`imports` 与 `settings.hostConfigDiscovery` 遗留字段在配置边界被忽略。标准共享文件、Pi override、provenance、setup 写入和 token CLI 保留。

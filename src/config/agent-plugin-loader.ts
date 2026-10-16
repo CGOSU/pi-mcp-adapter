@@ -1,7 +1,10 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { getAgentPath } from "./agent-dir.ts";
+import { getProjectPiConfigPath } from "./paths.js";
+import type { ConfigSourceSpec } from "./contracts.js";
 import type { McpConfig, ServerEntry } from "../contracts/core.ts";
+import { validateServerEntry } from "./validation.ts";
 
 const PLUGIN_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
 const MCP_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json";
@@ -30,6 +33,49 @@ export interface AgentPluginSummary {
   path: string;
   name?: string;
   serverCount: number;
+}
+
+export interface AgentPluginMcpConfigSource {
+  readonly source: ConfigSourceSpec;
+  readonly config: McpConfig;
+}
+
+export function loadAgentPluginConfigSources(
+  paths: unknown,
+  cwd: string,
+  provenance: { readonly scope: "global" | "project" },
+): AgentPluginMcpConfigSource[] {
+  const sources: AgentPluginMcpConfigSource[] = [];
+  const seen = new Set<string>();
+  for (const pluginPath of getPluginPaths(paths)) {
+    const pluginRoot = resolvePluginPath(pluginPath, cwd);
+    const config = loadAgentPluginMcpConfig(pluginPath, cwd);
+    if (!config) continue;
+    const mcpServers: Record<string, ServerEntry> = {};
+    for (const [serverName, server] of Object.entries(config.mcpServers)) {
+      if (seen.has(serverName)) {
+        console.warn(`Agent Plugin at ${pluginRoot} skips duplicate normalized MCP server ${serverName}`);
+        continue;
+      }
+      seen.add(serverName);
+      mcpServers[serverName] = server;
+    }
+    if (Object.keys(mcpServers).length === 0) continue;
+    const project = provenance.scope === "project";
+    sources.push({
+      source: {
+        id: project ? "agent-plugin-project" : "agent-plugin-global",
+        label: "Agent Plugin MCP config",
+        readPath: resolve(pluginRoot, "mcp.json"),
+        writePath: project ? getProjectPiConfigPath(cwd) : getAgentPath("mcp.json"),
+        kind: project ? "project" : "user",
+        shared: false,
+        scope: provenance.scope,
+      },
+      config: { mcpServers },
+    });
+  }
+  return sources;
 }
 
 export function loadAgentPluginConfigs(paths: unknown, cwd = process.cwd()): McpConfig {
@@ -160,11 +206,18 @@ function translateAgentPluginMcpConfig(raw: unknown, manifest: AgentPluginManife
     if (!translated) continue;
 
     const normalizedName = formatAgentPluginServerName(manifest.name, serverName);
+    const validated = validateServerEntry(normalizedName, translated);
+    if (!validated.ok) {
+      console.warn(
+        `Agent Plugin ${manifest.name} skips invalid MCP server ${serverName} (${validated.error.code}): ${validated.error.message}`,
+      );
+      continue;
+    }
     if (mcpServers[normalizedName]) {
       console.warn(`Agent Plugin ${manifest.name} skips invalid MCP server ${serverName}: normalized server name ${normalizedName} already exists`);
       continue;
     }
-    mcpServers[normalizedName] = translated;
+    mcpServers[normalizedName] = validated.value;
   }
   return { mcpServers };
 }

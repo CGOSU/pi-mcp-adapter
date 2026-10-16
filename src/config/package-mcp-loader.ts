@@ -1,8 +1,11 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import stripJsonComments from "strip-json-comments";
-import { getAgentDir, getConfigDirName } from "./agent-dir.ts";
+import { getAgentDir, getAgentPath, getConfigDirName } from "./agent-dir.ts";
+import { getProjectPiConfigPath } from "./paths.js";
+import type { ConfigSourceSpec } from "./contracts.js";
 import type { McpConfig, ServerEntry } from "../contracts/core.ts";
+import { validateServerEntry } from "./validation.ts";
 
 interface PackageSetting {
   source: string;
@@ -13,18 +16,29 @@ interface PackageManifest {
   pi?: { mcp?: unknown };
 }
 
+export interface PackageMcpConfigSource {
+  readonly source: ConfigSourceSpec;
+  readonly config: McpConfig;
+}
+
 export function loadPackageMcpConfigs(cwd = process.cwd()): McpConfig {
   const mcpServers: Record<string, ServerEntry> = {};
+  for (const source of loadPackageMcpConfigSources(cwd)) Object.assign(mcpServers, source.config.mcpServers);
+  return { mcpServers };
+}
+
+export function loadPackageMcpConfigSources(cwd = process.cwd()): PackageMcpConfigSource[] {
+  const sources: PackageMcpConfigSource[] = [];
   const seen = new Set<string>();
 
-  for (const packageRoot of getConfiguredPackageRoots(cwd)) {
+  for (const configuredPackage of getConfiguredPackageRoots(cwd)) {
+    const { root: packageRoot, scope } = configuredPackage;
     const manifest = readPackageManifest(packageRoot);
     if (!manifest || typeof manifest.name !== "string" || !manifest.name) continue;
     const paths = getManifestMcpPaths(manifest.pi?.mcp, manifest.name);
     if (!paths) continue;
 
     const packagePrefix = formatPackageName(manifest.name);
-    const packageServers = new Set<string>();
     for (const path of paths) {
       const configPath = resolvePackageConfigPath(packageRoot, path);
       if (!configPath) {
@@ -34,24 +48,42 @@ export function loadPackageMcpConfigs(cwd = process.cwd()): McpConfig {
 
       const config = readMcpConfig(configPath, manifest.name);
       if (!config) continue;
+      const mcpServers: Record<string, ServerEntry> = {};
       for (const [serverName, server] of Object.entries(config.mcpServers)) {
         const normalizedName = `${packagePrefix}__${formatServerName(serverName)}`;
-        if (packageServers.has(normalizedName) || seen.has(normalizedName)) {
+        if (seen.has(normalizedName)) {
           console.warn(`Pi package ${manifest.name} skips duplicate normalized MCP server ${normalizedName}`);
           continue;
         }
-        packageServers.add(normalizedName);
         seen.add(normalizedName);
         mcpServers[normalizedName] = server;
       }
+      if (Object.keys(mcpServers).length === 0) continue;
+      const project = scope === "project";
+      sources.push({
+        source: {
+          id: project ? "pi-package-project" : "pi-package-global",
+          label: `Pi package ${manifest.name} MCP config`,
+          readPath: configPath,
+          writePath: project ? getProjectPiConfigPath(cwd) : getAgentPath("mcp.json"),
+          kind: project ? "project" : "user",
+          shared: false,
+          scope: project ? "project" : "global",
+        },
+        config: { mcpServers },
+      });
     }
   }
-
-  return { mcpServers };
+  return sources;
 }
 
-function getConfiguredPackageRoots(cwd: string): string[] {
-  const roots: string[] = [];
+interface ConfiguredPackageRoot {
+  readonly root: string;
+  readonly scope: "user" | "project";
+}
+
+function getConfiguredPackageRoots(cwd: string): ConfiguredPackageRoot[] {
+  const roots: ConfiguredPackageRoot[] = [];
   for (const [settingsPath, scope] of [
     [join(cwd, getConfigDirName(), "settings.json"), "project"],
     [join(getAgentDir(), "settings.json"), "user"],
@@ -72,7 +104,7 @@ function getConfiguredPackageRoots(cwd: string): string[] {
           : undefined;
       if (!source) throw new Error(`${scope} Pi settings ${settingsPath} package entries must be strings or objects with a string source`);
       const root = resolvePackageRoot(source, scope, cwd);
-      if (root && !roots.includes(root)) roots.push(root);
+      if (root && !roots.some((entry) => entry.root === root)) roots.push({ root, scope });
     }
   }
   return roots;
@@ -120,10 +152,13 @@ function readMcpConfig(path: string, packageName: string): McpConfig | null {
   }
   const mcpServers: Record<string, ServerEntry> = {};
   for (const [name, server] of Object.entries(servers)) {
-    if (!server || typeof server !== "object" || Array.isArray(server)) {
-      throw new Error(`Pi package ${packageName} MCP config ${path} server ${name} must be a JSON object`);
+    const validated = validateServerEntry(name, server);
+    if (!validated.ok) {
+      throw new Error(
+        `Pi package ${packageName} MCP config ${path} contains an invalid server (${validated.error.code}): ${validated.error.message}`,
+      );
     }
-    mcpServers[name] = server as ServerEntry;
+    mcpServers[name] = validated.value;
   }
   return { mcpServers };
 }

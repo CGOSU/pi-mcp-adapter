@@ -122,7 +122,7 @@ describe("config discovery", () => {
           url: "https://package.test/mcp",
           headers: { Authorization: "Bearer package" },
           bearerTokenEnv: "PACKAGE_TOKEN",
-          requestHeadersCommand: "headers",
+          requestHeadersCommand: { command: "headers" },
           httpTransport: "sse",
         },
         stdio: {
@@ -137,7 +137,7 @@ describe("config discovery", () => {
           url: "https://package.test/socket",
           headers: { Authorization: "Bearer package" },
           bearerTokenEnv: "PACKAGE_TOKEN",
-          requestHeadersCommand: "headers",
+          requestHeadersCommand: { command: "headers" },
           httpTransport: "sse",
         },
       },

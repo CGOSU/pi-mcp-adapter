@@ -119,6 +119,9 @@ vi.mock("../../../src/utils.ts", () => ({
   truncateAtWord: mocks.truncateAtWord,
 }));
 
+// This suite validates the retired internal registration path; native registration is covered separately.
+vi.mock("../../../index.ts", async () => import("../../../src/extension/install.ts"));
+
 function createState() {
   return {
     manager: {

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **The extension now requires a patched Pi 1.2.0 host.** Pi's built-in MCP owner is the only connection, OAuth, and execution runtime; the adapter discovers it over the versioned public `pi.mcp-management` v1 protocol and negotiates every required capability up front. Stock or incomplete hosts fail explicitly with a structured error and no server is connected; the previous self-contained runtime is no longer used as a fallback. See [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md) for the fixed baseline (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`), the versioned patch, and the reproducible apply and verification steps.
+- The adapter registers only `/mcp-adapter`; `/mcp` remains Pi's native MCP manager. MCP tools, resources, and prompts come from the native owner's pipeline, while adapter-managed servers keep the configured `toolPrefix`, `exposure`, `toolExposure`, include/exclude, approval, and output-guard semantics.
+- Peer dependencies and the development type baseline moved to the `1.2.0` Pi package family, and the Node engine requirement is `>=22.19.0`.
+- Project-level MCP sources are gated by Pi's real project trust: in an untrusted project they are withheld from the live snapshot, are not connected, and direct-tool persistence refuses to write.
+
+### Added
+- `server.set-direct-tools` management capability and `McpManagementHandle.setDirectTools`, which persists the server-level `directTools` selection through the native owner's provenance, writable-source, and project-trust rules. `setExecutionPolicy` remains session-only and `setToolExposure` still writes `toolExposure`; neither impersonates the persisted selection.
+- `npm run test:public-types` to rebuild and verify the public artifacts against a patched Pi checkout, and `npm run test:patched-native-session` to run the real patched native extension and this adapter in one harness session with local fixtures and a faux provider.
+- [`docs/native-mcp-protocol.md`](docs/native-mcp-protocol.md), [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md), and a machine-readable patch manifest under `patches/`.
+
+### Removed
+- The `mcp-script-worker.mjs` and `app-bridge.bundle.js` runtime resources are no longer published. Related settings (`scriptMode`, `disableProxyTool`, `autoAuth`, `trace`, `oauthDir`, and the server-level `debug`/`trace` fields) are retained in configuration but are not activated by the native owner instead of being silently dropped.
+
 ## [2.27.1] - 2026-08-31
 
 ### Added

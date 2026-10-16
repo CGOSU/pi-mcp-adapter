@@ -17,6 +17,11 @@ export const REPOPROMPT_BINARY_CANDIDATES = [
   "/Applications/Repo Prompt.app/Contents/MacOS/repoprompt-mcp",
 ];
 
+export function getConfigPathFromArgv(argv: readonly string[] = process.argv): string | undefined {
+  const index = argv.indexOf("--mcp-config");
+  return index >= 0 && index + 1 < argv.length ? argv[index + 1] : undefined;
+}
+
 export function getPiGlobalConfigPath(overridePath?: string): string {
   return overridePath ? resolve(overridePath) : getAgentPath("mcp.json");
 }
@@ -45,6 +50,10 @@ export function getConfigSources(overridePath?: string, cwd = process.cwd()): Co
   const userPath = getEffectivePiGlobalConfigPath(overridePath);
   const projectPath = getProjectConfigPath(cwd);
   const projectPiPath = getProjectPiConfigPath(cwd);
+  const projectAgentsPaths = [
+    resolve(cwd, ".agents", "mcp.json"),
+    resolve(cwd, ".agents", "mcp", "mcp.json"),
+  ] as const;
   const sources: ConfigSourceSpec[] = [];
 
   if (isExclusiveConfigMode()) {
@@ -100,6 +109,19 @@ export function getConfigSources(overridePath?: string, cwd = process.cwd()): Co
       label: "project standard MCP",
       readPath: projectPath,
       writePath: projectPath,
+      kind: "project",
+      shared: true,
+      scope: "project",
+    });
+  }
+
+  for (const [index, agentsPath] of projectAgentsPaths.entries()) {
+    if ([userPath, projectPath, projectPiPath, GENERIC_GLOBAL_CONFIG_PATH, ...AGENTS_GLOBAL_CONFIG_PATHS].includes(agentsPath)) continue;
+    sources.push({
+      id: index === 0 ? "agents-project" : "agents-nested-project",
+      label: index === 0 ? "project .agents MCP" : "project .agents nested MCP",
+      readPath: agentsPath,
+      writePath: agentsPath,
       kind: "project",
       shared: true,
       scope: "project",

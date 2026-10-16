@@ -89,6 +89,18 @@ function writeRawConfigObject(filePath: string, raw: Record<string, unknown>): v
   renameSync(tmpPath, filePath);
 }
 
+function readValidatedConfigOrThrow(filePath: string, label: string): McpConfig | null {
+  const result = readValidatedConfig(filePath, label);
+  if (!result.ok) {
+    throw new Error(`${label} could not be used (${result.error.code}): ${result.error.message}`);
+  }
+  const firstIssue = result.issues?.[0];
+  if (firstIssue) {
+    throw new Error(`${label} contains an invalid entry (${firstIssue.code}): ${firstIssue.message}`);
+  }
+  return result.value;
+}
+
 function getServersObject(raw: Record<string, unknown>): Record<string, ServerEntry> {
   const existing = raw.mcpServers ?? raw["mcp-servers"] ?? {};
   if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
@@ -152,7 +164,7 @@ export function writeProjectServerDisabledOverride(
     let lowerConfig: McpConfig = { mcpServers: {} };
     for (const source of getConfigSources(overridePath, cwd)) {
       if (source.readPath === filePath) continue;
-      const loaded = readValidatedConfig(source.readPath, `MCP config from ${source.readPath}`);
+      const loaded = readValidatedConfigOrThrow(source.readPath, `MCP config from ${source.readPath}`);
       if (loaded) lowerConfig = mergeConfigs(lowerConfig, loaded);
     }
     if (isServerDisabled(lowerConfig.mcpServers[serverName])) next.disabled = false;
@@ -210,7 +222,8 @@ export function getServerProvenance(overridePath?: string, cwd = process.cwd()):
   const provenance = new Map<string, ServerProvenance>();
 
   for (const source of getConfigSources(overridePath, cwd)) {
-    const loaded = readValidatedConfig(source.readPath, `MCP config from ${source.readPath}`);
+    if (source.kind === "extension") continue;
+    const loaded = readValidatedConfigOrThrow(source.readPath, `MCP config from ${source.readPath}`);
     if (!loaded) continue;
 
     for (const name of Object.keys(loaded.mcpServers)) {

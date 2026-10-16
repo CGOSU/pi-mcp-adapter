@@ -32,17 +32,52 @@ Git-based Pi installs do not compile TypeScript during the production-only depen
 
 Restart Pi after installation.
 
+### Required Pi host
+
+This version requires a **patched Pi 1.2.0** host. Stock Pi 1.2.0 does not expose the native MCP management API this adapter is built on, and the adapter does not fall back to a second runtime. Against a stock or incomplete host, `/mcp-adapter` reports `This Pi host does not expose the patched native MCP management API. Install the patched Pi 1.2.0 package; adapter runtime fallback is disabled.` and no MCP server is connected.
+
+Prerequisites and the reproducible patch workflow are documented in:
+
+- [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md) — fixed baseline, apply steps, native tests, and public-artifact verification;
+- [`patches/pi-1.2.0-native-mcp-management.json`](patches/pi-1.2.0-native-mcp-management.json) — machine-readable baseline, patch SHA-256, capabilities, and verified commands;
+- [`docs/native-mcp-protocol.md`](docs/native-mcp-protocol.md) — the versioned `pi.mcp-management` v1 contract.
+
+The fixed inputs are Pi source baseline `06a466935536f8c9bcacb2d5efc0fc021be1bdff` and `@earendil-works/pi-coding-agent` `1.2.0` (Node `>=22.19.0`). The patch adds 48 files and changes no npm dependency. Pi's built-in MCP owner remains the only connection, OAuth, and execution runtime; the adapter is an opt-in assembly plus UI over it.
+
+### Entry points on a patched host
+
+| Surface | Owned by | Purpose |
+|---------|----------|---------|
+| `/mcp` | Pi built-in | Native MCP manager: `login <server>`, `logout <server>`, `reconnect <server>`, plus the interactive enable/disable/exposure manager |
+| `/mcp-adapter` | This adapter | Enhanced panel with tool/resource search, source and trust display, direct-tool selection and save, reconnect, and sign-in |
+
+The adapter entry registers exactly one command, `/mcp-adapter`, and no tool of its own: MCP tools, resources, and prompts are surfaced by the native owner's pipeline.
+
+MCP tools from adapter-managed servers keep the adapter's naming and exposure semantics: `settings.toolPrefix` / `toolPrefix` (default `server`, so `<server>_<tool>`) and native `exposure` (`codemode` by default, plus `deferred`, `direct`, `hidden`) with `toolExposure` per-tool overrides. The adapter does not register a duplicate MCP proxy or script tool. `/mcp-adapter` runs in TUI sessions; in non-TUI sessions it prints the same status as text, with a project-trust notice when project MCP sources are being withheld.
+
+### Behavior changes under the native owner
+
+The patched host is the only MCP runtime, so a few adapter features are retired rather than reimplemented on a second client:
+
+- **Retained:** config discovery, precedence, and provenance; direct-tool selection and persistence; include/exclude filtering; `toolPrefix`; search keywords; lifecycle and `idleTimeout`; per-request `requestHeadersCommand`; stdio/HTTP/socket transports; bearer tokens, `literalEnv`, and `pluginDataDir`; `approveTools`; `outputGuard`; sampling, auto-approve, and elicitation; resources and prompts; OAuth via the adapter keyring; the read-only `MCP_STATUS_EVENT` v1 snapshots; `createMcpAdapter`, `registerMcpServer`, and the five public subpaths.
+- **Not activated by the native owner:** `settings.scriptMode` / `disableProxyTool` / `autoAuth` / `trace` / `oauthDir` and the `debug`/`trace` server fields. These are left untouched in configuration and reported as retained-but-inactive instead of silently dropped; `scriptMode` and `disableProxyTool` stay off because the native owner must not gain a second MCP script or proxy execution surface, and `oauthDir` stays inactive because it must not trigger plaintext credential migration. The adapter no longer ships the `mcp-script-worker.mjs` or `app-bridge.bundle.js` runtime resources that backed the old script and MCP UI paths.
+- **Trust:** project-level sources (shared `.mcp.json`, project `.agents`/`.pi`) are gated by Pi's real project trust. In an untrusted project the servers are withheld from the live snapshot, are not connected, and `setDirectTools` refuses to write. Do not expect a self-declared trusted flag or a global rewrite to bypass this.
+- **Credentials:** the adapter's OS keyring stays the store for its own servers, reached through the native OAuth owner; the native default `mcp-auth.json` is not written by this path, and no stored token is ever migrated to plaintext.
+- **Protocol scope:** native MCP only supports Pi 1.2.0's `initialize`-era wire protocol. A configured `protocolVersion` of `2026-07-28` or `auto` is reported as a structured unsupported result before connecting, and the configuration is not rewritten.
+
 ### Published package layout
 
 The repository keeps the modular implementation under `src/**`; the npm package publishes the reproducible `dist/` build instead of the source tree. The build has five compatible ESM public entries:
 
-- `pi-mcp-adapter` — the Pi extension and SDK API
+- `pi-mcp-adapter` — the Pi extension and SDK API (`createMcpAdapter`, `registerMcpServer`, `MCP_STATUS_EVENT`, and reference/protocol helpers)
 - `pi-mcp-adapter/types`
 - `pi-mcp-adapter/config`
 - `pi-mcp-adapter/metadata-cache`
 - `pi-mcp-adapter/oauth`
 
-The entries retain native `dynamic import()` boundaries and are emitted as code-splitting chunks, so the extension does not eagerly load the MCP connection runtime, OAuth, commands, script worker, or UI runtime. The package also carries the independently loaded `mcp-script-worker.mjs`, `mcp-keyring-helper.cjs`, and `app-bridge.bundle.js` resources beside the chunks that resolve them. `npm run build:public` reproduces `dist/`; `prepack` runs that build before npm packaging. The published CLI is `dist/cli.js`.
+The entries retain native `dynamic import()` boundaries and are emitted as code-splitting chunks, so the extension does not eagerly load the MCP connection runtime, OAuth, commands, script worker, or UI runtime. The package carries the independently loaded `mcp-keyring-helper.cjs` resource beside the chunks that resolve it. `npm run build:public` reproduces `dist/`; `prepack` runs that build before npm packaging. The published CLI is `dist/cli.js`.
+
+> **Note:** the published extension entry is native-only (see [Required Pi host](#required-pi-host) and [Behavior changes under the native owner](#behavior-changes-under-the-native-owner)). The `src/**` modules for the older self-contained adapter runtime remain in the repository and are covered by their own tests, but they are no longer reachable from `dist/index.js`, and the `mcp-script-worker.mjs` and `app-bridge.bundle.js` runtime resources are no longer published. Sections below that describe the `mcp` proxy tool, `mcpScript`, `/mcp setup` and the other `/mcp` subcommands, or the MCP UI bridge document that older implementation rather than the current Pi extension entry.
 
 ## What happens on first run
 

@@ -24,8 +24,8 @@ export declare const visualizationStreamFrameTypeSchema: z.ZodEnum<{
 }>;
 export type VisualizationStreamFrameType = z.infer<typeof visualizationStreamFrameTypeSchema>;
 export declare const visualizationStreamStatusSchema: z.ZodEnum<{
-    error: "error";
     ok: "ok";
+    error: "error";
 }>;
 export type VisualizationStreamStatus = z.infer<typeof visualizationStreamStatusSchema>;
 export declare const uiStreamHostContextSchema: z.ZodObject<{
@@ -54,8 +54,8 @@ export declare const visualizationStreamEnvelopeSchema: z.ZodObject<{
         settled: "settled";
     }>;
     status: z.ZodEnum<{
-        error: "error";
         ok: "ok";
+        error: "error";
     }>;
     message: z.ZodOptional<z.ZodString>;
     spec: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
@@ -193,6 +193,12 @@ export interface HttpRequestHeadersCommand {
     timeoutMs?: number;
 }
 export interface ServerEntry {
+    /** Pi-native enablement field accepted when reading shared Pi MCP configuration. */
+    enabled?: boolean;
+    /** Pi-native tool exposure policy accepted when reading shared Pi MCP configuration. */
+    exposure?: "codemode" | "deferred" | "direct" | "hidden";
+    /** Per-tool exposure overrides from Pi-native MCP configuration. */
+    toolExposure?: Record<string, "codemode" | "deferred" | "direct" | "hidden">;
     command?: string;
     args?: string[];
     /** Explicit rmcp-mux Unix-domain socket path. Mutually exclusive with command and url. */
@@ -449,7 +455,7 @@ export interface McpPanelCallbacks {
     reconnect: (serverName: string) => Promise<boolean>;
     canAuthenticate: (serverName: string) => boolean;
     authenticate: (serverName: string) => Promise<McpAuthResult>;
-    getConnectionStatus: (serverName: string) => "connected" | "idle" | "failed" | "needs-auth" | "disabled";
+    getConnectionStatus: (serverName: string) => "connected" | "idle" | "failed" | "needs-auth" | "connecting" | "disabled";
     getFailureMessage?: (serverName: string) => string | null;
     refreshCacheAfterReconnect: (serverName: string) => ServerCacheEntry | null;
 }
@@ -464,6 +470,13 @@ export interface AgentPluginSummary {
     name?: string;
     serverCount: number;
 }
+export interface AgentPluginMcpConfigSource {
+    readonly source: ConfigSourceSpec;
+    readonly config: McpConfig;
+}
+export declare function loadAgentPluginConfigSources(paths: unknown, cwd: string, provenance: {
+    readonly scope: "global" | "project";
+}): AgentPluginMcpConfigSource[];
 export declare function loadAgentPluginConfigs(paths: unknown, cwd?: string): McpConfig;
 export declare function getAgentPluginSummaries(paths: unknown, cwd?: string): AgentPluginSummary[];
 
@@ -475,13 +488,13 @@ export interface KnownServerPreset {
 }
 export declare const KNOWN_SERVER_PRESETS: readonly KnownServerPreset[];
 export interface ConfigSourceSpec {
-    id: "shared-global" | "agents-global" | "agents-nested-global" | "pi-global" | "shared-project" | "pi-project";
+    id: "shared-global" | "agents-global" | "agents-nested-global" | "pi-global" | "shared-project" | "agents-project" | "agents-nested-project" | "pi-project" | "adapter-config" | "pi-package-global" | "pi-package-project" | "agent-plugin-global" | "agent-plugin-project";
     label: string;
     readPath: string;
     writePath: string;
-    kind: "user" | "project" | "shared";
+    kind: "user" | "project" | "shared" | "extension";
     shared: boolean;
-    scope: "global" | "project";
+    scope: "global" | "project" | "extension";
 }
 export interface ConfigDiscoveryPath {
     label: string;
@@ -493,6 +506,10 @@ export interface ConfigDiscoverySource extends ConfigDiscoveryPath {
     scope: ConfigSourceSpec["scope"];
     kind: "shared" | "pi";
     serverCount: number;
+    validationError?: {
+        code: string;
+        message: string;
+    };
 }
 export interface McpConfigConflict {
     serverName: string;
@@ -544,6 +561,7 @@ export declare const AGENTS_GLOBAL_CONFIG_PATHS: readonly [string, string];
 
 export declare const PROJECT_PI_CONFIG_NAME = "mcp.json";
 export declare const REPOPROMPT_BINARY_CANDIDATES: string[];
+export declare function getConfigPathFromArgv(argv?: readonly string[]): string | undefined;
 export declare function getPiGlobalConfigPath(overridePath?: string): string;
 export declare function getGenericGlobalConfigPath(): string;
 export declare function getProjectConfigPath(cwd?: string): string;
@@ -554,9 +572,51 @@ export declare function isExclusiveConfigMode(): boolean;
 export declare function getEffectivePiGlobalConfigPath(overridePath?: string): string;
 export declare function resolveConfiguredOAuthDir(raw: unknown, cwd?: string): string | undefined;
 
+export type ConfigValidationCode = "invalid-root" | "invalid-server-map" | "invalid-server-name" | "invalid-server-entry" | "unknown-server-field" | "invalid-server-field" | "invalid-settings" | "unknown-settings-field" | "invalid-setting" | "invalid-nested-field" | "conflicting-server-map";
+export interface ConfigValidationIssue {
+    readonly code: ConfigValidationCode;
+    readonly path: string;
+    readonly message: string;
+}
+export interface ConfigValidationError {
+    readonly code: ConfigValidationCode;
+    readonly message: string;
+    readonly issues: readonly ConfigValidationIssue[];
+}
+export type ConfigValidationResult<T> = {
+    readonly ok: true;
+    readonly value: T;
+    readonly issues?: readonly ConfigValidationIssue[];
+} | {
+    readonly ok: false;
+    readonly error: ConfigValidationError;
+};
+export declare function validateServerEntry(name: string, raw: unknown, options?: {
+    requireTransport?: boolean;
+}): ConfigValidationResult<ServerEntry>;
+export declare function validateMcpConfig(raw: unknown): ConfigValidationResult<McpConfig>;
+
+export type ConfigReadError = ConfigValidationError | {
+    readonly code: "invalid-json" | "read-failed";
+    readonly message: string;
+    readonly issues: readonly [];
+};
+export type ConfigReadResult = {
+    readonly ok: true;
+    readonly value: McpConfig | null;
+    readonly issues?: readonly ConfigValidationIssue[];
+} | {
+    readonly ok: false;
+    readonly error: ConfigReadError;
+};
+export declare function parseJsonConfig(raw: string): unknown;
+export declare function readValidatedConfig(path: string, _label: string): ConfigReadResult;
+
 export interface LoadedConfigSource {
     source: ConfigSourceSpec;
     config: McpConfig | null;
+    error?: ConfigReadError;
+    validationIssues?: readonly ConfigValidationIssue[];
 }
 export declare function loadConfigSources(overridePath?: string, cwd?: string): LoadedConfigSource[];
 export declare function getMergedSettingsFromSources(sources: readonly LoadedConfigSource[]): McpSettings | undefined;

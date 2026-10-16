@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "target": {
+    "repository": "Pi upstream source",
+    "package": "@earendil-works/pi-coding-agent",
+    "version": "1.2.0",
+    "baseCommit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff",
+    "nodeEngine": ">=22.19.0"
+  },
+  "patch": {
+    "path": "pi-1.2.0-native-mcp-management.patch",
+    "format": "git binary/full-index diff",
+    "sha256": "d499d6fba6728dbaced2876149b362780ce4b8ef2129ec3283587a456c46c654",
+    "sizeBytes": 543194,
+    "fileCount": 48
+  },
+  "dependencies": {
+    "added": [],
+    "removed": [],
+    "installCommand": "npm ci --ignore-scripts --no-audit --no-fund",
+    "notes": "The patch reuses the fixed Pi 1.2.0 workspace dependencies and does not change package manifests or lockfiles."
+  },
+  "publicApi": {
+    "protocolId": "pi.mcp-management",
+    "protocolVersion": 1,
+    "discovery": "public pi.events protocol",
+    "capabilities": [
+      "server.snapshot",
+      "server.subscribe",
+      "server.enable",
+      "server.disable",
+      "server.reconnect",
+      "server.set-exposure",
+      "tool.set-exposure",
+      "server.set-direct-tools",
+      "execution.set-policy",
+      "catalog.refresh",
+      "catalog.resources",
+      "catalog.prompts",
+      "resource.read",
+      "resource.read-app",
+      "prompt.get",
+      "app.call-tool",
+      "oauth.sign-in",
+      "oauth.sign-out"
+    ],
+    "directToolsPersistence": {
+      "capability": "server.set-direct-tools",
+      "handleMethod": "McpManagementHandle.setDirectTools",
+      "configField": "directTools",
+      "executionPolicy": "session-only; setExecutionPolicy does not persist configuration"
+    },
+    "assemblyExport": "installMcpOwnerAssembly",
+    "compatibility": "The adapter requires every listed capability and fails explicitly on stock or incomplete Pi hosts; no legacy runtime fallback is provided."
+  },
+  "verification": {
+    "baseline": {
+      "commit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff",
+      "packageVersion": "1.2.0",
+      "worktreeBeforeApply": "clean"
+    },
+    "applyCheck": "git apply --check passed on an independent clean checkout",
+    "apply": "git apply passed; resulting changes matched all 48 patch paths",
+    "nativeTests": {
+      "command": "node \"$(git rev-parse --show-toplevel)/node_modules/vitest/dist/cli.js\" --run test/mcp-management.test.ts test/mcp-extension.test.ts test/mcp-direct-tools-config.test.ts test/mcp-owner-assembly.test.ts",
+      "result": "4 test files passed; 57 tests passed"
+    },
+    "sameSessionRegression": {
+      "command": "npm run test:patched-native-session -- --pi-source <clean-patched-Pi-checkout>",
+      "result": "1 integration test passed against the actual patched native extension and adapter in one harness session, using the local MCP fixture and faux provider"
+    },
+    "publicArtifacts": {
+      "command": "npm run test:public-types -- --pi-source <clean-patched-Pi-checkout>",
+      "result": "Adapter typecheck passed; public build and export/package checks passed (5 tests); a consumer compiled against the packed patched Pi public declarations and adapter public entries; 18 generated dist files were synchronized; a dry-run pack contained 25 files and no src/test/source maps"
+    }
+  }
+}

@@ -1,8 +1,10 @@
 # 当前状态
 
-## 暂停中的 Pi 原生 MCP 迁移
+## 进行中的 Pi 原生 MCP 迁移
 
-迁移任务及恢复条件已保存于唯一详细待办 [`docs/todo.md`](todo.md)。`native-management-api` 有历史完成记录；后续五项仍未完成。本轮只保存待办，未恢复实现；跨电脑继续前须按 TODO 核实 Pi 上游源码是否已安全转移。
+迁移任务、顺序、依赖及恢复条件见唯一详细待办 [`docs/todo.md`](todo.md)；已交付能力的完整清单与用户前置条件见 [`README.md`](../README.md) 「Required Pi host」与「Behavior changes under the native owner」。历史 `native-management-api` 源码未恢复；本轮已从固定 Pi 1.2.0 基线重建 session-scoped 原生 API（已完成、不重做），定向测试通过，`npm run check` 受基线缺失模型数据影响而未通过；实现与 adapter 契约审计见 [`docs/native-mcp-evidence.md`](native-mcp-evidence.md)。用户已确认 trust、keyring/OAuth、“暂不支持原生 2026-07-28 远程协议”与 directTools 持久化四项决策，见 [`docs/decisions.md`](decisions.md)。迁移的十二项任务已全部完成：前六项原生能力、`directTools` 持久化与面板迁移、真实同会话回归、干净基线补丁/公共产物交付、文档与 Git 收尾。早期被阻塞的旧面板任务未重试、未伪报完成，其澄清与副作用记录保留在 [`docs/session-log.md`](session-log.md)。
+
+交付边界：adapter 的 `dist/**` 由 `npm run build:public` 在 patched Pi 1.2.0 环境下可重复生成（当前 18 个文件），发布入口为 native-only；stock Pi 1.2.0 缺少管理 API 时 adapter 显式失败，不 fallback 到旧 runtime。旧自包含 adapter 运行时对应的 `src/**` 模块仍在仓库中并由各自测试覆盖，但已不从 `dist/index.js` 可达；`mcp-script-worker.mjs` 与 `app-bridge.bundle.js` 已不再随包发布。
 
 ## 项目
 
@@ -36,9 +38,16 @@
 
 ## 未完成与交付边界
 
-- 本次源码、测试和文档改动仍在工作区，未执行 git commit 或 push；tracked `dist` 由 `npm run build:public` 同步。
-- `AGENTS.md` 与 `docs/clean-code.md` 是刻意保留的未跟踪排除项，不纳入本次交付。
+- 本轮迁移的 adapter 改动已在工作区；提交与 push 结果见 [`docs/session-log.md`](session-log.md) 最新记录。tracked `dist` 由 `npm run build:public` 在 patched Pi 1.2.0 下同步；在 stock Pi 1.2.0 工作区直接运行该脚本会在声明发射阶段失败并已清空 `dist/`，必须改用 `npm run test:public-types -- --pi-source <patched checkout>` 重新生成。
+- 未激活的 adapter 设置（`scriptMode`、`disableProxyTool`、`autoAuth`、`trace`、`oauthDir` 及 server 级 `debug`/`trace`）仍保留在配置中但不由 native owner 生效，属于有意保留的边界；详见 README。
+- `AGENTS.md` 与 `docs/clean-code.md` 已在 commit `4b7f17c` 纳入版本控制，本任务未修改它们（`git status` 无变化），也不属于本次迁移改动。
 
 ## 最近一次更新
 
+- 2026-10-16：完成最终文档与 adapter Git 交付。在独立干净 checkout（`git clone --no-hardlinks`，detached `06a466935536f8c9bcacb2d5efc0fc021be1bdff`，Pi `1.2.0`，apply 前 worktree clean）上重复验证：`git apply --check` 与真实 `git apply` 均成功且得到与 manifest 一致的 48 个路径，`npm ci --ignore-scripts` 装 299 个包，4 文件/57 项 native 测试通过，`test:public-types` 与 `test:patched-native-session` 均通过并同步 18 个 `dist` 文件；patch SHA-256 与 manifest 一致。用户文档新增 patched Pi 前置条件、`/mcp` 与 `/mcp-adapter` 分工、trust/keyring/生命周期/缓存与在 native owner 下保留/不激活的功能边界；详细命令、真实结果与限制见 [`docs/session-log.md`](session-log.md)。
+- 2026-10-16：真实 patched Pi native MCP extension 与 adapter 在同一 harness session 的回归 runner 已通过；覆盖本地 fixture 的 live tool/resource/prompt catalog、执行及失败、管理刷新/读取、持久化与 session-only 策略、未信任项目拒绝、runtime registration、session reload 后旧 handle 失效，以及 adapter status v1/命令状态。runner 与实际命令、限制和详细结果见 [`docs/session-log.md`](session-log.md)。
+- 2026-10-16：用户确认「保留 directTools 选择语义并扩展原生管理 API 持久化」（唯一决定见 [`docs/decisions.md`](decisions.md)）。该决定源自暂停的 `native-panel-status-and-live-catalog`：原生 `setExecutionPolicy` 不持久化、`setToolExposure` 写的是 `toolExposure` 且被 direct 选择覆盖，与面板既有保存语义不等价。[`docs/todo.md`](todo.md) 新增任务 `native-direct-tools-persistence`（第 8 项）作为面板迁移的直接前置，后续任务顺延为 12 项；[`docs/native-mcp-protocol.md`](native-mcp-protocol.md) 新增“待实现：directTools 持久化”目标契约段。本轮只更新文档，未改生产代码、未运行测试或上游命令，源码未提交、未 push。
+- 2026-10-15：用户确认“先不支持”原生 `2026-07-28` 远程 MCP 协议；新增决定见 [`docs/decisions.md`](decisions.md)，[`docs/todo.md`](todo.md) 的传输任务协议验收改为结构化不支持（不降级、不删配置）。本轮只更新文档，未运行代码测试或上游命令，源码未提交、未 push。
+- 2026-10-14：用户确认全部推荐方案（项目级配置统一经过 Pi project-trust，未信任可展示但不连接/执行；保留 keyring 存储与既有 OAuth 登录连续性，不自动明文迁移）。两项决策已固化到 [`docs/decisions.md`](decisions.md)，[`docs/todo.md`](todo.md) 已重排为 11 项剩余任务并明确入口切换前置条件；已完成 API 不重做。本轮只更新文档，未运行代码测试或上游命令，adapter/native 源码未提交、未 push。
+- 2026-10-14：在独立固定基线 Pi 1.2.0 源码工作区重建 session-scoped 原生 MCP 管理协议；历史实现未恢复。定向测试通过，完整 check 被缺失的上游模型数据阻断。docs-commit 已完成契约审计。详见 [`docs/native-mcp-evidence.md`](native-mcp-evidence.md)、[`docs/todo.md`](todo.md) 和 [`docs/session-log.md`](session-log.md)。
 - 2026-08-31：删除宿主专属 MCP 配置探测、兼容 imports、setup 采用流程和 CLI `init`；遗留字段被忽略，标准配置层与 token CLI 保留。已完成 typecheck、定向 UI/命令/CLI 测试和 CLI 删除命令验证；发布构建与 package/public export 验证见 [`docs/session-log.md`](session-log.md)。

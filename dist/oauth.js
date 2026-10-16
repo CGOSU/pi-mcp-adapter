@@ -370,12 +370,14 @@ function toAuthEntry(value) {
   if (codeVerifier === null || oauthState === null || serverUrl === null) return void 0;
   const tokens = entry.tokens === void 0 ? void 0 : toStoredTokens(entry.tokens);
   const clientInfo = entry.clientInfo === void 0 ? void 0 : toStoredClientInfo(entry.clientInfo);
-  if (entry.tokens !== void 0 && !tokens || entry.clientInfo !== void 0 && !clientInfo) return void 0;
+  const nativeOAuth = entry.nativeOAuth === void 0 ? void 0 : toNativeOAuthStorageMetadata(entry.nativeOAuth);
+  if (entry.tokens !== void 0 && !tokens || entry.clientInfo !== void 0 && !clientInfo || entry.nativeOAuth !== void 0 && !nativeOAuth) return void 0;
   const authEntry = {};
   if (tokens) authEntry.tokens = tokens;
   if (clientInfo) authEntry.clientInfo = clientInfo;
   if (codeVerifier !== void 0) authEntry.codeVerifier = codeVerifier;
   if (oauthState !== void 0) authEntry.oauthState = oauthState;
+  if (nativeOAuth !== void 0) authEntry.nativeOAuth = nativeOAuth;
   if (serverUrl !== void 0) authEntry.serverUrl = serverUrl;
   return authEntry;
 }
@@ -402,16 +404,86 @@ function toStoredClientInfo(value) {
   const clientIdIssuedAt = optionalNumber(clientInfo.clientIdIssuedAt);
   const clientSecretExpiresAt = optionalNumber(clientInfo.clientSecretExpiresAt);
   const configPreRegistered = optionalBoolean(clientInfo.configPreRegistered);
-  if (clientSecret === null || issuer === null || clientIdIssuedAt === null || clientSecretExpiresAt === null || configPreRegistered === null) return void 0;
+  const tokenEndpointAuthMethod = optionalString(clientInfo.tokenEndpointAuthMethod);
+  const grantTypes = optionalStringArray(clientInfo.grantTypes);
+  const responseTypes = optionalStringArray(clientInfo.responseTypes);
+  const applicationType = optionalString(clientInfo.applicationType);
+  const clientName = optionalString(clientInfo.clientName);
+  const clientUri = optionalString(clientInfo.clientUri);
+  const logoUri = optionalString(clientInfo.logoUri);
+  const scope = optionalString(clientInfo.scope);
+  const contacts = optionalStringArray(clientInfo.contacts);
+  const tosUri = optionalString(clientInfo.tosUri);
+  const policyUri = optionalString(clientInfo.policyUri);
+  const jwksUri = optionalString(clientInfo.jwksUri);
+  const jwks = clientInfo.jwks === void 0 ? void 0 : toAuthJsonValue(clientInfo.jwks);
+  const softwareId = optionalString(clientInfo.softwareId);
+  const softwareVersion = optionalString(clientInfo.softwareVersion);
+  const softwareStatement = optionalString(clientInfo.softwareStatement);
+  if (clientSecret === null || issuer === null || clientIdIssuedAt === null || clientSecretExpiresAt === null || configPreRegistered === null || tokenEndpointAuthMethod === null || grantTypes === null || responseTypes === null || applicationType === null || clientName === null || clientUri === null || logoUri === null || scope === null || contacts === null || tosUri === null || policyUri === null || jwksUri === null || clientInfo.jwks !== void 0 && jwks === void 0 || softwareId === null || softwareVersion === null || softwareStatement === null) return void 0;
   const storedClient = { clientId: clientInfo.clientId };
   const redirectUris = stringArray(clientInfo.redirectUris);
   if (clientSecret !== void 0) storedClient.clientSecret = clientSecret;
   if (clientIdIssuedAt !== void 0) storedClient.clientIdIssuedAt = clientIdIssuedAt;
   if (clientSecretExpiresAt !== void 0) storedClient.clientSecretExpiresAt = clientSecretExpiresAt;
   if (redirectUris !== void 0) storedClient.redirectUris = redirectUris;
+  if (tokenEndpointAuthMethod !== void 0) storedClient.tokenEndpointAuthMethod = tokenEndpointAuthMethod;
+  if (grantTypes !== void 0) storedClient.grantTypes = grantTypes;
+  if (responseTypes !== void 0) storedClient.responseTypes = responseTypes;
+  if (applicationType !== void 0) storedClient.applicationType = applicationType;
+  if (clientName !== void 0) storedClient.clientName = clientName;
+  if (clientUri !== void 0) storedClient.clientUri = clientUri;
+  if (logoUri !== void 0) storedClient.logoUri = logoUri;
+  if (scope !== void 0) storedClient.scope = scope;
+  if (contacts !== void 0) storedClient.contacts = contacts;
+  if (tosUri !== void 0) storedClient.tosUri = tosUri;
+  if (policyUri !== void 0) storedClient.policyUri = policyUri;
+  if (jwksUri !== void 0) storedClient.jwksUri = jwksUri;
+  if (jwks !== void 0) storedClient.jwks = jwks;
+  if (softwareId !== void 0) storedClient.softwareId = softwareId;
+  if (softwareVersion !== void 0) storedClient.softwareVersion = softwareVersion;
+  if (softwareStatement !== void 0) storedClient.softwareStatement = softwareStatement;
   if (issuer !== void 0) storedClient.issuer = issuer;
   if (configPreRegistered !== void 0) storedClient.configPreRegistered = configPreRegistered;
   return storedClient;
+}
+function optionalStringArray(value) {
+  if (value === void 0) return void 0;
+  return Array.isArray(value) && value.every((item) => typeof item === "string") ? [...value] : null;
+}
+function toNativeOAuthStorageMetadata(value) {
+  const metadata = toRecord(value);
+  if (!metadata) return void 0;
+  const tokenType = optionalString(metadata.tokenType);
+  const idToken = optionalString(metadata.idToken);
+  const discovery = metadata.discovery === void 0 ? void 0 : toAuthJsonObject(metadata.discovery);
+  if (tokenType === null || idToken === null || metadata.discovery !== void 0 && !discovery) return void 0;
+  const result = {};
+  if (tokenType !== void 0) result.tokenType = tokenType;
+  if (idToken !== void 0) result.idToken = idToken;
+  if (discovery !== void 0) result.discovery = discovery;
+  return result;
+}
+function toAuthJsonValue(value) {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : void 0;
+  if (Array.isArray(value)) {
+    const items = value.map(toAuthJsonValue);
+    return items.some((item) => item === void 0) ? void 0 : items;
+  }
+  const record = toRecord(value);
+  if (!record) return void 0;
+  const result = /* @__PURE__ */ Object.create(null);
+  for (const [key, item] of Object.entries(record)) {
+    const parsed = toAuthJsonValue(item);
+    if (parsed === void 0) return void 0;
+    result[key] = parsed;
+  }
+  return result;
+}
+function toAuthJsonObject(value) {
+  const parsed = toAuthJsonValue(value);
+  return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : void 0;
 }
 function toRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value : void 0;
@@ -657,6 +729,12 @@ function updateTokens(serverName, tokens, serverUrl, options) {
     delete entry.clientInfo;
     delete entry.codeVerifier;
     delete entry.oauthState;
+    delete entry.nativeOAuth;
+  }
+  if (entry.nativeOAuth) {
+    delete entry.nativeOAuth.tokenType;
+    delete entry.nativeOAuth.idToken;
+    if (Object.keys(entry.nativeOAuth).length === 0) delete entry.nativeOAuth;
   }
   entry.tokens = tokens;
   saveAuthEntry(serverName, entry, serverUrl, options);
@@ -667,6 +745,7 @@ function updateClientInfo(serverName, clientInfo, serverUrl, options) {
     delete entry.tokens;
     delete entry.codeVerifier;
     delete entry.oauthState;
+    delete entry.nativeOAuth;
   }
   entry.clientInfo = clientInfo;
   saveAuthEntry(serverName, entry, serverUrl, options);

@@ -34,7 +34,7 @@
   "license": "MIT",
   "author": "Nico Bailon",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.19.0"
   },
   "bin": {
     "pi-mcp-adapter": "dist/cli.js"
@@ -46,6 +46,8 @@
     "test": "node test-runner.mjs",
     "test:vitest": "vitest run",
     "test:public-exports": "npm run build:public && node --test test/node/package/public-exports.test.mjs test/node/package/build-artifacts.test.mjs test/node/package/package-tarball.test.mjs",
+    "test:public-types": "node scripts/test-patched-public-types.mjs",
+    "test:patched-native-session": "node scripts/test-patched-native-session.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:oauth": "node test/node/run-auth-tests.mjs",
@@ -101,8 +103,9 @@
     "zod": "^3.25.0 || ^4.0.0"
   },
   "peerDependencies": {
-    "@earendil-works/pi-ai": "^0.84.1",
-    "@earendil-works/pi-tui": "*",
+    "@earendil-works/pi-coding-agent": "^1.2.0",
+    "@earendil-works/pi-ai": "^1.2.0",
+    "@earendil-works/pi-tui": "^1.2.0",
     "typebox": "*",
     "zod": "^3.25.0 || ^4.0.0"
   },
@@ -118,9 +121,9 @@
     }
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.84.1",
-    "@earendil-works/pi-coding-agent": "0.84.1",
-    "@earendil-works/pi-tui": "0.84.1",
+    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/pi-coding-agent": "1.2.0",
+    "@earendil-works/pi-tui": "1.2.0",
     "@modelcontextprotocol/conformance": "0.1.16",
     "@types/bun": "^1.0.0",
     "@types/cross-spawn": "6.0.6",

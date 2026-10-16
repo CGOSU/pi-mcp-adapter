@@ -8,7 +8,7 @@ import type { ConfigDiscoverySource, McpConfigConflict, McpDiscoverySummary, Mcp
 import type { ServerEntry } from "../contracts/core.js";
 
 function getConfigSourceSummaries(loadedSources: readonly LoadedConfigSource[]): ConfigDiscoverySource[] {
-  return loadedSources.map(({ source, config }) => ({
+  return loadedSources.map(({ source, config, error, validationIssues }) => ({
     id: source.id,
     label: source.label,
     path: source.readPath,
@@ -16,6 +16,11 @@ function getConfigSourceSummaries(loadedSources: readonly LoadedConfigSource[]):
     scope: source.scope,
     kind: source.shared ? "shared" : "pi",
     serverCount: config ? Object.keys(config.mcpServers).length : 0,
+    ...(error
+      ? { validationError: { code: error.code, message: error.message } }
+      : validationIssues?.[0]
+        ? { validationError: { code: validationIssues[0].code, message: validationIssues[0].message } }
+        : {}),
   } satisfies ConfigDiscoverySource));
 }
 

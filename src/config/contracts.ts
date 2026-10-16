@@ -43,13 +43,26 @@ export const KNOWN_SERVER_PRESETS: readonly KnownServerPreset[] = [
 ];
 
 export interface ConfigSourceSpec {
-  id: "shared-global" | "agents-global" | "agents-nested-global" | "pi-global" | "shared-project" | "pi-project";
+  id:
+    | "shared-global"
+    | "agents-global"
+    | "agents-nested-global"
+    | "pi-global"
+    | "shared-project"
+    | "agents-project"
+    | "agents-nested-project"
+    | "pi-project"
+    | "adapter-config"
+    | "pi-package-global"
+    | "pi-package-project"
+    | "agent-plugin-global"
+    | "agent-plugin-project";
   label: string;
   readPath: string;
   writePath: string;
-  kind: "user" | "project" | "shared";
+  kind: "user" | "project" | "shared" | "extension";
   shared: boolean;
-  scope: "global" | "project";
+  scope: "global" | "project" | "extension";
 }
 
 export interface ConfigDiscoveryPath {
@@ -63,6 +76,7 @@ export interface ConfigDiscoverySource extends ConfigDiscoveryPath {
   scope: ConfigSourceSpec["scope"];
   kind: "shared" | "pi";
   serverCount: number;
+  validationError?: { code: string; message: string };
 }
 
 export interface McpConfigConflict {

@@ -63,13 +63,7 @@ export async function parallelLimit<T, R>(
   return results;
 }
 
-export function getConfigPathFromArgv(): string | undefined {
-  const idx = process.argv.indexOf("--mcp-config");
-  if (idx >= 0 && idx + 1 < process.argv.length) {
-    return process.argv[idx + 1];
-  }
-  return undefined;
-}
+export { getConfigPathFromArgv } from "./config/paths.js";
 
 export function interpolateEnvVars(value: string): string;
 export function interpolateEnvVars(value: string, environment: NodeJS.ProcessEnv): string;

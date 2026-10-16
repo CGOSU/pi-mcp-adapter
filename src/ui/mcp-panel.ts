@@ -9,6 +9,7 @@ import { resourceNameToToolName } from "../tools/resource-tools.ts";
 import { sanitizeTerminalText, stripOscSequences } from "../utils.ts";
 import { isServerCacheValid, type MetadataCache, type ServerCacheEntry, type CachedTool } from "../catalog/metadata-cache.ts";
 import { isUiToolVisibleToModel } from "./tool-visibility.ts";
+import type { NativePanelResource, NativePanelServerDetails } from "../native/panel-data.ts";
 
 interface PanelTheme {
   border: string;
@@ -126,6 +127,7 @@ interface ToolState {
   isDirect: boolean;
   wasDirect: boolean;
   estimatedTokens: number;
+  effectiveExposure?: "codemode" | "deferred" | "direct" | "hidden";
 }
 
 interface ServerState {
@@ -134,22 +136,32 @@ interface ServerState {
   includeTools?: string[];
   excludeTools?: string[];
   exposeResources: boolean;
+  directSelection: true | string[] | false;
+  wholeSelectionOverride?: boolean;
   connectionStatus: ConnectionStatus;
   failureMessage?: string | null;
   tools: ToolState[];
+  resources: NativePanelResource[];
+  unrepresentedDirectTools: string[];
   directCount: number;
   directTokens: number;
   hasCachedData: boolean;
+  catalogFreshness?: "live" | "cached" | "missing";
+  resourceFreshness?: "live" | "cached" | "missing";
+  sourceScope?: string;
 }
 
 interface VisibleItem {
-  type: "server" | "tool";
+  type: "server" | "tool" | "resource";
   serverIndex: number;
   toolIndex?: number;
+  resourceIndex?: number;
 }
 
 class McpPanel {
   private noticeLines: string[];
+  private baseNoticeLines: string[];
+  private projectUntrusted = false;
   private prefix: ToolPrefix;
   private servers: ServerState[] = [];
   private cursorIndex = 0;
@@ -167,6 +179,9 @@ class McpPanel {
   private t = DEFAULT_THEME;
   private authOnly: boolean;
   private keys: PanelKeys;
+  private nativeDetails: ReadonlyMap<string, NativePanelServerDetails> | undefined;
+  private showTokenEstimate: boolean;
+  private nativeUnavailable = false;
 
   private static readonly MAX_VISIBLE = 12;
   private static readonly INACTIVITY_MS = 60_000;
@@ -174,31 +189,52 @@ class McpPanel {
   constructor(
     private config: McpConfig,
     private cache: MetadataCache | null,
-    provenance: Map<string, ServerProvenance>,
+    private provenance: Map<string, ServerProvenance>,
     private callbacks: McpPanelCallbacks,
     tui: { requestRender(): void },
     private done: (result: McpPanelResult) => void,
-    options: { noticeLines?: string[]; authOnly?: boolean; keybindings?: PanelKeybindings } = {},
+    options: {
+      noticeLines?: string[];
+      authOnly?: boolean;
+      keybindings?: PanelKeybindings;
+      nativeDetails?: ReadonlyMap<string, NativePanelServerDetails>;
+      showTokenEstimate?: boolean;
+      projectTrusted?: boolean;
+    } = {},
   ) {
     this.tui = tui;
-    this.noticeLines = options.noticeLines ?? [];
+    this.baseNoticeLines = options.noticeLines ?? [];
+    this.projectUntrusted = options.projectTrusted === false;
+    this.noticeLines = this.composeNoticeLines();
     this.authOnly = options.authOnly === true;
     this.keys = createPanelKeys(options.keybindings);
     this.prefix = config.settings?.toolPrefix ?? "server";
+    this.nativeDetails = options.nativeDetails;
+    this.showTokenEstimate = options.showTokenEstimate !== false;
 
-    for (const [serverName, definition] of Object.entries(config.mcpServers)) {
-      if (this.authOnly && !callbacks.canAuthenticate(serverName)) continue;
-      const prov = provenance.get(serverName);
+    this.loadServers();
+
+    this.rebuildVisibleItems();
+    this.resetInactivityTimeout();
+  }
+
+  private loadServers(previousServers: ReadonlyMap<string, ServerState> = new Map()): void {
+    this.servers = [];
+    for (const [serverName, definition] of Object.entries(this.config.mcpServers)) {
+      if (this.authOnly && !this.callbacks.canAuthenticate(serverName)) continue;
+      const previous = previousServers.get(serverName);
+      const previousTools = new Map(previous?.tools.map((tool) => [tool.name, tool]));
       const cachedEntry = this.cache?.servers?.[serverName];
       const serverCache = cachedEntry && isServerCacheValid(cachedEntry, definition) ? cachedEntry : undefined;
 
-      const globalDirect = config.settings?.directTools;
-      let toolFilter: true | string[] | false = false;
+      const globalDirect = this.config.settings?.directTools;
+      let directSelection: true | string[] | false = false;
       if (definition.directTools !== undefined) {
-        toolFilter = definition.directTools;
+        directSelection = definition.directTools;
       } else if (globalDirect) {
-        toolFilter = globalDirect;
+        directSelection = globalDirect;
       }
+      const toolFilter = previous?.wholeSelectionOverride ?? directSelection;
 
       const tools: ToolState[] = [];
       if (serverCache && !this.authOnly && !isServerDisabled(definition)) {
@@ -208,13 +244,20 @@ class McpPanel {
             continue;
           }
 
-          const isDirect = toolFilter === true || (Array.isArray(toolFilter) && toolFilter.includes(tool.name));
+          const selectedByDraft = toolFilter === true || (Array.isArray(toolFilter) && toolFilter.includes(tool.name));
+          const wasDirect = directSelection === true || (Array.isArray(directSelection) && directSelection.includes(tool.name));
+          const previousTool = previousTools.get(tool.name);
+          const isDirect = previousTool && previousTool.isDirect !== previousTool.wasDirect
+            ? previousTool.isDirect
+            : selectedByDraft;
+          const effectiveExposure = this.nativeDetails?.get(serverName)?.toolExposures.get(tool.name);
           tools.push({
             name: tool.name,
             description: tool.description ?? "",
             isDirect,
-            wasDirect: isDirect,
-            estimatedTokens: estimateTokens(tool),
+            wasDirect,
+            estimatedTokens: this.showTokenEstimate ? estimateTokens(tool) : 0,
+            ...(effectiveExposure === undefined ? {} : { effectiveExposure }),
           });
         }
         if (definition.exposeResources !== false) {
@@ -224,7 +267,12 @@ class McpPanel {
               continue;
             }
 
-            const isDirect = toolFilter === true || (Array.isArray(toolFilter) && toolFilter.includes(baseName));
+            const selectedByDraft = toolFilter === true || (Array.isArray(toolFilter) && toolFilter.includes(baseName));
+            const wasDirect = directSelection === true || (Array.isArray(directSelection) && directSelection.includes(baseName));
+            const previousTool = previousTools.get(baseName);
+            const isDirect = previousTool && previousTool.isDirect !== previousTool.wasDirect
+              ? previousTool.isDirect
+              : selectedByDraft;
             const ct: CachedTool = {
               name: baseName,
               ...(resource.description !== undefined ? { description: resource.description } : {}),
@@ -233,15 +281,32 @@ class McpPanel {
               name: baseName,
               description: resource.description ?? `Read resource: ${resource.uri}`,
               isDirect,
-              wasDirect: isDirect,
-              estimatedTokens: estimateTokens(ct),
+              wasDirect,
+              estimatedTokens: this.showTokenEstimate ? estimateTokens(ct) : 0,
             });
           }
         }
       }
 
-      const status = callbacks.getConnectionStatus(serverName);
-      const failureMessage = callbacks.getFailureMessage?.(serverName) ?? null;
+      const representedNames = new Set(tools.map((tool) => tool.name));
+      const availableNames = [
+        ...(serverCache?.tools ?? []).map((tool) => tool.name),
+        ...(definition.exposeResources === false ? [] : (serverCache?.resources ?? []).map((resource) => `read_${resourceNameToToolName(resource.name)}`)),
+      ];
+      const persistedNames = Array.isArray(directSelection)
+        ? directSelection
+        : directSelection === true ? availableNames : [];
+      const unrepresentedDirectTools = [...new Set(persistedNames.filter((name) => !representedNames.has(name)))];
+      const detail = this.nativeDetails?.get(serverName);
+      for (const tool of tools) {
+        const previousTool = previousTools.get(tool.name);
+        if (previousTool && previousTool.isDirect !== previousTool.wasDirect) tool.isDirect = previousTool.isDirect;
+        const effectiveExposure = detail?.toolExposures.get(tool.name);
+        if (effectiveExposure !== undefined) tool.effectiveExposure = effectiveExposure;
+      }
+      const resources = detail?.resources ?? [];
+      const status = this.callbacks.getConnectionStatus(serverName);
+      const failureMessage = this.callbacks.getFailureMessage?.(serverName) ?? null;
       let directCount = 0;
       let directTokens = 0;
       for (const tool of tools) {
@@ -251,21 +316,71 @@ class McpPanel {
       }
       this.servers.push({
         name: serverName,
-        expanded: false,
+        expanded: previous?.expanded ?? false,
         ...(definition.includeTools !== undefined ? { includeTools: definition.includeTools } : {}),
         ...(definition.excludeTools !== undefined ? { excludeTools: definition.excludeTools } : {}),
         exposeResources: definition.exposeResources !== false,
+        directSelection: Array.isArray(directSelection) ? [...directSelection] : directSelection,
+        ...(previous?.wholeSelectionOverride === undefined ? {} : { wholeSelectionOverride: previous.wholeSelectionOverride }),
         connectionStatus: status,
         failureMessage,
         tools,
+        resources: [...resources],
+        unrepresentedDirectTools,
         directCount,
         directTokens,
-        hasCachedData: !!serverCache,
+        hasCachedData: detail ? detail.catalogFreshness !== "missing" : !!serverCache,
+        ...(detail === undefined ? {} : {
+          catalogFreshness: detail.catalogFreshness,
+          resourceFreshness: detail.resourceFreshness,
+          sourceScope: detail.scope,
+        }),
       });
     }
+  }
 
+  private composeNoticeLines(): string[] {
+    return [
+      ...this.baseNoticeLines,
+      ...(this.projectUntrusted ? ["Project MCP sources are omitted until Pi project trust is granted."] : []),
+    ];
+  }
+
+  updateProjectTrust(projectTrusted: boolean | undefined): void {
+    if (projectTrusted === undefined || this.projectUntrusted === !projectTrusted) return;
+    this.projectUntrusted = !projectTrusted;
+    this.noticeLines = this.composeNoticeLines();
+    this.tui.requestRender();
+  }
+
+  updateNativeData(
+    config: McpConfig,
+    cache: MetadataCache | null,
+    nativeDetails: ReadonlyMap<string, NativePanelServerDetails>,
+  ): void {
+    const previousServers = new Map(this.servers.map((server) => [server.name, server]));
+    this.config = config;
+    this.cache = cache;
+    this.nativeDetails = nativeDetails;
+    this.prefix = config.settings?.toolPrefix ?? "server";
+    this.loadServers(previousServers);
     this.rebuildVisibleItems();
-    this.resetInactivityTimeout();
+    this.updateDirty();
+    this.cursorIndex = Math.min(this.cursorIndex, Math.max(0, this.visibleItems.length - 1));
+    this.tui.requestRender();
+  }
+
+  markNativeUnavailable(message: string): void {
+    if (this.nativeUnavailable) return;
+    this.nativeUnavailable = true;
+    this.authNotice = message;
+    this.noticeLines = [...this.noticeLines, message];
+    for (const server of this.servers) {
+      if (server.connectionStatus !== "disabled") server.connectionStatus = "idle";
+      if (server.catalogFreshness === "live") server.catalogFreshness = "cached";
+      if (server.resourceFreshness === "live") server.resourceFreshness = "cached";
+    }
+    this.tui.requestRender();
   }
 
   private resetInactivityTimeout(): void {
@@ -315,6 +430,18 @@ class McpPanel {
           }
           this.visibleItems.push({ type: "tool", serverIndex: si, toolIndex: ti });
         }
+        for (let ri = 0; ri < server.resources.length; ri++) {
+          const resource = server.resources[ri];
+          if (!resource) continue;
+          if (query) {
+            const resourceName = resource.title ?? resource.name;
+            const score = mode === "name"
+              ? Math.max(fuzzyScore(query, resourceName), fuzzyScore(query, server.name) * 0.6)
+              : fuzzyScore(query, resource.description ?? resourceName);
+            if (score === 0) continue;
+          }
+          this.visibleItems.push({ type: "resource", serverIndex: si, resourceIndex: ri });
+        }
       }
     }
 
@@ -322,7 +449,7 @@ class McpPanel {
       this.visibleItems = this.visibleItems.filter((item) => {
         if (item.type === "server") {
           return this.visibleItems.some(
-            (other) => other.type === "tool" && other.serverIndex === item.serverIndex,
+            (other) => other.serverIndex === item.serverIndex && other.type !== "server",
           );
         }
         return true;
@@ -331,21 +458,34 @@ class McpPanel {
   }
 
   private updateDirty(): void {
-    this.dirty = this.servers.some((s) => s.tools.some((t) => t.isDirect !== t.wasDirect));
+    this.dirty = this.servers.some((server) =>
+      server.tools.some((tool) => tool.isDirect !== tool.wasDirect) ||
+      (server.wholeSelectionOverride !== undefined &&
+        !(typeof server.directSelection === "boolean" && server.directSelection === server.wholeSelectionOverride)),
+    );
   }
 
   private buildResult(): McpPanelResult {
     const changes = new Map<string, true | string[] | false>();
     for (const server of this.servers) {
-      const changed = server.tools.some((t) => t.isDirect !== t.wasDirect);
-      if (!changed) continue;
-      const directTools = server.tools.filter((t) => t.isDirect);
-      if (directTools.length === server.tools.length && server.tools.length > 0) {
+      const toolsChanged = server.tools.some((tool) => tool.isDirect !== tool.wasDirect);
+      const overrideChanged = server.wholeSelectionOverride !== undefined &&
+        !(typeof server.directSelection === "boolean" && server.directSelection === server.wholeSelectionOverride);
+      if (!toolsChanged && !overrideChanged) continue;
+      if (overrideChanged) {
+        changes.set(server.name, server.wholeSelectionOverride ?? false);
+        continue;
+      }
+      const directTools = [
+        ...server.tools.filter((t) => t.isDirect).map((tool) => tool.name),
+        ...server.unrepresentedDirectTools,
+      ];
+      if (directTools.length === server.tools.length && server.tools.length > 0 && server.unrepresentedDirectTools.length === 0) {
         changes.set(server.name, true);
       } else if (directTools.length === 0) {
         changes.set(server.name, false);
       } else {
-        changes.set(server.name, directTools.map((t) => t.name));
+        changes.set(server.name, directTools);
       }
     }
     return { changes, cancelled: false };
@@ -364,6 +504,14 @@ class McpPanel {
     if (matchesKey(data, "ctrl+c")) {
       this.cleanup();
       this.done({ cancelled: true, changes: new Map() });
+      return;
+    }
+
+    if (this.nativeUnavailable) {
+      if (matchesKey(data, "escape")) {
+        this.cleanup();
+        this.done({ cancelled: true, changes: new Map() });
+      }
       return;
     }
 
@@ -572,8 +720,8 @@ class McpPanel {
           this.cache ??= { version: 1, servers: {} };
           this.cache.servers[server.name] = entry;
           this.rebuildServerTools(server, entry);
+          server.hasCachedData = true;
         }
-        server.hasCachedData = true;
       }
       if (options.afterAuth) {
         this.authNotice = connected && server.connectionStatus === "connected"
@@ -595,6 +743,8 @@ class McpPanel {
     if (!server) return;
     if (item.type === "server") {
       const newState = !server.tools.every((t) => t.isDirect);
+      if (newState) delete server.wholeSelectionOverride;
+      else server.wholeSelectionOverride = false;
       let directTokens = 0;
       for (const tool of server.tools) {
         tool.isDirect = newState;
@@ -611,6 +761,7 @@ class McpPanel {
   }
 
   private toggleToolDirect(server: ServerState, tool: ToolState): void {
+    delete server.wholeSelectionOverride;
     tool.isDirect = !tool.isDirect;
     server.directCount += tool.isDirect ? 1 : -1;
     server.directTokens += tool.isDirect ? tool.estimatedTokens : -tool.estimatedTokens;
@@ -663,14 +814,16 @@ class McpPanel {
       const entry = otherServerName === serverName
         ? currentEntry
         : cachedEntry && isServerCacheValid(cachedEntry, otherDefinition) ? cachedEntry : undefined;
-      if (!entry) continue;
+      const nativeResources = this.nativeDetails?.get(otherServerName)?.resources.filter((resource) => resource.kind !== "template");
+      if (!entry && !nativeResources) continue;
       const otherPrefix = resolveToolPrefix(otherDefinition, this.prefix);
-      for (const tool of entry.tools ?? []) {
+      for (const tool of entry?.tools ?? []) {
         if (!isUiToolVisibleToModel(tool.uiVisibility)) continue;
         for (const candidate of getToolNameCandidates(tool.name, otherServerName, otherPrefix, false)) candidates.add(candidate);
       }
       if (otherDefinition.exposeResources !== false) {
-        for (const resource of entry.resources ?? []) {
+        const resources = nativeResources ?? entry?.resources ?? [];
+        for (const resource of resources) {
           const baseName = `read_${resourceNameToToolName(resource.name)}`;
           for (const candidate of getToolNameCandidates(baseName, otherServerName, otherPrefix, false)) candidates.add(candidate);
         }
@@ -681,8 +834,12 @@ class McpPanel {
   }
 
   private rebuildServerTools(server: ServerState, entry: ServerCacheEntry): void {
-    const existingState = new Map<string, boolean>();
-    for (const t of server.tools) existingState.set(t.name, t.isDirect);
+    const existingState = new Map(server.tools.map((tool) => [tool.name, tool]));
+    const draftSelection = server.wholeSelectionOverride ?? server.directSelection;
+    const isSelectedByDraftPolicy = (name: string): boolean =>
+      draftSelection === true || (Array.isArray(draftSelection) && draftSelection.includes(name));
+    const isSelectedBySavedPolicy = (name: string): boolean =>
+      server.directSelection === true || (Array.isArray(server.directSelection) && server.directSelection.includes(name));
 
     const newTools: ToolState[] = [];
     for (const tool of entry.tools ?? []) {
@@ -691,14 +848,16 @@ class McpPanel {
         continue;
       }
 
-      const prev = existingState.get(tool.name);
-      const isDirect = prev !== undefined ? prev : false;
+      const previous = existingState.get(tool.name);
+      const isDirect = previous?.isDirect ?? isSelectedByDraftPolicy(tool.name);
+      const effectiveExposure = this.nativeDetails?.get(server.name)?.toolExposures.get(tool.name);
       newTools.push({
         name: tool.name,
         description: tool.description ?? "",
         isDirect,
-        wasDirect: prev !== undefined ? server.tools.find((t) => t.name === tool.name)?.wasDirect ?? false : false,
-        estimatedTokens: estimateTokens(tool),
+        wasDirect: previous?.wasDirect ?? isSelectedBySavedPolicy(tool.name),
+        estimatedTokens: this.showTokenEstimate ? estimateTokens(tool) : 0,
+        ...(effectiveExposure === undefined ? {} : { effectiveExposure }),
       });
     }
 
@@ -709,8 +868,8 @@ class McpPanel {
           continue;
         }
 
-        const prev = existingState.get(baseName);
-        const isDirect = prev !== undefined ? prev : false;
+        const previous = existingState.get(baseName);
+        const isDirect = previous?.isDirect ?? isSelectedByDraftPolicy(baseName);
         const ct: CachedTool = {
           name: baseName,
           ...(resource.description !== undefined ? { description: resource.description } : {}),
@@ -719,13 +878,22 @@ class McpPanel {
           name: baseName,
           description: resource.description ?? `Read resource: ${resource.uri}`,
           isDirect,
-          wasDirect: prev !== undefined ? server.tools.find((t) => t.name === baseName)?.wasDirect ?? false : false,
-          estimatedTokens: estimateTokens(ct),
+          wasDirect: previous?.wasDirect ?? isSelectedBySavedPolicy(baseName),
+          estimatedTokens: this.showTokenEstimate ? estimateTokens(ct) : 0,
         });
       }
     }
 
     server.tools = newTools;
+    const representedNames = new Set(newTools.map((tool) => tool.name));
+    const candidateNames = [
+      ...(entry.tools ?? []).map((tool) => tool.name),
+      ...(server.exposeResources ? (entry.resources ?? []).map((resource) => `read_${resourceNameToToolName(resource.name)}`) : []),
+    ];
+    const persistedNames = Array.isArray(server.directSelection)
+      ? server.directSelection
+      : server.directSelection === true ? candidateNames : [];
+    server.unrepresentedDirectTools = [...new Set(persistedNames.filter((name) => !representedNames.has(name)))];
     server.directCount = 0;
     server.directTokens = 0;
     for (const tool of newTools) {
@@ -779,7 +947,9 @@ class McpPanel {
 
     if (this.servers.length === 0) {
       lines.push(emptyRow());
-      lines.push(row(fg(t.hint, italic(this.authOnly ? "No OAuth-capable MCP servers configured." : "No MCP servers configured."))));
+      lines.push(row(fg(t.hint, italic(this.nativeDetails
+        ? "No native MCP servers are visible in this session."
+        : this.authOnly ? "No OAuth-capable MCP servers configured." : "No MCP servers configured."))));
       lines.push(emptyRow());
     } else {
       const maxVis = McpPanel.MAX_VISIBLE;
@@ -803,9 +973,12 @@ class McpPanel {
               lines.push(row(`    ${fg(t.cancel, line)}`));
             }
           }
-        } else if (item.toolIndex !== undefined) {
+        } else if (item.type === "tool" && item.toolIndex !== undefined) {
           const tool = server.tools[item.toolIndex];
           if (tool) lines.push(row(this.renderToolRow(tool, isCursor, innerW)));
+        } else if (item.type === "resource" && item.resourceIndex !== undefined) {
+          const resource = server.resources[item.resourceIndex];
+          if (resource) lines.push(row(this.renderResourceRow(resource, server.resourceFreshness, isCursor, innerW)));
         }
       }
 
@@ -844,8 +1017,11 @@ class McpPanel {
           directCount += server.directCount;
           directTokens += server.directTokens;
         }
-        const stats =
-          directCount > 0 ? `${directCount} direct  ~${directTokens.toLocaleString()} tokens` : "no direct tools";
+        const stats = directCount > 0
+          ? this.showTokenEstimate
+            ? `${directCount} direct  ~${directTokens.toLocaleString()} tokens`
+            : `${directCount} saved direct`
+          : "no direct tools";
         lines.push(row(fg(t.description, stats + (this.dirty ? fg(t.needsAuth, "  (unsaved)") : ""))));
       }
     }
@@ -906,9 +1082,12 @@ class McpPanel {
     const serverName = sanitizeDisplayText(server.name);
     const nameStr = isCursor ? bold(fg(t.selected, serverName)) : serverName;
     const statusLabel = this.renderConnectionStatus(server);
+    const nativeLabels = server.catalogFreshness === undefined
+      ? ""
+      : `  ${fg(t.description, `${server.sourceScope ?? "unknown"} · catalog ${server.catalogFreshness} · resources ${server.resourceFreshness ?? "missing"} (${server.resources.length})`)}`;
 
     if (!server.hasCachedData && !this.authOnly) {
-      return `${prefix}   ${nameStr}  ${fg(t.description, "(not cached)")}${statusLabel}`;
+      return `${prefix}   ${nameStr}  ${fg(t.description, server.catalogFreshness === "missing" ? "catalog missing" : "(not cached)")}${statusLabel}${nativeLabels}`;
     }
 
     const directCount = server.directCount;
@@ -923,13 +1102,13 @@ class McpPanel {
     let toolInfo = "";
     if (totalCount > 0) {
       toolInfo = `${directCount}/${totalCount}`;
-      if (directCount > 0) {
+      if (directCount > 0 && this.showTokenEstimate) {
         toolInfo += `  ~${server.directTokens.toLocaleString()}`;
       }
       toolInfo = fg(t.description, toolInfo);
     }
 
-    return `${prefix} ${toggleIcon} ${nameStr}  ${toolInfo}${statusLabel}`;
+    return `${prefix} ${toggleIcon} ${nameStr}  ${toolInfo}${statusLabel}${nativeLabels}`;
   }
 
   private selectedServerHasFailureMessage(): boolean {
@@ -980,9 +1159,27 @@ class McpPanel {
     if (server.connectionStatus === "needs-auth") return `  ${fg(t.needsAuth, "needs auth")}`;
     if (server.connectionStatus === "connecting") return `  ${fg(t.needsAuth, "connecting")}`;
     if (server.connectionStatus === "failed") return `  ${fg(t.cancel, "failed")}`;
+    if (this.nativeDetails?.has(server.name)) {
+      return server.connectionStatus === "connected"
+        ? `  ${fg(t.direct, "connected")}`
+        : `  ${fg(t.description, "not connected")}`;
+    }
     if (this.authOnly && server.connectionStatus === "connected") return `  ${fg(t.direct, "connected")}`;
     if (this.authOnly) return `  ${fg(t.description, "idle")}`;
     return "";
+  }
+
+  private renderResourceRow(resource: NativePanelResource, freshness: "live" | "cached" | "missing" | undefined, isCursor: boolean, innerW: number): string {
+    const t = this.t;
+    const cursor = isCursor ? fg(t.selected, "▸") : " ";
+    const title = sanitizeDisplayText(resource.title ?? resource.name);
+    const description = sanitizeDisplayText(resource.description ?? resource.mimeType ?? "");
+    const kind = resource.kind === "template" ? "template" : "resource";
+    const freshnessLabel = freshness === undefined ? "" : `  ${freshness}`;
+    const prefixLen = 8 + visibleWidth(title);
+    const maxDescLen = Math.max(0, innerW - prefixLen - 8);
+    const desc = maxDescLen > 5 && description ? ` — ${truncateToWidth(description, maxDescLen, "…")}` : "";
+    return `  ${cursor} ◇ ${title}  ${fg(t.description, `${kind}${freshnessLabel}${desc}`)}`;
   }
 
   private renderToolRow(tool: ToolState, isCursor: boolean, innerW: number): string {
@@ -1002,7 +1199,8 @@ class McpPanel {
         ? fg(t.description, "— " + truncateToWidth(description, maxDescLen, "…"))
         : "";
 
-    return `  ${cursor} ${toggleIcon} ${nameStr} ${descStr}`;
+    const exposure = tool.effectiveExposure === undefined ? "" : `  ${fg(t.hint, `[${tool.effectiveExposure}]`)}`;
+    return `  ${cursor} ${toggleIcon} ${nameStr} ${descStr}${exposure}`;
   }
 
   invalidate(): void {}
@@ -1019,7 +1217,14 @@ export function createMcpPanel(
   callbacks: McpPanelCallbacks,
   tui: { requestRender(): void },
   done: (result: McpPanelResult) => void,
-  options?: { noticeLines?: string[]; authOnly?: boolean; keybindings?: PanelKeybindings },
+  options?: {
+    noticeLines?: string[];
+    authOnly?: boolean;
+    keybindings?: PanelKeybindings;
+    nativeDetails?: ReadonlyMap<string, NativePanelServerDetails>;
+    showTokenEstimate?: boolean;
+    projectTrusted?: boolean;
+  },
 ): McpPanel & { dispose(): void } {
   return new McpPanel(config, cache, provenance, callbacks, tui, done, options ?? {});
 }

@@ -87,6 +87,10 @@ var REPOPROMPT_BINARY_CANDIDATES = [
   join2(homedir2(), "RepoPrompt", "repoprompt_cli"),
   "/Applications/Repo Prompt.app/Contents/MacOS/repoprompt-mcp"
 ];
+function getConfigPathFromArgv(argv = process.argv) {
+  const index = argv.indexOf("--mcp-config");
+  return index >= 0 && index + 1 < argv.length ? argv[index + 1] : void 0;
+}
 function getPiGlobalConfigPath(overridePath) {
   return overridePath ? resolve2(overridePath) : getAgentPath("mcp.json");
 }
@@ -110,6 +114,10 @@ function getConfigSources(overridePath, cwd = process.cwd()) {
   const userPath = getEffectivePiGlobalConfigPath(overridePath);
   const projectPath = getProjectConfigPath(cwd);
   const projectPiPath = getProjectPiConfigPath(cwd);
+  const projectAgentsPaths = [
+    resolve2(cwd, ".agents", "mcp.json"),
+    resolve2(cwd, ".agents", "mcp", "mcp.json")
+  ];
   const sources = [];
   if (isExclusiveConfigMode()) {
     return [{
@@ -165,6 +173,18 @@ function getConfigSources(overridePath, cwd = process.cwd()) {
       scope: "project"
     });
   }
+  for (const [index, agentsPath] of projectAgentsPaths.entries()) {
+    if ([userPath, projectPath, projectPiPath, GENERIC_GLOBAL_CONFIG_PATH, ...AGENTS_GLOBAL_CONFIG_PATHS].includes(agentsPath)) continue;
+    sources.push({
+      id: index === 0 ? "agents-project" : "agents-nested-project",
+      label: index === 0 ? "project .agents MCP" : "project .agents nested MCP",
+      readPath: agentsPath,
+      writePath: agentsPath,
+      kind: "project",
+      shared: true,
+      scope: "project"
+    });
+  }
   if (projectPiPath !== userPath && projectPiPath !== projectPath) {
     sources.push({
       id: "pi-project",
@@ -198,16 +218,488 @@ function resolveConfiguredOAuthDir(raw, cwd = process.cwd()) {
 import { existsSync as existsSync2, readFileSync as readFileSync2, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join as join3, relative, resolve as resolve3, sep } from "node:path";
 import stripJsonComments from "strip-json-comments";
+
+// src/config/validation.ts
+var SERVER_FIELDS = /* @__PURE__ */ new Set([
+  "enabled",
+  "exposure",
+  "toolExposure",
+  "command",
+  "args",
+  "socket",
+  "env",
+  "cwd",
+  "url",
+  "headers",
+  "requestHeadersCommand",
+  "auth",
+  "bearerToken",
+  "bearerTokenEnv",
+  "bearerTokenStore",
+  "oauth",
+  "lifecycle",
+  "idleTimeout",
+  "requestTimeoutMs",
+  "exposeResources",
+  "directTools",
+  "toolPrefix",
+  "includeTools",
+  "excludeTools",
+  "searchKeywords",
+  "approveTools",
+  "debug",
+  "trace",
+  "httpTransport",
+  "pluginDataDir",
+  "literalEnv",
+  "protocolVersion",
+  "disabled"
+]);
+var SETTINGS_FIELDS = /* @__PURE__ */ new Set([
+  "toolPrefix",
+  "showStatusIcon",
+  "mcpFooterStatus",
+  "notifyOnStartupConnect",
+  "agentPluginPaths",
+  "idleTimeout",
+  "requestTimeoutMs",
+  "directTools",
+  "strictDirectToolArguments",
+  "directToolResultDetails",
+  "warnOnLargeDirectTools",
+  "scriptMode",
+  "toolResultRendering",
+  "collapsedResultLines",
+  "approveTools",
+  "disableProxyTool",
+  "freezeDirectTools",
+  "autoAuth",
+  "sampling",
+  "samplingAutoApprove",
+  "elicitation",
+  "outputGuard",
+  "trace",
+  "authRequiredMessage",
+  "oauthDir"
+]);
+var ROOT_FIELDS = /* @__PURE__ */ new Set(["mcpServers", "mcp-servers", "settings", "$schema", "imports"]);
+var IGNORED_LEGACY_SETTINGS_FIELDS = /* @__PURE__ */ new Set(["hostConfigDiscovery"]);
+var TOOL_PREFIXES = ["server", "none", "short", "mcp"];
+var LIFECYCLE_MODES = ["keep-alive", "lazy", "lazy-keep-alive", "eager"];
+var PROTOCOL_VERSIONS = ["legacy", "auto", "2026-07-28"];
+var HTTP_TRANSPORTS = ["streamable-http", "sse"];
+var URL_PROTOCOLS = /* @__PURE__ */ new Set(["http:", "https:"]);
+var MAX_REQUEST_TIMEOUT_MS = 2147483647;
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function addIssue(issues, code, path, message) {
+  issues.push({ code, path, message });
+}
+function fail(issues) {
+  const first = issues[0] ?? {
+    code: "invalid-root",
+    path: "config",
+    message: "MCP configuration is invalid."
+  };
+  return {
+    ok: false,
+    error: { code: first.code, message: first.message, issues }
+  };
+}
+function checkString(value, path, issues, code, expectation = "must be a string", allowEmpty = true) {
+  if (typeof value !== "string" || !allowEmpty && value.trim().length === 0 || value.includes("\0")) {
+    addIssue(issues, code, path, `${path} ${expectation}.`);
+  }
+}
+function checkBoolean(value, path, issues, code) {
+  if (typeof value !== "boolean") addIssue(issues, code, path, `${path} must be a boolean.`);
+}
+function checkEnum(value, values, path, issues, code) {
+  if (typeof value !== "string" || !values.includes(value)) {
+    addIssue(issues, code, path, `${path} must be one of: ${values.join(", ")}.`);
+  }
+}
+function checkStringArray(value, path, issues, code) {
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string" || entry.includes("\0"))) {
+    addIssue(issues, code, path, `${path} must be an array of strings without NUL characters.`);
+  }
+}
+function isValidDirectToolsSelection(value) {
+  if (typeof value === "boolean") return true;
+  try {
+    if (!Array.isArray(value) || value.length > 256) return false;
+    for (let index = 0; index < value.length; index++) {
+      if (!Object.hasOwn(value, index)) return false;
+      const toolName = value[index];
+      if (typeof toolName !== "string" || toolName.length === 0 || toolName.length > 256 || /[\u0000-\u001f\u007f]/.test(toolName)) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+function checkDirectToolsSelection(value, path, issues, code) {
+  if (!isValidDirectToolsSelection(value)) {
+    addIssue(issues, code, path, `${path} must be a boolean or an array of at most 256 bounded tool names.`);
+  }
+}
+function checkStringRecord(value, path, issues, code) {
+  if (!isRecord(value) || Object.values(value).some((entry) => typeof entry !== "string" || entry.includes("\0"))) {
+    addIssue(issues, code, path, `${path} must be an object with string values without NUL characters.`);
+  }
+}
+function checkHeaders(value, path, issues, code) {
+  if (!isRecord(value) || Object.values(value).some((entry) => typeof entry !== "string" || entry.includes("\0"))) {
+    addIssue(issues, code, path, `${path} must be an object with valid string header values.`);
+    return;
+  }
+  const normalizedNames = Object.keys(value).map((name) => name.toLowerCase());
+  if (new Set(normalizedNames).size !== normalizedNames.length) {
+    addIssue(issues, code, path, `${path} cannot contain duplicate header names with different casing.`);
+    return;
+  }
+  try {
+    new Headers(value);
+  } catch {
+    addIssue(issues, code, path, `${path} contains an invalid HTTP header name or value.`);
+  }
+}
+function checkNumber(value, path, issues, code, minimum, integer = false, maximum = Number.MAX_SAFE_INTEGER) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum || integer && !Number.isSafeInteger(value)) {
+    const range = integer ? `a safe integer between ${minimum} and ${maximum}` : `a finite number between ${minimum} and ${maximum}`;
+    addIssue(issues, code, path, `${path} must be ${range}.`);
+  }
+}
+function checkHttpUrl(value, path, issues, code) {
+  if (typeof value !== "string" || !URL.canParse(value)) {
+    addIssue(issues, code, path, `${path} must be an absolute HTTP or HTTPS URL.`);
+    return;
+  }
+  const url = new URL(value);
+  if (!URL_PROTOCOLS.has(url.protocol) || url.username || url.password || url.hash) {
+    addIssue(issues, code, path, `${path} must be an HTTP or HTTPS URL without embedded credentials or a fragment.`);
+  }
+}
+function checkKnownFields(value, allowed, path, issues, code) {
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) addIssue(issues, code, `${path}.${key}`, `${path}.${key} is not a supported configuration field.`);
+  }
+}
+function validateOAuth(value, path, issues) {
+  if (value === false) return;
+  if (!isRecord(value)) {
+    addIssue(issues, "invalid-server-field", path, `${path} must be false or an OAuth configuration object.`);
+    return;
+  }
+  const fields = /* @__PURE__ */ new Set([
+    "grantType",
+    "clientId",
+    "clientSecret",
+    "scope",
+    "authorizationParams",
+    "redirectUri",
+    "clientName",
+    "clientUri",
+    "logoUri",
+    "skipIssuerMetadataValidation"
+  ]);
+  checkKnownFields(value, fields, path, issues, "unknown-server-field");
+  if (value.grantType !== void 0) {
+    checkEnum(value.grantType, ["authorization_code", "client_credentials"], `${path}.grantType`, issues, "invalid-nested-field");
+  }
+  for (const field of ["clientId", "clientSecret", "scope", "clientName"]) {
+    if (value[field] !== void 0) checkString(value[field], `${path}.${field}`, issues, "invalid-nested-field");
+  }
+  for (const field of ["redirectUri", "clientUri", "logoUri"]) {
+    if (value[field] !== void 0) checkHttpUrl(value[field], `${path}.${field}`, issues, "invalid-nested-field");
+  }
+  if (value.authorizationParams !== void 0) {
+    checkStringRecord(value.authorizationParams, `${path}.authorizationParams`, issues, "invalid-nested-field");
+  }
+  if (value.skipIssuerMetadataValidation !== void 0) {
+    checkBoolean(value.skipIssuerMetadataValidation, `${path}.skipIssuerMetadataValidation`, issues, "invalid-nested-field");
+  }
+}
+function validateRequestHeadersCommand(value, path, issues) {
+  if (!isRecord(value)) {
+    addIssue(issues, "invalid-server-field", path, `${path} must be a command configuration object.`);
+    return;
+  }
+  const fields = /* @__PURE__ */ new Set(["command", "args", "env", "timeoutMs"]);
+  checkKnownFields(value, fields, path, issues, "unknown-server-field");
+  if (value.command === void 0) {
+    addIssue(issues, "invalid-nested-field", `${path}.command`, `${path}.command is required.`);
+  } else {
+    checkString(value.command, `${path}.command`, issues, "invalid-nested-field", "must be a non-empty string", false);
+  }
+  if (value.args !== void 0) checkStringArray(value.args, `${path}.args`, issues, "invalid-nested-field");
+  if (value.env !== void 0) checkStringRecord(value.env, `${path}.env`, issues, "invalid-nested-field");
+  if (value.timeoutMs !== void 0 && (typeof value.timeoutMs !== "number" || !Number.isSafeInteger(value.timeoutMs) || value.timeoutMs < 1 || value.timeoutMs > 6e4)) {
+    addIssue(issues, "invalid-nested-field", `${path}.timeoutMs`, `${path}.timeoutMs must be an integer between 1 and 60000.`);
+  }
+}
+function validateServerField(field, value, path, issues) {
+  const code = "invalid-server-field";
+  switch (field) {
+    case "command":
+    case "socket":
+    case "cwd":
+    case "bearerToken":
+    case "bearerTokenEnv":
+    case "pluginDataDir":
+      checkString(value, path, issues, code, field === "command" || field === "socket" ? "must be a non-empty string" : "must be a string", field !== "command" && field !== "socket");
+      break;
+    case "args":
+    case "includeTools":
+    case "excludeTools":
+      checkStringArray(value, path, issues, code);
+      break;
+    case "env":
+      checkStringRecord(value, path, issues, code);
+      break;
+    case "headers":
+      checkHeaders(value, path, issues, code);
+      break;
+    case "requestHeadersCommand":
+      validateRequestHeadersCommand(value, path, issues);
+      break;
+    case "auth":
+      if (value !== false && value !== "oauth" && value !== "bearer") {
+        addIssue(issues, code, path, `${path} must be "oauth", "bearer", or false.`);
+      }
+      break;
+    case "bearerTokenStore":
+    case "exposeResources":
+    case "enabled":
+    case "debug":
+    case "trace":
+    case "literalEnv":
+    case "disabled":
+      checkBoolean(value, path, issues, code);
+      break;
+    case "oauth":
+      validateOAuth(value, path, issues);
+      break;
+    case "lifecycle":
+      checkEnum(value, LIFECYCLE_MODES, path, issues, code);
+      break;
+    case "exposure":
+      checkEnum(value, ["codemode", "deferred", "direct", "hidden"], path, issues, code);
+      break;
+    case "toolExposure":
+      if (!isRecord(value)) {
+        addIssue(issues, code, path, `${path} must map tool names to exposure values.`);
+      } else {
+        for (const [name, exposure] of Object.entries(value)) {
+          if (name.length === 0 || name.includes("\0")) {
+            addIssue(issues, code, `${path}.<tool>`, `${path} contains an invalid tool name.`);
+          }
+          checkEnum(exposure, ["codemode", "deferred", "direct", "hidden"], `${path}.${name}`, issues, code);
+        }
+      }
+      break;
+    case "idleTimeout":
+      checkNumber(value, path, issues, code, 0);
+      break;
+    case "requestTimeoutMs":
+      checkNumber(value, path, issues, code, 0, false, MAX_REQUEST_TIMEOUT_MS);
+      break;
+    case "directTools":
+      checkDirectToolsSelection(value, path, issues, code);
+      break;
+    case "toolPrefix":
+      checkEnum(value, TOOL_PREFIXES, path, issues, code);
+      break;
+    case "searchKeywords":
+      if (!isRecord(value)) {
+        addIssue(issues, code, path, `${path} must map tool names to arrays of keywords.`);
+      } else {
+        for (const [name, keywords] of Object.entries(value)) {
+          checkStringArray(keywords, `${path}.${name}`, issues, code);
+        }
+      }
+      break;
+    case "approveTools":
+      if (typeof value !== "boolean") checkStringArray(value, path, issues, code);
+      break;
+    case "httpTransport":
+      checkEnum(value, HTTP_TRANSPORTS, path, issues, code);
+      break;
+    case "protocolVersion":
+      checkEnum(value, PROTOCOL_VERSIONS, path, issues, code);
+      break;
+    case "url":
+      checkHttpUrl(value, path, issues, code);
+      break;
+  }
+}
+function validateServerEntry(name, raw, options = {}) {
+  const issues = [];
+  if (name.trim().length === 0 || /[\u0000-\u001f\u007f]/.test(name)) {
+    addIssue(issues, "invalid-server-name", "mcpServers.<entry>", "Server names must be non-empty and contain no control characters.");
+  }
+  if (!isRecord(raw)) {
+    addIssue(issues, "invalid-server-entry", "mcpServers.<entry>", "Each server entry must be an object.");
+    return fail(issues);
+  }
+  checkKnownFields(raw, SERVER_FIELDS, "mcpServers.<entry>", issues, "unknown-server-field");
+  const transports = ["command", "url", "socket"].filter((field) => raw[field] !== void 0);
+  if (transports.length > 1 || options.requireTransport && transports.length !== 1) {
+    addIssue(issues, "invalid-server-entry", "mcpServers.<entry>", "A server entry must configure exactly one transport.");
+  }
+  if (typeof raw.enabled === "boolean" && typeof raw.disabled === "boolean" && raw.enabled === raw.disabled) {
+    addIssue(issues, "invalid-server-entry", "mcpServers.<entry>", "enabled and disabled specify conflicting server states.");
+  }
+  for (const [field, value] of Object.entries(raw)) {
+    if (SERVER_FIELDS.has(field) && value !== void 0) validateServerField(field, value, `mcpServers.<entry>.${field}`, issues);
+  }
+  if (issues.length > 0) return fail(issues);
+  return { ok: true, value: structuredClone(raw) };
+}
+function validateSetting(field, value, issues) {
+  const path = `settings.${field}`;
+  const code = "invalid-setting";
+  switch (field) {
+    case "toolPrefix":
+      checkEnum(value, TOOL_PREFIXES, path, issues, code);
+      break;
+    case "showStatusIcon":
+    case "mcpFooterStatus":
+      if (field === "showStatusIcon") checkBoolean(value, path, issues, code);
+      else checkEnum(value, ["full", "compact", "off"], path, issues, code);
+      break;
+    case "notifyOnStartupConnect":
+    case "directTools":
+    case "strictDirectToolArguments":
+    case "warnOnLargeDirectTools":
+    case "scriptMode":
+    case "disableProxyTool":
+    case "freezeDirectTools":
+    case "autoAuth":
+    case "sampling":
+    case "samplingAutoApprove":
+    case "elicitation":
+      checkBoolean(value, path, issues, code);
+      break;
+    case "agentPluginPaths":
+      checkStringArray(value, path, issues, code);
+      break;
+    case "idleTimeout":
+      checkNumber(value, path, issues, code, 0);
+      break;
+    case "requestTimeoutMs":
+      checkNumber(value, path, issues, code, 0, false, MAX_REQUEST_TIMEOUT_MS);
+      break;
+    case "directToolResultDetails":
+      checkEnum(value, ["lean", "bounded"], path, issues, code);
+      break;
+    case "toolResultRendering":
+      checkEnum(value, ["compact", "boxed"], path, issues, code);
+      break;
+    case "collapsedResultLines":
+      if (value !== 1 && value !== 2 && value !== 3) {
+        addIssue(issues, code, path, `${path} must be 1, 2, or 3.`);
+      }
+      break;
+    case "approveTools":
+      if (typeof value !== "boolean") checkStringArray(value, path, issues, code);
+      break;
+    case "outputGuard":
+      if (typeof value !== "boolean") {
+        if (!isRecord(value)) {
+          addIssue(issues, code, path, `${path} must be a boolean or an output-guard settings object.`);
+          break;
+        }
+        const fields = /* @__PURE__ */ new Set(["maxBytes", "maxLines", "detailsMaxBytes"]);
+        checkKnownFields(value, fields, path, issues, "unknown-settings-field");
+        for (const [name, limit] of Object.entries(value)) {
+          if (fields.has(name)) checkNumber(limit, `${path}.${name}`, issues, "invalid-nested-field", 1, true);
+        }
+      }
+      break;
+    case "trace":
+      if (!isRecord(value)) {
+        addIssue(issues, code, path, `${path} must be a trace settings object.`);
+        break;
+      }
+      checkKnownFields(value, /* @__PURE__ */ new Set(["enabled", "file", "maxBytes", "maxEvents"]), path, issues, "unknown-settings-field");
+      if (value.enabled !== void 0) checkBoolean(value.enabled, `${path}.enabled`, issues, "invalid-nested-field");
+      if (value.file !== void 0) checkString(value.file, `${path}.file`, issues, "invalid-nested-field", "must be a non-empty string", false);
+      if (value.maxBytes !== void 0) checkNumber(value.maxBytes, `${path}.maxBytes`, issues, "invalid-nested-field", 1, true);
+      if (value.maxEvents !== void 0) checkNumber(value.maxEvents, `${path}.maxEvents`, issues, "invalid-nested-field", 1, true);
+      break;
+    case "authRequiredMessage":
+    case "oauthDir":
+      checkString(value, path, issues, code);
+      break;
+  }
+}
+function validateMcpConfig(raw) {
+  const issues = [];
+  if (!isRecord(raw)) {
+    addIssue(issues, "invalid-root", "config", "MCP configuration root must be an object.");
+    return fail(issues);
+  }
+  checkKnownFields(raw, ROOT_FIELDS, "config", issues, "invalid-root");
+  if (raw.$schema !== void 0 && typeof raw.$schema !== "string") {
+    addIssue(issues, "invalid-root", "config.$schema", "config.$schema must be a string.");
+  }
+  if (Object.hasOwn(raw, "mcpServers") && Object.hasOwn(raw, "mcp-servers")) {
+    addIssue(issues, "conflicting-server-map", "config", "Use only one of mcpServers or mcp-servers.");
+  }
+  const serverMap = Object.hasOwn(raw, "mcpServers") ? raw.mcpServers : raw["mcp-servers"];
+  if (serverMap !== void 0 && !isRecord(serverMap)) {
+    addIssue(issues, "invalid-server-map", "mcpServers", "mcpServers must be an object keyed by server name.");
+  }
+  const servers = {};
+  const serverIssues = [];
+  if (isRecord(serverMap)) {
+    for (const [name, entry] of Object.entries(serverMap)) {
+      const validated = validateServerEntry(name, entry);
+      if (validated.ok) servers[name] = validated.value;
+      else serverIssues.push(...validated.error.issues);
+    }
+  }
+  let settings;
+  if (raw.settings !== void 0) {
+    if (!isRecord(raw.settings)) {
+      addIssue(issues, "invalid-settings", "settings", "settings must be an object.");
+    } else {
+      checkKnownFields(raw.settings, /* @__PURE__ */ new Set([...SETTINGS_FIELDS, ...IGNORED_LEGACY_SETTINGS_FIELDS]), "settings", issues, "unknown-settings-field");
+      for (const [field, value] of Object.entries(raw.settings)) {
+        if (SETTINGS_FIELDS.has(field)) validateSetting(field, value, issues);
+      }
+      settings = structuredClone(raw.settings);
+      delete settings.hostConfigDiscovery;
+    }
+  }
+  if (issues.length > 0) return fail([...issues, ...serverIssues]);
+  return {
+    ok: true,
+    value: { mcpServers: servers, ...settings === void 0 ? {} : { settings } },
+    ...serverIssues.length === 0 ? {} : { issues: serverIssues }
+  };
+}
+
+// src/config/package-mcp-loader.ts
 function loadPackageMcpConfigs(cwd = process.cwd()) {
   const mcpServers = {};
+  for (const source of loadPackageMcpConfigSources(cwd)) Object.assign(mcpServers, source.config.mcpServers);
+  return { mcpServers };
+}
+function loadPackageMcpConfigSources(cwd = process.cwd()) {
+  const sources = [];
   const seen = /* @__PURE__ */ new Set();
-  for (const packageRoot of getConfiguredPackageRoots(cwd)) {
+  for (const configuredPackage of getConfiguredPackageRoots(cwd)) {
+    const { root: packageRoot, scope } = configuredPackage;
     const manifest = readPackageManifest(packageRoot);
     if (!manifest || typeof manifest.name !== "string" || !manifest.name) continue;
     const paths = getManifestMcpPaths(manifest.pi?.mcp, manifest.name);
     if (!paths) continue;
     const packagePrefix = formatPackageName(manifest.name);
-    const packageServers = /* @__PURE__ */ new Set();
     for (const path of paths) {
       const configPath = resolvePackageConfigPath(packageRoot, path);
       if (!configPath) {
@@ -216,19 +708,33 @@ function loadPackageMcpConfigs(cwd = process.cwd()) {
       }
       const config = readMcpConfig(configPath, manifest.name);
       if (!config) continue;
+      const mcpServers = {};
       for (const [serverName, server] of Object.entries(config.mcpServers)) {
         const normalizedName = `${packagePrefix}__${formatServerName(serverName)}`;
-        if (packageServers.has(normalizedName) || seen.has(normalizedName)) {
+        if (seen.has(normalizedName)) {
           console.warn(`Pi package ${manifest.name} skips duplicate normalized MCP server ${normalizedName}`);
           continue;
         }
-        packageServers.add(normalizedName);
         seen.add(normalizedName);
         mcpServers[normalizedName] = server;
       }
+      if (Object.keys(mcpServers).length === 0) continue;
+      const project = scope === "project";
+      sources.push({
+        source: {
+          id: project ? "pi-package-project" : "pi-package-global",
+          label: `Pi package ${manifest.name} MCP config`,
+          readPath: configPath,
+          writePath: project ? getProjectPiConfigPath(cwd) : getAgentPath("mcp.json"),
+          kind: project ? "project" : "user",
+          shared: false,
+          scope: project ? "project" : "global"
+        },
+        config: { mcpServers }
+      });
     }
   }
-  return { mcpServers };
+  return sources;
 }
 function getConfiguredPackageRoots(cwd) {
   const roots = [];
@@ -248,7 +754,7 @@ function getConfiguredPackageRoots(cwd) {
       const source = typeof entry === "string" ? entry : entry && typeof entry === "object" && !Array.isArray(entry) && typeof entry.source === "string" ? entry.source : void 0;
       if (!source) throw new Error(`${scope} Pi settings ${settingsPath} package entries must be strings or objects with a string source`);
       const root = resolvePackageRoot(source, scope, cwd);
-      if (root && !roots.includes(root)) roots.push(root);
+      if (root && !roots.some((entry2) => entry2.root === root)) roots.push({ root, scope });
     }
   }
   return roots;
@@ -287,10 +793,13 @@ function readMcpConfig(path, packageName) {
   }
   const mcpServers = {};
   for (const [name, server] of Object.entries(servers)) {
-    if (!server || typeof server !== "object" || Array.isArray(server)) {
-      throw new Error(`Pi package ${packageName} MCP config ${path} server ${name} must be a JSON object`);
+    const validated = validateServerEntry(name, server);
+    if (!validated.ok) {
+      throw new Error(
+        `Pi package ${packageName} MCP config ${path} contains an invalid server (${validated.error.code}): ${validated.error.message}`
+      );
     }
-    mcpServers[name] = server;
+    mcpServers[name] = validated.value;
   }
   return { mcpServers };
 }
@@ -463,11 +972,18 @@ function translateAgentPluginMcpConfig(raw, manifest, pluginRoot) {
     const translated = translateAgentPluginServer(manifest, pluginRoot, serverName, entry);
     if (!translated) continue;
     const normalizedName = formatAgentPluginServerName(manifest.name, serverName);
+    const validated = validateServerEntry(normalizedName, translated);
+    if (!validated.ok) {
+      console.warn(
+        `Agent Plugin ${manifest.name} skips invalid MCP server ${serverName} (${validated.error.code}): ${validated.error.message}`
+      );
+      continue;
+    }
     if (mcpServers[normalizedName]) {
       console.warn(`Agent Plugin ${manifest.name} skips invalid MCP server ${serverName}: normalized server name ${normalizedName} already exists`);
       continue;
     }
-    mcpServers[normalizedName] = translated;
+    mcpServers[normalizedName] = validated.value;
   }
   return { mcpServers };
 }
@@ -722,45 +1238,40 @@ import stripJsonComments2 from "strip-json-comments";
 function parseJsonConfig(raw) {
   return JSON.parse(stripJsonComments2(raw, { trailingCommas: true }));
 }
-function readValidatedConfig(path, label) {
-  if (!existsSync4(path)) return null;
+function readValidatedConfig(path, _label) {
   try {
-    return validateConfig(parseJsonConfig(readFileSync4(path, "utf-8")));
-  } catch (error) {
-    console.warn(`Failed to load ${label}:`, error);
-    return null;
+    if (!existsSync4(path)) return { ok: true, value: null };
+    let parsed;
+    try {
+      parsed = parseJsonConfig(readFileSync4(path, "utf-8"));
+    } catch {
+      return { ok: false, error: { code: "invalid-json", message: "Configuration file is not valid JSON.", issues: [] } };
+    }
+    const validated = validateMcpConfig(parsed);
+    return validated.ok ? { ok: true, value: validated.value, ...validated.issues ? { issues: validated.issues } : {} } : validated;
+  } catch {
+    return { ok: false, error: { code: "read-failed", message: "Configuration file could not be read.", issues: [] } };
   }
-}
-function validateConfig(raw) {
-  if (!isRecord(raw)) {
-    return { mcpServers: {} };
-  }
-  return {
-    mcpServers: toServerEntries(raw.mcpServers ?? raw["mcp-servers"]),
-    ...raw.settings !== void 0 ? { settings: raw.settings } : {}
-  };
-}
-function toServerEntries(servers) {
-  if (!isRecord(servers)) return {};
-  const entries = {};
-  for (const [name, entry] of Object.entries(servers)) {
-    if (isServerEntry(entry)) entries[name] = entry;
-  }
-  return entries;
-}
-function isServerEntry(value) {
-  return isRecord(value);
-}
-function isRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 // src/config/load.ts
 function loadConfigSources(overridePath, cwd = process.cwd()) {
-  return getConfigSources(overridePath, cwd).map((source) => ({
-    source,
-    config: readValidatedConfig(source.readPath, `MCP config from ${source.readPath}`)
-  }));
+  return getConfigSources(overridePath, cwd).map((source) => {
+    const result = readValidatedConfig(source.readPath, `MCP config from ${source.readPath}`);
+    if (result.ok) {
+      if (result.issues?.length) {
+        const first = result.issues[0];
+        console.warn(`MCP config source ${source.readPath} contains invalid entries (${first.code}): ${first.message}`);
+      }
+      return {
+        source,
+        config: result.value,
+        ...result.issues?.length ? { validationIssues: result.issues } : {}
+      };
+    }
+    console.warn(`Failed to load MCP config from ${source.readPath} (${result.error.code}): ${result.error.message}`);
+    return { source, config: null, error: result.error };
+  });
 }
 function getMergedSettingsFromSources(sources) {
   let settings;
@@ -795,14 +1306,15 @@ function getMergedSettings(overridePath, cwd = process.cwd()) {
 import { existsSync as existsSync5 } from "node:fs";
 import { dirname, join as join4, resolve as resolve5 } from "node:path";
 function getConfigSourceSummaries(loadedSources) {
-  return loadedSources.map(({ source, config }) => ({
+  return loadedSources.map(({ source, config, error, validationIssues }) => ({
     id: source.id,
     label: source.label,
     path: source.readPath,
     exists: existsSync5(source.readPath),
     scope: source.scope,
     kind: source.shared ? "shared" : "pi",
-    serverCount: config ? Object.keys(config.mcpServers).length : 0
+    serverCount: config ? Object.keys(config.mcpServers).length : 0,
+    ...error ? { validationError: { code: error.code, message: error.message } } : validationIssues?.[0] ? { validationError: { code: validationIssues[0].code, message: validationIssues[0].message } } : {}
   }));
 }
 function getMcpStandardConfigSummary(overridePath, cwd = process.cwd()) {
@@ -923,7 +1435,7 @@ import { dirname as dirname2 } from "node:path";
 
 // src/contracts/core.ts
 function isServerDisabled(definition) {
-  return definition?.disabled === true;
+  return definition?.disabled === true || definition?.enabled === false;
 }
 
 // src/config/write.ts
@@ -998,6 +1510,17 @@ function writeRawConfigObject(filePath, raw) {
 `, "utf-8");
   renameSync(tmpPath, filePath);
 }
+function readValidatedConfigOrThrow(filePath, label) {
+  const result = readValidatedConfig(filePath, label);
+  if (!result.ok) {
+    throw new Error(`${label} could not be used (${result.error.code}): ${result.error.message}`);
+  }
+  const firstIssue = result.issues?.[0];
+  if (firstIssue) {
+    throw new Error(`${label} contains an invalid entry (${firstIssue.code}): ${firstIssue.message}`);
+  }
+  return result.value;
+}
 function getServersObject(raw) {
   const existing = raw.mcpServers ?? raw["mcp-servers"] ?? {};
   if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
@@ -1042,7 +1565,7 @@ function writeProjectServerDisabledOverride(overridePath, cwd, serverName, disab
     let lowerConfig = { mcpServers: {} };
     for (const source of getConfigSources(overridePath, cwd)) {
       if (source.readPath === filePath) continue;
-      const loaded = readValidatedConfig(source.readPath, `MCP config from ${source.readPath}`);
+      const loaded = readValidatedConfigOrThrow(source.readPath, `MCP config from ${source.readPath}`);
       if (loaded) lowerConfig = mergeConfigs(lowerConfig, loaded);
     }
     if (isServerDisabled(lowerConfig.mcpServers[serverName])) next.disabled = false;
@@ -1091,7 +1614,8 @@ function writeSharedServerEntry(filePath, serverName, entry) {
 function getServerProvenance(overridePath, cwd = process.cwd()) {
   const provenance = /* @__PURE__ */ new Map();
   for (const source of getConfigSources(overridePath, cwd)) {
-    const loaded = readValidatedConfig(source.readPath, `MCP config from ${source.readPath}`);
+    if (source.kind === "extension") continue;
+    const loaded = readValidatedConfigOrThrow(source.readPath, `MCP config from ${source.readPath}`);
     if (!loaded) continue;
     for (const name of Object.keys(loaded.mcpServers)) {
       provenance.set(name, {
@@ -1138,6 +1662,7 @@ export {
   buildStarterProjectConfig,
   cloneMcpConfig,
   getConfigDiscoveryPaths,
+  getConfigPathFromArgv,
   getConfigSources,
   getEffectivePiGlobalConfigPath,
   getGenericGlobalConfigPath,

@@ -3,20 +3,35 @@ import { loadPackageMcpConfigs } from "./package-mcp-loader.ts";
 import { loadAgentPluginConfigs } from "./agent-plugin-loader.ts";
 import { getConfigSources, isExclusiveConfigMode } from "./paths.js";
 import { mergeConfigs } from "./merge.js";
-import { readValidatedConfig } from "./read.js";
+import { readValidatedConfig, type ConfigReadError } from "./read.js";
+import type { ConfigValidationIssue } from "./validation.ts";
 import type { ConfigSourceSpec } from "./contracts.js";
 import type { McpConfig, McpSettings } from "../contracts/core.js";
 
 export interface LoadedConfigSource {
   source: ConfigSourceSpec;
   config: McpConfig | null;
+  error?: ConfigReadError;
+  validationIssues?: readonly ConfigValidationIssue[];
 }
 
 export function loadConfigSources(overridePath?: string, cwd = process.cwd()): LoadedConfigSource[] {
-  return getConfigSources(overridePath, cwd).map((source) => ({
-    source,
-    config: readValidatedConfig(source.readPath, `MCP config from ${source.readPath}`),
-  }));
+  return getConfigSources(overridePath, cwd).map((source) => {
+    const result = readValidatedConfig(source.readPath, `MCP config from ${source.readPath}`);
+    if (result.ok) {
+      if (result.issues?.length) {
+        const first = result.issues[0]!;
+        console.warn(`MCP config source ${source.readPath} contains invalid entries (${first.code}): ${first.message}`);
+      }
+      return {
+        source,
+        config: result.value,
+        ...(result.issues?.length ? { validationIssues: result.issues } : {}),
+      };
+    }
+    console.warn(`Failed to load MCP config from ${source.readPath} (${result.error.code}): ${result.error.message}`);
+    return { source, config: null, error: result.error };
+  });
 }
 
 export function getMergedSettingsFromSources(sources: readonly LoadedConfigSource[]): McpSettings | undefined {

@@ -64,3 +64,58 @@
 - 通过：`git diff --check`；文档静态核对确认 `docs/todo.md` 存在、列出 5 项后续任务，且 `current-state.md`/`session-log.md` 链接均指向该 TODO。命令提示 `docs/current-state.md` 的 LF 将在 Git 后续处理时转为 CRLF；检查退出码为 0。
 - 未运行代码测试、build 或真实 MCP 操作。
 - 遗留：本轮不提交、不 push。Pi 上游源码当前状态未重新核实；跨电脑继续前必须按 [`docs/todo.md`](todo.md) 检查源码/补丁是否安全可用。
+
+### 2026-10-14：从固定 Pi 1.2.0 基线重建原生 MCP 管理 API
+
+- 完成：按用户授权在 `/Users/cgosu/code/JavaScript/pi-upstream-native` 的固定基线 `06a466935536f8c9bcacb2d5efc0fc021be1bdff` 重建 session-scoped 原生管理协议；历史实现未恢复。实现/导出集中于 coding-agent MCP core、原生 extension owner、runtime/config 和公开入口；补充协议及 extension 文档、API 和 owner 回归测试。adapter 已记录授权和契约。保留内置 MCP 作为连接、OAuth 和工具执行唯一 owner；其余 adapter 迁移尚未开始。
+- 通过：在 `packages/coding-agent` 执行 `node "$(git rev-parse --show-toplevel)/node_modules/vitest/dist/cli.js" --run test/mcp-management.test.ts test/mcp-extension.test.ts`，2 个测试文件、36 个测试通过。
+- 未通过：上游 `npm run check` 失败于 `tsc --noEmit`。固定基线缺少 `packages/ai/src/providers/data/`（含 `amazon-bedrock.json`），造成 AI model catalog 类型推导为 `never` 并在 AI/coding-agent 测试中出现广泛类型错误；本次 MCP 改动文件未出现在错误输出中。没有修改无关 AI model 数据；后续 `check:browser-smoke` 未运行。
+- 通过：上游与 adapter 分别执行 `git diff --check` 均无输出、exit 0；新增未跟踪协议/源文件以 `grep -nE '[[:blank:]]+$'` 检查，未发现 trailing whitespace。
+- 当时下一步：由 docs-commit 核对最新协议实现、直接调用方、测试结果和 adapter 契约映射，再由 architect 重规划；该审计已由下方 2026-10-14 记录完成。不得把本轮 API 任务描述为全部迁移完成。上游和 adapter 均未提交、未推送。
+
+### 2026-10-14：原生协议与 adapter 契约映射审计
+
+- 完成：docs-commit 在不修改生产代码的前提下，核对 adapter `ServerEntry`/`McpSettings` 全部字段、公开入口、配置来源/provenance、project trust、OAuth storage、生命周期/metadata cache、审批/工具 pipeline、status/panel/catalog，以及 native API 的当前实现、直接调用方、OAuth owner、测试和 public package boundary。发现的 confirmed facts、inferences、unconfirmed items、conflicts 和下一阶段阻塞决策见唯一审计报告 [`docs/native-mcp-evidence.md`](native-mcp-evidence.md)。
+- 工作区：adapter HEAD `98a3b7952210074ef3651af2058208e1bc00a691`；Pi HEAD `06a466935536f8c9bcacb2d5efc0fc021be1bdff`。本任务只新增审计文档并更新状态索引；未改生产代码、运行测试/build、提交或推送。
+- 验证边界：本轮只读定位 adapter 测试；API 定向测试 `2 files / 36 tests passed` 和上游 `npm run check` 缺失 model-data 失败均为上一阶段实际运行记录，详见审计报告，不在本轮重跑。
+- 下一步：architect 依据该报告重规划生命周期、adapter entry、panel/catalog、同会话回归和补丁交付。既有 API 不重做，生命周期实现尚未开始，最终将必要上游改动作为版本化补丁与 manifest 交付在 adapter，而非复制整份 Pi 源码。
+
+### 2026-10-14：固化 trust 与 OAuth 决策并重排剩余迁移计划
+
+- 完成：将用户已确认的两项推荐方案写入 [`docs/decisions.md`](decisions.md)：项目级 MCP 配置（含共享 `.mcp.json`、项目 `.agents`/`.pi` 来源）统一经过真实 Pi project-trust，未信任只可脱敏展示、不连接/不执行、不注册可执行缓存工具；保留 adapter keyring 存储与既有 OAuth 登录连续性，不自动把旧凭据复制到明文文件。`docs/todo.md` 由“暂停五项待办”重写为 11 项剩余任务的实施顺序，明确前六项原生能力（生命周期、配置/trust、keyring、传输、执行策略、资源/Apps）是入口切换的前置条件；已完成 `native-management-api` 保持完成状态不重做。
+- 完成：`docs/native-mcp-evidence.md` 将问题 1/2 标记为已由用户决定并指向唯一决策来源，交接结论改为引用当前计划；`docs/native-mcp-protocol.md` 状态行移除“等待 architect 重规划”的已过期表述；`docs/current-state.md` 更新迁移索引与最近更新。未改生产代码、测试或上游工作区。
+- 本轮实际检查：`git diff --check`（见验证）；文档链接静态核对；确认 `docs/todo.md` 列出 11 项任务、入口迁移任务标注了前置能力依赖，且 `docs/decisions.md` 包含 trust 与 keyring 两条决定。
+- 未运行代码测试、类型检查、build 或上游命令；本轮不提交、不 push。
+- 遗留：前六项原生能力迁移尚未开始；`native-management-api` 的定向测试与 `npm run check` 结果仍为上一阶段实际记录，未在本轮重跑。
+
+### 2026-10-16：确认 directTools 持久化方案并重排面板迁移前置任务
+
+- 背景：`native-panel-status-and-live-catalog` 在实施前面发现业务契约不等价：面板既有的工具选择/保存语义是写 `ServerEntry.directTools`，而 native `setExecutionPolicy` 只更新当前 session、`setToolExposure` 持久化的是 `toolExposure`；`effectiveMcpToolExposure` 中 `directTools` 选择优先，上游 `McpServerConfigPatch`/`updateMcpServerConfig` 也只写 `enabled`/`exposure`/`toolExposure`。当事 developer-test 未自行写入配置绕过唯一 native owner，而是报告阻塞并交回架构。
+- 完成：用户确认推荐方案（保留 `directTools` 选择语义，由 native owner 在真实 project-trust 与既有 provenance 门控下新增持久化能力）。已写入 [`docs/decisions.md`](decisions.md)（2026-10-16 决定）；[`docs/todo.md`](todo.md) 新增任务 8 `native-direct-tools-persistence`（含面板所需脱敏快照字段）作为面板迁移直接前置，后续任务顺延为12 项，并同步更新状态行、恢复清单与面板任务约束（不侧面写配置、不编造计数、不展示传输错误文本）；[`docs/native-mcp-protocol.md`](native-mcp-protocol.md) 新增“待实现：directTools 持久化”目标契约段，明确现状与不得冒充的要求；[`docs/native-mcp-evidence.md`](native-mcp-evidence.md) C6 补充本次核实事实与已确认边界，交接结论同步三项固定约束。
+- 本轮实际检查：`git diff --check` 与新增/修改文本 trailing-whitespace 扫描；文档关键字静态核对（`decisions.md` 含 2026-10-16 决定、`todo.md` 列出 12 项任务且任务 8/9 依赖顺序正确、`native-mcp-protocol.md` 含待实现段）。
+- 未运行代码测试、类型检查、build 或上游命令；未改生产代码、测试或上游工作区；本轮不提交、不 push。
+- 遗留：`native-panel-status-and-live-catalog` 仍为 blocked，需先完成 `native-direct-tools-persistence` ；待迁移的 adapter 与上游工作区仍保留大量未提交改动。
+
+### 2026-10-15：确认暂不支持原生 2026-07-28 远程 MCP 协议
+
+- 决定：用户确认本轮迁移暂不实现 native MCP client 的 `2026-07-28` wire protocol。唯一决定见 [`docs/decisions.md`](decisions.md)；据此把 `native-transport-auth-and-request-compatibility` 的协议验收改为：显式 `2026-07-28` pin 与当前无法等价实现的 modern `auto` 协商必须在连接/执行前返回具体、可区分的结构化不支持结果，不静默退回 legacy，也不删除或改写配置。
+- 事实依据（读取源码，未改任何源码）：固定 Pi 1.2.0 的 `packages/mcp/src/protocol/types.ts` 只声明到 `2025-11-25`/`2024-11-05` 支持版本，`packages/mcp/src/client.ts` 始终执行 `initialize` 握手且无 `versionNegotiation`；adapter `src/contracts/core.ts` 与 `src/runtime/server-manager.ts` 则分别支持 `legacy | auto | 2026-07-28` 并把 `auto` 映射为 `{ mode: "auto" }`、`2026-07-28` 映射为显式 pin。
+- 完成：更新 [`docs/decisions.md`](decisions.md) 新增 2026-10-15 决定、[`docs/todo.md`](todo.md) 状态行与传输任务验收、[`docs/native-mcp-protocol.md`](native-mcp-protocol.md) 兼容约束、[`docs/native-mcp-evidence.md`](native-mcp-evidence.md) C9 结论、[`docs/current-state.md`](current-state.md) 最近更新。未改生产代码、测试或上游工作区。
+- 本轮实际检查：`git diff --check` 与新增文本的 trailing-whitespace 扫描通过；文档关键字静态核对确认 2026-10-15 决定存在于 `decisions.md`、`todo.md` 传输任务包含“结构化不支持”验收且入口切换前六项前置能力表述未被破坏。
+- 未运行代码测试、类型检查、build 或上游命令；本轮不提交、不 push。
+- 遗留：`native-transport-auth-and-request-compatibility` 仍为 paused 状态，需在解决阻塞后由 developer-test 以真实身份重试；此前源码未改动，重试时仍须补齐其余传输/认证/请求能力。
+
+### 2026-10-16：真实 patched Pi 与 adapter 同会话回归
+
+- 完成：新增 `scripts/test-patched-native-session.mjs` 显式 `--pi-source` runner、Vitest source aliases、local stdio MCP fixture 和 `test/integration/native/patched-native-session.test.mjs`；package script 为 `test:patched-native-session`。runner 校验 Pi `1.2.0` 与固定 HEAD `06a466935536f8c9bcacb2d5efc0fc021be1bdff`，使用临时隔离的 Pi 配置目录与内存 OAuth test store。测试在同一个 Pi upstream harness session 中加载真实 patched MCP extension 与 adapter，使用本地 fixture/faux provider，覆盖 native tool/resource/prompt live catalog、显式 catalog refresh、实际 tool 调用与 MCP 错误、资源及 prompt 读取、未信任 project config 不连接且不能写入、adapter `/mcp-adapter` 与原生 `/mcp` 状态、directTools 落盘与 session-only policy 分离、写入失败、runtime 注册服务器撤回时不中途重放、OAuth adapter store 映射、session reload 后 stale handle 失效及 v1 status 清空。该 runner 验证 status/命令状态，没有声称渲染 enhanced TUI panel；UI panel 测试仍单独负责 renderer 行为。
+- 通过：`npm run test:patched-native-session -- --pi-source /Users/cgosu/code/JavaScript/pi-upstream-native`；实际使用固定 Pi 1.2.0 checkout，1 个 test file / 1 个 test 通过。`node --check` 对 runner、Vitest config、fixture、integration test 全部通过；`git diff --check` 与上述任务文件 trailing-whitespace 检查通过。test-value review 对 integration test 记录 `keep`（建议仅供参考，不会修改测试）。
+- 限制：没有运行全量 upstream tests/build，也没有在本任务重新运行 typecheck；runner 使用本地 fixture 与隔离内存凭据，不访问生产服务或真实 keyring。Pi 上游保持未提交，本轮没有 commit/push。adapter 工作区已有其他迁移改动，最终交付前仍须按任务归属精确筛选。
+
+### 2026-10-16：干净基线补丁/产物交付与 adapter 文档、Git 收尾
+
+- 完成：为最终交付新增 `docs/native-mcp-patch.md`、`patches/pi-1.2.0-native-mcp-management.patch`（48 个固定基线文件）与 manifest，新增 `scripts/test-patched-public-types.mjs`/`test-patched-native-session.mjs`/`vitest-patched-native.config.mjs`，并在 adapter 完成 native bridge、面板、状态与配置映射迁移；用户文档在 README 增加 patched Pi 前置条件、`/mcp` 与 `/mcp-adapter` 分工、trust/keyring/生命周期/缓存与在 native owner 下保留/不激活的功能边界。本记录只描述本轮实际执行结果。
+- 本任务实际执行的补丁可复现性检查：用 `git clone --no-hardlinks` 创建独立 checkout 并 `git checkout --detach 06a466935536f8c9bcacb2d5efc0fc021be1bdff`，确认 Pi `1.2.0`、apply 前 `git status --short --branch` 无修改；`git apply --check` 与 `git apply` 均退出 0，`git diff --check` 无输出，变更路径与 manifest 的 48 项一致；`shasum -a 256` 得到 `d499d6fba6728dbaced2876149b362780ce4b8ef2129ec3283587a456c46c654`，与 manifest 相同。该独立 checkout 与固定开发工作区 `/Users/cgosu/code/JavaScript/pi-upstream-native` 是两个不同目录，后者未被本任务修改（`git rev-parse HEAD` 与改动路径集合核对未变）。
+- 本任务实际验证：在上述干净 checkout 执行 `npm ci --ignore-scripts --no-audit --no-fund`，装 299 个包成功（仅 engine/deprecation 警告，未跑生命周期脚本）；在 `packages/coding-agent` 执行 4 个 native 测试文件（`mcp-management`、`mcp-extension`、`mcp-direct-tools-config`、`mcp-owner-assembly`）共 57 项全部通过；`npm run test:public-types -- --pi-source /tmp/pi-patch-clean-r27` 通过 adapter typecheck、5 项 public build/export/package 检查及 packed 消费者严格编译，并同步 18 个生成 `dist` 文件；`npm run test:patched-native-session -- --pi-source /tmp/pi-patch-clean-r27` 在同一 harness session 加载真实 patched native extension 与 adapter，1 个集成测试通过。adapter 侧另跑 `npx vitest run test/unit/native test/unit/config/native-config-mapping.test.ts test/unit/auth/native-oauth-credential-backend.test.ts`，10 个文件、40 项通过；`npm pack --ignore-scripts --dry-run --json` 为 25 个文件。
+- 副作用与恢复：本任务曾两次在 adapter 根目录运行 `npm run build:public`（一次直接、一次经 `npm run test:public-exports`），该脚本先 `rm -rf dist`，随后在 stock Pi 1.2.0 下因缺少管理 API 导出而在声明发射阶段失败，导致 6 个生成文件（`*.d.ts` 与 `mcp-keyring-helper.cjs`）被删除。未尝试手工重建，而是用文档化的 `npm run test:public-types -- --pi-source <patched checkout>` 重新生成；对 `dist/` 全部文件做 SHA-256 快照对比，结果与事故前完全一致（`DIST IDENTICAL`）。已在 [`docs/pitfalls.md`](pitfalls.md) 记录。没有 tracked 文件被误删、没有写入 Pi 上游、没有使用真实凭据或生产服务。
+- 限制：未运行全量上游 `npm test`/`npm run build`/`npm run check`（历史 model-data 阻塞不变，也不作为本轮结果）；stock Pi 1.2.0 下 adapter 的 `npm run typecheck` 仍然因缺少 patched 管理 API 导出而失败，这是预期的宿主前置条件，不是 patched 环境的结果。patch、manifest 与 `dist` 的上游/产物交付已完成；Pi 上游未提交、未推送、未发布、未打 tag。
+- 遗留：无已知未完成的迁移实现项；未激活的 adapter 设置（`scriptMode`、`disableProxyTool`、`autoAuth`、`trace`、`oauthDir`、server 级 `debug`/`trace`）按边界保留在配置中但不生效，已在 README 与 `current-state` 说明。

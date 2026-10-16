@@ -140,7 +140,7 @@ function getToolNameCandidates(toolName, serverName, prefix, includeLegacy = tru
 
 // src/contracts/core.ts
 function isServerDisabled(definition) {
-  return definition?.disabled === true;
+  return definition?.disabled === true || definition?.enabled === false;
 }
 
 // src/catalog/tool-selectors.ts
@@ -236,8 +236,23 @@ function resourceNameToToolName(name) {
 }
 
 // src/utils.ts
-import { homedir as homedir2, platform } from "node:os";
-import { extname, isAbsolute, join as join2 } from "node:path";
+import { homedir as homedir3, platform } from "node:os";
+import { extname, isAbsolute, join as join3 } from "node:path";
+
+// src/config/paths.ts
+import { homedir as homedir2 } from "node:os";
+import { join as join2, resolve as resolve2 } from "node:path";
+var GENERIC_GLOBAL_CONFIG_PATH = join2(homedir2(), ".config", "mcp", "mcp.json");
+var AGENTS_GLOBAL_CONFIG_PATHS = [
+  join2(homedir2(), ".agents", "mcp.json"),
+  join2(homedir2(), ".agents", "mcp", "mcp.json")
+];
+var REPOPROMPT_BINARY_CANDIDATES = [
+  join2(homedir2(), "RepoPrompt", "repoprompt_cli"),
+  "/Applications/Repo Prompt.app/Contents/MacOS/repoprompt-mcp"
+];
+
+// src/utils.ts
 function interpolateEnvVars(value, environment = process.env) {
   return value.replace(/\$\{(\w+)\}/g, (_, name) => environment[name] ?? "").replace(/\$env:(\w+)/g, (_, name) => environment[name] ?? "").replace(/\{env:(\w+)\}/g, (_, name) => environment[name] ?? "");
 }
@@ -283,9 +298,9 @@ function resolveServerUrl(definition, environment = process.env) {
 function resolveConfigPath(value, environment = process.env) {
   if (value === void 0) return void 0;
   const resolved = interpolateEnvVars(value, environment);
-  if (resolved === "~") return homedir2();
+  if (resolved === "~") return homedir3();
   if (resolved.startsWith("~/") || resolved.startsWith("~\\")) {
-    return join2(homedir2(), resolved.slice(2));
+    return join3(homedir3(), resolved.slice(2));
   }
   return resolved;
 }

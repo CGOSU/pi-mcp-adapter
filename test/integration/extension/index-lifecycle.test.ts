@@ -125,6 +125,10 @@ vi.mock("../../../src/utils.ts", () => ({
   truncateAtWord: mocks.truncateAtWord,
 }));
 
+// Retain coverage of the internal legacy adapter without treating it as the public entry.
+// Native public-entry behavior is covered in test/unit/native and test/node/package.
+vi.mock("../../../index.ts", async () => import("../../../src/extension/install.ts"));
+
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -246,7 +250,7 @@ function connectedStatusSnapshot(toolCount: number) {
   };
 }
 
-describe("mcpAdapter session lifecycle", () => {
+describe("legacy mcpAdapter session lifecycle", () => {
   const originalDirectTools = process.env.MCP_DIRECT_TOOLS;
 
   beforeEach(() => {
@@ -1151,7 +1155,7 @@ describe("mcpAdapter session lifecycle", () => {
     );
   });
 
-  it("exports createMcpAdapter while retaining the default adapter export", async () => {
+  it("retains the internal factory and default helper for legacy lifecycle coverage", async () => {
     const adapterModule = await import("../../../index.ts");
     expect(adapterModule.createMcpAdapter).toBeTypeOf("function");
     expect(adapterModule.default).toBeTypeOf("function");

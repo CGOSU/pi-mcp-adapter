@@ -1,4 +1,4 @@
-import { matchesKey, type KeyId } from "@earendil-works/pi-tui";
+import { matchesKey, type Keybinding, type KeyId } from "@earendil-works/pi-tui";
 
 /** The panel keybinding ids the adapter panels resolve through pi-tui. */
 export type PanelSelectKeybinding =
@@ -8,7 +8,7 @@ export type PanelSelectKeybinding =
 
 /** Structural subset of pi-tui's `KeybindingsManager` (which satisfies it). */
 export interface PanelKeybindings {
-  matches(data: string, keybinding: PanelSelectKeybinding): boolean;
+  matches(data: string, keybinding: Keybinding): boolean;
   getUserBindings?(): Record<string, KeyId | KeyId[] | undefined>;
 }
 

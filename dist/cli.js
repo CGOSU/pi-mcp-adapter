@@ -17,8 +17,8 @@ async function importTokenModules(error) {
   try {
     const [store, config, utils] = await Promise.all([
       import("./chunks/mcp-bearer-store-EWCDC4RT.js"),
-      import("./chunks/config-GTMPUIFK.js"),
-      import("./chunks/utils-PH3NBHDM.js")
+      import("./chunks/config-WTFTZQOL.js"),
+      import("./chunks/utils-KB5ADVBM.js")
     ]);
     return { store, config, utils };
   } catch (err) {

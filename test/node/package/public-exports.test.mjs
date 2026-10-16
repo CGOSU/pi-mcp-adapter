@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cp, mkdtemp, mkdir, readdir, rm } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readdir, realpath, rm, symlink } from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
@@ -7,7 +7,14 @@ test("public metadata, config, and type helpers load in plain Node from node_mod
   const fixtureRoot = await mkdtemp(path.join(process.cwd(), ".tmp-public-exports-"));
   try {
     const packageRoot = path.join(fixtureRoot, "node_modules", "pi-mcp-adapter");
+    const piScopeRoot = path.join(fixtureRoot, "node_modules", "@earendil-works");
     await mkdir(path.dirname(packageRoot), { recursive: true });
+    await mkdir(piScopeRoot, { recursive: true });
+    await symlink(
+      await realpath(path.join(process.cwd(), "node_modules", "@earendil-works", "pi-coding-agent")),
+      path.join(piScopeRoot, "pi-coding-agent"),
+      process.platform === "win32" ? "junction" : "dir",
+    );
     for (const entry of await readdir(process.cwd())) {
       if (entry === "node_modules" || entry === ".git" || entry.startsWith(".tmp-public-exports-")) {
         continue;

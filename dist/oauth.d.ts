@@ -19,12 +19,36 @@ export interface StoredTokens {
     issuer?: string;
 }
 /** OAuth client information from dynamic or static registration */
+export type AuthJsonValue = null | boolean | number | string | AuthJsonValue[] | {
+    [key: string]: AuthJsonValue;
+};
+export interface NativeOAuthStorageMetadata {
+    tokenType?: string;
+    idToken?: string;
+    discovery?: Record<string, AuthJsonValue>;
+}
 export interface StoredClientInfo {
     clientId: string;
     clientSecret?: string;
     clientIdIssuedAt?: number;
     clientSecretExpiresAt?: number;
     redirectUris?: string[];
+    tokenEndpointAuthMethod?: string;
+    grantTypes?: string[];
+    responseTypes?: string[];
+    applicationType?: string;
+    clientName?: string;
+    clientUri?: string;
+    logoUri?: string;
+    scope?: string;
+    contacts?: string[];
+    tosUri?: string;
+    policyUri?: string;
+    jwksUri?: string;
+    jwks?: AuthJsonValue;
+    softwareId?: string;
+    softwareVersion?: string;
+    softwareStatement?: string;
     /** SEP-2352 authorization-server issuer binding */
     issuer?: string;
     /**
@@ -42,6 +66,8 @@ export interface AuthEntry {
     clientInfo?: StoredClientInfo;
     codeVerifier?: string;
     oauthState?: string;
+    /** Additional native MCP OAuth fields stored with the same keyring entry. */
+    nativeOAuth?: NativeOAuthStorageMetadata;
     serverUrl?: string;
 }
 export interface AuthStorageOptions {

@@ -52,12 +52,36 @@ export interface StoredTokens {
 }
 
 /** OAuth client information from dynamic or static registration */
+export type AuthJsonValue = null | boolean | number | string | AuthJsonValue[] | { [key: string]: AuthJsonValue };
+
+export interface NativeOAuthStorageMetadata {
+  tokenType?: string;
+  idToken?: string;
+  discovery?: Record<string, AuthJsonValue>;
+}
+
 export interface StoredClientInfo {
   clientId: string;
   clientSecret?: string;
   clientIdIssuedAt?: number;
   clientSecretExpiresAt?: number;
   redirectUris?: string[];
+  tokenEndpointAuthMethod?: string;
+  grantTypes?: string[];
+  responseTypes?: string[];
+  applicationType?: string;
+  clientName?: string;
+  clientUri?: string;
+  logoUri?: string;
+  scope?: string;
+  contacts?: string[];
+  tosUri?: string;
+  policyUri?: string;
+  jwksUri?: string;
+  jwks?: AuthJsonValue;
+  softwareId?: string;
+  softwareVersion?: string;
+  softwareStatement?: string;
   /** SEP-2352 authorization-server issuer binding */
   issuer?: string;
   /**
@@ -76,6 +100,8 @@ export interface AuthEntry {
   clientInfo?: StoredClientInfo;
   codeVerifier?: string;
   oauthState?: string;
+  /** Additional native MCP OAuth fields stored with the same keyring entry. */
+  nativeOAuth?: NativeOAuthStorageMetadata;
   serverUrl?: string; // Track the URL these credentials are for
 }
 
@@ -472,13 +498,19 @@ function toAuthEntry(value: unknown): AuthEntry | undefined {
 
   const tokens = entry.tokens === undefined ? undefined : toStoredTokens(entry.tokens);
   const clientInfo = entry.clientInfo === undefined ? undefined : toStoredClientInfo(entry.clientInfo);
-  if ((entry.tokens !== undefined && !tokens) || (entry.clientInfo !== undefined && !clientInfo)) return undefined;
+  const nativeOAuth = entry.nativeOAuth === undefined ? undefined : toNativeOAuthStorageMetadata(entry.nativeOAuth);
+  if (
+    (entry.tokens !== undefined && !tokens) ||
+    (entry.clientInfo !== undefined && !clientInfo) ||
+    (entry.nativeOAuth !== undefined && !nativeOAuth)
+  ) return undefined;
 
   const authEntry: AuthEntry = {};
   if (tokens) authEntry.tokens = tokens;
   if (clientInfo) authEntry.clientInfo = clientInfo;
   if (codeVerifier !== undefined) authEntry.codeVerifier = codeVerifier;
   if (oauthState !== undefined) authEntry.oauthState = oauthState;
+  if (nativeOAuth !== undefined) authEntry.nativeOAuth = nativeOAuth;
   if (serverUrl !== undefined) authEntry.serverUrl = serverUrl;
   return authEntry;
 }
@@ -510,7 +542,30 @@ function toStoredClientInfo(value: unknown): StoredClientInfo | undefined {
   const clientIdIssuedAt = optionalNumber(clientInfo.clientIdIssuedAt);
   const clientSecretExpiresAt = optionalNumber(clientInfo.clientSecretExpiresAt);
   const configPreRegistered = optionalBoolean(clientInfo.configPreRegistered);
-  if (clientSecret === null || issuer === null || clientIdIssuedAt === null || clientSecretExpiresAt === null || configPreRegistered === null) return undefined;
+  const tokenEndpointAuthMethod = optionalString(clientInfo.tokenEndpointAuthMethod);
+  const grantTypes = optionalStringArray(clientInfo.grantTypes);
+  const responseTypes = optionalStringArray(clientInfo.responseTypes);
+  const applicationType = optionalString(clientInfo.applicationType);
+  const clientName = optionalString(clientInfo.clientName);
+  const clientUri = optionalString(clientInfo.clientUri);
+  const logoUri = optionalString(clientInfo.logoUri);
+  const scope = optionalString(clientInfo.scope);
+  const contacts = optionalStringArray(clientInfo.contacts);
+  const tosUri = optionalString(clientInfo.tosUri);
+  const policyUri = optionalString(clientInfo.policyUri);
+  const jwksUri = optionalString(clientInfo.jwksUri);
+  const jwks = clientInfo.jwks === undefined ? undefined : toAuthJsonValue(clientInfo.jwks);
+  const softwareId = optionalString(clientInfo.softwareId);
+  const softwareVersion = optionalString(clientInfo.softwareVersion);
+  const softwareStatement = optionalString(clientInfo.softwareStatement);
+  if (
+    clientSecret === null || issuer === null || clientIdIssuedAt === null || clientSecretExpiresAt === null ||
+    configPreRegistered === null || tokenEndpointAuthMethod === null || grantTypes === null || responseTypes === null ||
+    applicationType === null || clientName === null || clientUri === null || logoUri === null || scope === null ||
+    contacts === null || tosUri === null || policyUri === null || jwksUri === null ||
+    (clientInfo.jwks !== undefined && jwks === undefined) || softwareId === null || softwareVersion === null ||
+    softwareStatement === null
+  ) return undefined;
 
   const storedClient: StoredClientInfo = { clientId: clientInfo.clientId };
   const redirectUris = stringArray(clientInfo.redirectUris);
@@ -518,9 +573,67 @@ function toStoredClientInfo(value: unknown): StoredClientInfo | undefined {
   if (clientIdIssuedAt !== undefined) storedClient.clientIdIssuedAt = clientIdIssuedAt;
   if (clientSecretExpiresAt !== undefined) storedClient.clientSecretExpiresAt = clientSecretExpiresAt;
   if (redirectUris !== undefined) storedClient.redirectUris = redirectUris;
+  if (tokenEndpointAuthMethod !== undefined) storedClient.tokenEndpointAuthMethod = tokenEndpointAuthMethod;
+  if (grantTypes !== undefined) storedClient.grantTypes = grantTypes;
+  if (responseTypes !== undefined) storedClient.responseTypes = responseTypes;
+  if (applicationType !== undefined) storedClient.applicationType = applicationType;
+  if (clientName !== undefined) storedClient.clientName = clientName;
+  if (clientUri !== undefined) storedClient.clientUri = clientUri;
+  if (logoUri !== undefined) storedClient.logoUri = logoUri;
+  if (scope !== undefined) storedClient.scope = scope;
+  if (contacts !== undefined) storedClient.contacts = contacts;
+  if (tosUri !== undefined) storedClient.tosUri = tosUri;
+  if (policyUri !== undefined) storedClient.policyUri = policyUri;
+  if (jwksUri !== undefined) storedClient.jwksUri = jwksUri;
+  if (jwks !== undefined) storedClient.jwks = jwks;
+  if (softwareId !== undefined) storedClient.softwareId = softwareId;
+  if (softwareVersion !== undefined) storedClient.softwareVersion = softwareVersion;
+  if (softwareStatement !== undefined) storedClient.softwareStatement = softwareStatement;
   if (issuer !== undefined) storedClient.issuer = issuer;
   if (configPreRegistered !== undefined) storedClient.configPreRegistered = configPreRegistered;
   return storedClient;
+}
+
+function optionalStringArray(value: unknown): string[] | null | undefined {
+  if (value === undefined) return undefined;
+  return Array.isArray(value) && value.every((item) => typeof item === 'string') ? [...value] : null;
+}
+
+function toNativeOAuthStorageMetadata(value: unknown): NativeOAuthStorageMetadata | undefined {
+  const metadata = toRecord(value);
+  if (!metadata) return undefined;
+  const tokenType = optionalString(metadata.tokenType);
+  const idToken = optionalString(metadata.idToken);
+  const discovery = metadata.discovery === undefined ? undefined : toAuthJsonObject(metadata.discovery);
+  if (tokenType === null || idToken === null || (metadata.discovery !== undefined && !discovery)) return undefined;
+  const result: NativeOAuthStorageMetadata = {};
+  if (tokenType !== undefined) result.tokenType = tokenType;
+  if (idToken !== undefined) result.idToken = idToken;
+  if (discovery !== undefined) result.discovery = discovery;
+  return result;
+}
+
+function toAuthJsonValue(value: unknown): AuthJsonValue | undefined {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (Array.isArray(value)) {
+    const items = value.map(toAuthJsonValue);
+    return items.some((item) => item === undefined) ? undefined : items as AuthJsonValue[];
+  }
+  const record = toRecord(value);
+  if (!record) return undefined;
+  const result = Object.create(null) as Record<string, AuthJsonValue>;
+  for (const [key, item] of Object.entries(record)) {
+    const parsed = toAuthJsonValue(item);
+    if (parsed === undefined) return undefined;
+    result[key] = parsed;
+  }
+  return result;
+}
+
+function toAuthJsonObject(value: unknown): Record<string, AuthJsonValue> | undefined {
+  const parsed = toAuthJsonValue(value);
+  return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed : undefined;
 }
 
 function toRecord(value: unknown): Record<string, unknown> | undefined {
@@ -869,6 +982,12 @@ export function updateTokens(
     delete entry.clientInfo;
     delete entry.codeVerifier;
     delete entry.oauthState;
+    delete entry.nativeOAuth;
+  }
+  if (entry.nativeOAuth) {
+    delete entry.nativeOAuth.tokenType;
+    delete entry.nativeOAuth.idToken;
+    if (Object.keys(entry.nativeOAuth).length === 0) delete entry.nativeOAuth;
   }
   entry.tokens = tokens;
   saveAuthEntry(serverName, entry, serverUrl, options);
@@ -888,6 +1007,7 @@ export function updateClientInfo(
     delete entry.tokens;
     delete entry.codeVerifier;
     delete entry.oauthState;
+    delete entry.nativeOAuth;
   }
   entry.clientInfo = clientInfo;
   saveAuthEntry(serverName, entry, serverUrl, options);
@@ -902,6 +1022,7 @@ export function updateCodeVerifier(serverName: string, codeVerifier: string, ser
     delete entry.tokens;
     delete entry.clientInfo;
     delete entry.oauthState;
+    delete entry.nativeOAuth;
   }
   entry.codeVerifier = codeVerifier;
   saveAuthEntry(serverName, entry, serverUrl, options);
@@ -927,6 +1048,7 @@ export function updateOAuthState(serverName: string, state: string, serverUrl?: 
     delete entry.tokens;
     delete entry.clientInfo;
     delete entry.codeVerifier;
+    delete entry.nativeOAuth;
   }
   entry.oauthState = state;
   saveAuthEntry(serverName, entry, serverUrl, options);
@@ -995,6 +1117,11 @@ export function clearTokens(serverName: string, options?: AuthStorageOptions): v
   const entry = getAuthEntry(serverName, options);
   if (entry) {
     delete entry.tokens;
+    if (entry.nativeOAuth) {
+      delete entry.nativeOAuth.tokenType;
+      delete entry.nativeOAuth.idToken;
+      if (Object.keys(entry.nativeOAuth).length === 0) delete entry.nativeOAuth;
+    }
     saveAuthEntry(serverName, entry, undefined, options);
   }
 }

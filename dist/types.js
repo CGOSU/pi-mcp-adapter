@@ -1,6 +1,6 @@
 // src/contracts/core.ts
 function isServerDisabled(definition) {
-  return definition?.disabled === true;
+  return definition?.disabled === true || definition?.enabled === false;
 }
 var MCP_TOOL_APPROVAL_REQUEST_EVENT = "pi-mcp-adapter:tool-approval-request";
 

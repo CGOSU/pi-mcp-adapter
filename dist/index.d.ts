@@ -24,8 +24,8 @@ export declare const visualizationStreamFrameTypeSchema: z.ZodEnum<{
 }>;
 export type VisualizationStreamFrameType = z.infer<typeof visualizationStreamFrameTypeSchema>;
 export declare const visualizationStreamStatusSchema: z.ZodEnum<{
-    error: "error";
     ok: "ok";
+    error: "error";
 }>;
 export type VisualizationStreamStatus = z.infer<typeof visualizationStreamStatusSchema>;
 export declare const uiStreamHostContextSchema: z.ZodObject<{
@@ -54,8 +54,8 @@ export declare const visualizationStreamEnvelopeSchema: z.ZodObject<{
         settled: "settled";
     }>;
     status: z.ZodEnum<{
-        error: "error";
         ok: "ok";
+        error: "error";
     }>;
     message: z.ZodOptional<z.ZodString>;
     spec: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
@@ -193,6 +193,12 @@ export interface HttpRequestHeadersCommand {
     timeoutMs?: number;
 }
 export interface ServerEntry {
+    /** Pi-native enablement field accepted when reading shared Pi MCP configuration. */
+    enabled?: boolean;
+    /** Pi-native tool exposure policy accepted when reading shared Pi MCP configuration. */
+    exposure?: "codemode" | "deferred" | "direct" | "hidden";
+    /** Per-tool exposure overrides from Pi-native MCP configuration. */
+    toolExposure?: Record<string, "codemode" | "deferred" | "direct" | "hidden">;
     command?: string;
     args?: string[];
     /** Explicit rmcp-mux Unix-domain socket path. Mutually exclusive with command and url. */
@@ -449,7 +455,7 @@ export interface McpPanelCallbacks {
     reconnect: (serverName: string) => Promise<boolean>;
     canAuthenticate: (serverName: string) => boolean;
     authenticate: (serverName: string) => Promise<McpAuthResult>;
-    getConnectionStatus: (serverName: string) => "connected" | "idle" | "failed" | "needs-auth" | "disabled";
+    getConnectionStatus: (serverName: string) => "connected" | "idle" | "failed" | "needs-auth" | "connecting" | "disabled";
     getFailureMessage?: (serverName: string) => string | null;
     refreshCacheAfterReconnect: (serverName: string) => ServerCacheEntry | null;
 }
@@ -554,21 +560,10 @@ export interface McpStatusEventBus {
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-
-
-
-
 export interface McpServerRegistration {
     dispose(): Promise<void>;
 }
 export declare function createMcpAdapter(options?: McpAdapterOptions): (pi: ExtensionAPI) => void;
-/**
- * Register an MCP server with the adapter installed for this Pi instance.
- * Registrations are session/runtime scoped and never persisted. Duplicate
- * names fail closed. Registered servers are proxy-tool-only; their tools
- * become visible at the next tool sync. To change a definition, dispose the
- * registration and register again.
- */
 export declare function registerMcpServer(options: {
     pi: ExtensionAPI;
     name: string;

@@ -106,6 +106,12 @@ export interface HttpRequestHeadersCommand {
 
 // Server configuration
 export interface ServerEntry {
+  /** Pi-native enablement field accepted when reading shared Pi MCP configuration. */
+  enabled?: boolean;
+  /** Pi-native tool exposure policy accepted when reading shared Pi MCP configuration. */
+  exposure?: "codemode" | "deferred" | "direct" | "hidden";
+  /** Per-tool exposure overrides from Pi-native MCP configuration. */
+  toolExposure?: Record<string, "codemode" | "deferred" | "direct" | "hidden">;
   command?: string;
   args?: string[];
   /** Explicit rmcp-mux Unix-domain socket path. Mutually exclusive with command and url. */
@@ -180,7 +186,7 @@ export interface ServerEntry {
 
 /** Only the literal boolean `true` disables a server. */
 export function isServerDisabled(definition: ServerEntry | undefined): boolean {
-  return definition?.disabled === true;
+  return definition?.disabled === true || definition?.enabled === false;
 }
 
 // Output guard tuning (settings.outputGuard object form)
@@ -394,7 +400,7 @@ export interface McpPanelCallbacks {
   reconnect: (serverName: string) => Promise<boolean>;
   canAuthenticate: (serverName: string) => boolean;
   authenticate: (serverName: string) => Promise<McpAuthResult>;
-  getConnectionStatus: (serverName: string) => "connected" | "idle" | "failed" | "needs-auth" | "disabled";
+  getConnectionStatus: (serverName: string) => "connected" | "idle" | "failed" | "needs-auth" | "connecting" | "disabled";
   getFailureMessage?: (serverName: string) => string | null;
   refreshCacheAfterReconnect: (serverName: string) => ServerCacheEntry | null;
 }

@@ -145,7 +145,7 @@ export async function runMcpScript(
     if (details.error !== undefined) {
       const errorCode = String(details.error);
       const suggestions = Array.isArray(details.suggestions)
-        ? details.suggestions.filter((suggestion): suggestion is string => typeof suggestion === "string")
+        ? details.suggestions.filter((suggestion: unknown): suggestion is string => typeof suggestion === "string")
         : [];
       const message = errorCode === "tool_not_found"
         ? `Tool "${path}" not found. Use await tools.search({ query: "..." }) inside mcpScript.${suggestions.length > 0 ? ` Did you mean: ${suggestions.join(", ")}` : ""}`

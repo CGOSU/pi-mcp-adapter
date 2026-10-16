@@ -10,16 +10,8 @@ const distRoot = join(repoRoot, "dist");
 const publicEntries = ["index.ts", "config.ts", "metadata-cache.ts", "types.ts", "oauth.ts"];
 const runtimeResources = [
   {
-    source: "src/tools/mcp-script-worker.mjs",
-    marker: 'new Worker(new URL("./mcp-script-worker.mjs", import.meta.url)',
-  },
-  {
     source: "src/auth/mcp-keyring-helper.cjs",
     marker: 'new URL("./mcp-keyring-helper.cjs", import.meta.url)',
-  },
-  {
-    source: "src/ui/app-bridge.bundle.js",
-    marker: 'path.join(import.meta.dirname, "app-bridge.bundle.js")',
   },
 ];
 

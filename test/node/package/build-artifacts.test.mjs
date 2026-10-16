@@ -50,7 +50,7 @@ async function staticClosure(entry) {
   return closure;
 }
 
-test("public entries are split ESM files with bundled declarations", async () => {
+test("public entries are ESM files with bundled declarations and resolvable chunks", async () => {
   const files = await walk(distRoot);
   const relativeFiles = files.map(filePath => path.relative(distRoot, filePath).split(path.sep).join("/"));
 
@@ -62,7 +62,6 @@ test("public entries are split ESM files with bundled declarations", async () =>
 
   const indexSource = await readFile(path.join(distRoot, "index.js"), "utf8");
   const dynamicImports = [...indexSource.matchAll(/import\(["'](\.\/chunks\/[^"']+)["']\)/g)].map(match => match[1]);
-  assert.ok(dynamicImports.length > 0);
   for (const specifier of dynamicImports) {
     assert.equal(await stat(path.resolve(distRoot, specifier)).then(() => true), true, `missing ${specifier}`);
   }
@@ -78,8 +77,6 @@ test("extension startup stays free of delayed runtime modules", async () => {
   const closure = await staticClosure(path.join(distRoot, "index.js"));
   const forbiddenMarkers = [
     "src/auth/mcp-auth-flow.ts",
-    "src/auth/mcp-auth.ts",
-    "src/auth/mcp-bearer-store.ts",
     "src/auth/mcp-oauth-provider.ts",
     "src/auth/mcp-callback-server.ts",
     "src/auth/oauth-handler.ts",
@@ -115,18 +112,25 @@ test("extension startup stays free of delayed runtime modules", async () => {
     "src/config/write.ts",
   ];
   const offenders = [];
+  let includesNativeCredentialBridge = false;
+  let includesKeyringStorage = false;
+  let includesBearerTokenStore = false;
   for (const filePath of closure) {
     const source = await readFile(filePath, "utf8");
     if (forbiddenMarkers.some(marker => source.includes(`// ${marker}`))) offenders.push(path.relative(distRoot, filePath));
+    includesNativeCredentialBridge ||= source.includes("// src/native/oauth-credential-backend.ts");
+    includesKeyringStorage ||= source.includes("// src/auth/mcp-auth.ts");
+    includesBearerTokenStore ||= source.includes("// src/auth/mcp-bearer-store.ts");
   }
   assert.deepEqual(offenders, []);
+  assert.equal(includesNativeCredentialBridge, true);
+  assert.equal(includesKeyringStorage, true);
+  assert.equal(includesBearerTokenStore, true);
 });
 
 test("runtime resources sit beside every built module that resolves them", async () => {
   const resources = [
-    { marker: 'new Worker(new URL("./mcp-script-worker.mjs", import.meta.url)', name: "mcp-script-worker.mjs" },
     { marker: 'new URL("./mcp-keyring-helper.cjs", import.meta.url)', name: "mcp-keyring-helper.cjs" },
-    { marker: 'path.join(import.meta.dirname, "app-bridge.bundle.js")', name: "app-bridge.bundle.js" },
   ];
   const generatedJavaScript = (await walk(distRoot)).filter(filePath => filePath.endsWith(".js"));
 
