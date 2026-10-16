@@ -16,7 +16,7 @@
 
 - 根目录源码保留 `index.ts`、`config.ts`、`metadata-cache.ts`、`types.ts`、`oauth.ts` 和 `cli.js` 公共兼容入口；已删除 53 个未发布转发 facade，剩余入口不被内部领域模块反向依赖。
 - 领域实现位于 `src/contracts`、`src/catalog`、`src/config`、`src/runtime`、`src/auth`、`src/tools`、`src/ui`、`src/commands` 和 `src/extension`。
-- `index.ts` 的静态闭包只保留配置读取、metadata cache、Schema、工具表面和注册所需代码。连接、OAuth、命令处理、gateway/direct 执行、script worker、UI server/runtime 通过缓存的原生 `dynamic import()` 按需加载。
+- `index.ts` 的静态闭包保留配置读取、metadata cache、Schema、工具表面、注册代码，以及 native owner 所需的同步 keyring/bearer credential bridge（`src/auth/mcp-auth.ts`、`src/auth/mcp-bearer-store.ts`）。OAuth flows/providers、命令处理、gateway/direct 执行、script worker、UI server/runtime 仍通过缓存的原生 `dynamic import()` 按需加载。
 - 有效且全为 lazy 的 metadata cache 会跳过 `session_start` 的完整 runtime 初始化；eager、keep-alive、冷缓存和 `MCP_DIRECT_TOOLS` 语义保持。
 - `src/catalog` 的 selector index 和 `MetadataCatalogSnapshot` 在一次 catalog/sync 中复用，避免跨服务器重复扫描和重复读取缓存。
 
@@ -28,7 +28,7 @@
 
 ## 最终验证状态
 
-- `npm run typecheck`、package manifest、public exports、OAuth Node tests、打包、production-only 临时安装和静态启动导入图均已执行并通过，具体结果见 [`docs/session-log.md`](session-log.md)。
+- `npm run typecheck`、package manifest、public exports、OAuth Node tests、打包、production-only 临时安装和静态启动导入图均已执行并通过，具体结果见 [`docs/session-log.md`](session-log.md)。最近一次全量 Vitest 在构建 interactive visualizer example 后为 119 个文件、1,350 项通过。
 - 最终 source-vs-bundle 3-run fresh RPC benchmark：source 的 module/main/wall 中位数为 `437ms`/`475ms`/`1128ms`，bundle 为 `199ms`/`228ms`/`754ms`；bundle 未出现超过 15% 的可重复回退，且静态启动闭包门禁通过。
 - `npm run benchmark:catalog -- --runs 5`：5×100 direct/live shared 为 `4.72ms`/`4.45ms`，20×100 为 `18.73ms`/`17.43ms`，50×100 为 `45.07ms`/`45.05ms`；旧 per-server 50×100 对照为 `989.27ms`。
 - 10,000 工具搜索压测 cold 为 `50.28ms`，5 次 warm median 为 `5.73ms`，结果正确。
@@ -44,6 +44,7 @@
 
 ## 最近一次更新
 
+- 2026-10-16：CI 保留工作流并按原生迁移前置条件调整验证：checkout 固定 Pi 1.2.0 基线、应用仓库 patch、运行上游 native owner 定向测试、patched public-type/build 检查及同会话集成测试；Vitest 中旧 runtime 回归测试显式加载保留的 `src/extension/install.ts`，package manifest expectation 同步到 Pi 1.2.0。完整本地 Vitest 为 119 个文件、1,350 项通过；GitHub Actions 尚未实际运行。
 - 2026-10-16：修复 `build:public` 在构建失败时丢失已提交 `dist/` 生成物的隐患（`7f5cfe8`，已 push）。构建改为在 `.tmp-public-build-*` 暂存目录完成后原子替换 `dist/`，失败时还原旧目录；stock Pi 1.2.0 下构建仍以声明发射错误失败，但 `dist/` 18 个文件 SHA-256 不变。唯一决定见 [`docs/decisions.md`](decisions.md)，失败路径与恢复方式见 [`docs/pitfalls.md`](pitfalls.md)，实际命令见 [`docs/session-log.md`](session-log.md)。
 - 2026-10-16：迁移已提交并 push 到 adapter 主仓库 `main`：commit `05c4a3f1023f2d0ce7458515d1782fc72370ed69`（`迁移 MCP 扩展到 Pi 1.2.0 原生管理协议`，104 个文件，仓库本地身份 CGOSU/dev@cgosu.com），远端 `origin/main` 已与本地一致（无强推、未重放）。Pi 上游未提交、未 push、未发布。真实命令与结果见 [`docs/session-log.md`](session-log.md)。
 - 2026-10-16：完成最终文档与 adapter Git 交付准备。在独立干净 checkout（`git clone --no-hardlinks`，detached `06a466935536f8c9bcacb2d5efc0fc021be1bdff`，Pi `1.2.0`，apply 前 worktree clean）上重复验证：`git apply --check` 与真实 `git apply` 均成功且得到与 manifest 一致的 48 个路径，`npm ci --ignore-scripts` 装 299 个包，4 文件/57 项 native 测试通过，`test:public-types` 与 `test:patched-native-session` 均通过并同步 18 个 `dist` 文件；patch SHA-256 与 manifest 一致。用户文档新增 patched Pi 前置条件、`/mcp` 与 `/mcp-adapter` 分工、trust/keyring/生命周期/缓存与在 native owner 下保留/不激活的功能边界；详细命令、真实结果与限制见 [`docs/session-log.md`](session-log.md)。

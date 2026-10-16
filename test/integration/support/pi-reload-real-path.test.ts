@@ -88,7 +88,7 @@ async function createReloadHarness() {
     cwd,
     agentDir,
     settingsManager,
-    additionalExtensionPaths: [resolve("index.ts")],
+    additionalExtensionPaths: [resolve("src/extension/install.ts")],
   });
   await loader.reload();
   const errors: Array<{ error: string; stack?: string }> = [];

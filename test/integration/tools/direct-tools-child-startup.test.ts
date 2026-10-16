@@ -39,7 +39,7 @@ describe("direct tools in child Pi processes", () => {
           PI_CODING_AGENT_DIR: agentDir,
           MCP_CHILD_CONFIG: configPath,
           MCP_CHILD_PROJECT_DIR: projectDir,
-          MCP_CHILD_ADAPTER_PATH: resolve("index.ts"),
+          MCP_CHILD_ADAPTER_PATH: resolve("src/extension/install.ts"),
           MCP_CHILD_PROBE_PATH: resolve("test/fixtures/direct-tools-agent-start-probe.ts"),
           MCP_DIRECT_TOOLS: "demo/reload_identity",
         },

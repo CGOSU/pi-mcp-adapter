@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fileURLToPath } from "node:url";
-import { createMcpAdapter } from "../../../index.ts";
+import { createMcpAdapter as createLegacyMcpAdapter } from "../../../src/extension/install.ts";
 import { runMcpScript } from "../../../src/tools/mcp-code.ts";
 import { McpServerManager } from "../../../src/runtime/server-manager.ts";
 import type { McpExtensionState } from "../../../src/extension/state.ts";
@@ -24,7 +24,7 @@ function textBlocks(result: Awaited<ReturnType<typeof runMcpScript>>): string[] 
 describe("runMcpScript", () => {
   it("registers mcpScript by default", () => {
     const registerTool = vi.fn();
-    createMcpAdapter({ config: { settings: {}, mcpServers: {} } })({
+    createLegacyMcpAdapter({ config: { settings: {}, mcpServers: {} } })({
       registerTool,
       registerFlag: vi.fn(),
       registerCommand: vi.fn(),
@@ -42,7 +42,7 @@ describe("runMcpScript", () => {
 
   it("skips mcpScript when scriptMode is false", () => {
     const registerTool = vi.fn();
-    createMcpAdapter({ config: { settings: { scriptMode: false }, mcpServers: {} } })({
+    createLegacyMcpAdapter({ config: { settings: { scriptMode: false }, mcpServers: {} } })({
       registerTool,
       registerFlag: vi.fn(),
       registerCommand: vi.fn(),

@@ -19,23 +19,43 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/checkout@v4
+        with:
+          repository: earendil-works/pi
+          ref: 06a466935536f8c9bcacb2d5efc0fc021be1bdff
+          path: pi-upstream
+          persist-credentials: false
 
       - run: npm ci
-      - name: Verify committed public build
+      - name: Install fixed Pi workspace dependencies
+        working-directory: pi-upstream
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Apply the versioned native MCP patch
         run: |
-          npm run build:public
+          git -C pi-upstream apply --check "$GITHUB_WORKSPACE/patches/pi-1.2.0-native-mcp-management.patch"
+          git -C pi-upstream apply "$GITHUB_WORKSPACE/patches/pi-1.2.0-native-mcp-management.patch"
+      - name: Test patched Pi native MCP owner
+        working-directory: pi-upstream/packages/coding-agent
+        run: |
+          node "$(git rev-parse --show-toplevel)/node_modules/vitest/dist/cli.js" --run \
+            test/mcp-management.test.ts \
+            test/mcp-extension.test.ts \
+            test/mcp-direct-tools-config.test.ts \
+            test/mcp-owner-assembly.test.ts
+      - name: Verify adapter public build against patched Pi
+        run: |
+          npm run test:public-types -- --pi-source "$GITHUB_WORKSPACE/pi-upstream"
           git diff --exit-code -- dist
+      - name: Test patched Pi and adapter in one session
+        run: npm run test:patched-native-session -- --pi-source "$GITHUB_WORKSPACE/pi-upstream"
       - name: Build interactive visualizer example
         run: |
           npm install --prefix examples/interactive-visualizer --no-package-lock --no-audit --no-fund
           npm run --prefix examples/interactive-visualizer build
-      - name: Typecheck
-        run: npm run typecheck
-      - run: npm run test:public-exports
-      - run: npm test
+      - run: npm run test:vitest
       - run: npm run test:oauth
       - run: npm run test:conformance
-      - run: npm pack --dry-run
+      - run: npm pack --ignore-scripts --dry-run
 
   production-install:
     runs-on: windows-latest

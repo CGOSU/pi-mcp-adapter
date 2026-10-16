@@ -8,6 +8,13 @@
 
 ## 会话
 
+### 2026-10-16：修正 native MCP 迁移后的 CI 与旧 runtime 回归检查
+
+- 背景：CI 原先直接用 npm 发布的 stock Pi 1.2.0 执行 `build:public`/typecheck/public exports，但这些源码引用仅由仓库固定补丁提供的 native MCP API；此外旧 child-startup/reload 用例把 native-only `index.ts` 当作 legacy runtime 入口，package manifest 测试仍断言 Pi 0.84.1 pins。静态导入图也需区分必须同步提供给 native owner 的 keyring/bearer credential bridge 与真正延迟的 OAuth flows/legacy runtime。
+- 完成：保留 `.github/workflows/ci.yml`，改为 checkout 固定 Pi 基线 `06a466935536f8c9bcacb2d5efc0fc021be1bdff`、应用仓库 patch、执行 Pi native owner 定向测试、`test:public-types`、patched same-session 集成测试、adapter Vitest/OAuth/conformance，并在产物检查后用 `npm pack --ignore-scripts` 避免对 stock peer 触发 `prepack`。旧 runtime 的 child-startup、reload 与 `mcpScript` 用例显式加载保留的 `src/extension/install.ts`；manifest expectation 更新为 Pi 1.2.0；启动图测试记录 native credential bridge 的静态导入例外。未改生产业务逻辑，未删除 CI workflow。
+- 通过：安装并构建 `examples/interactive-visualizer`；`npm run test:vitest` 在本机 Node `v26.11.1` 为 119 个文件/1,350 项通过；末尾定向 5 个文件/34 项通过；patched Pi native owner 4 个文件/57 项通过；`npm run test:public-types -- --pi-source /Users/cgosu/code/JavaScript/pi-upstream-native` 的 adapter typecheck、public exports/package 检查与 consumer 编译通过并同步 18 个 `dist` 文件；`npm run test:patched-native-session -- --pi-source /Users/cgosu/code/JavaScript/pi-upstream-native` 的 same-session 回归 1 项通过；`npm pack --ignore-scripts --dry-run --json` 为 25 个文件；`git diff --check`、`git diff --exit-code -- dist` 和 Ruby YAML parse 均通过。
+- 遗留：未实际触发远端 GitHub Actions；本机通过不等于远端工作流已验证。测试价值 review 对 4 个行为/导入图测试记录 `keep` 建议；package manifest 是配置文件，file-review 不接受其作为 implementation path，未伪报对应 review 完成。改动已创建本地中文提交，未 push。
+
 ### 2026-08-23：MCP runtime 懒加载与启动回归
 
 - 完成：拆分启动边界；`index.ts` 使用缓存的原生 `dynamic import()` 延后 MCP runtime、命令、OAuth、脚本和执行模块；prompts、namespace tools 和 direct tools 通过共享初始化回调保持首次调用行为。新增 `direct-tool-catalog.ts`、启动导入图测试和 `benchmark:startup` 命令，并将新模块加入发布清单。

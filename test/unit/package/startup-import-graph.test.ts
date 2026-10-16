@@ -22,13 +22,12 @@ const sourceFiles = new Set([
   ...collectSourceFiles(join(repoRoot, "src")),
 ]);
 
+// The native owner receives a synchronous bridge to existing keyring and bearer-token stores; OAuth flows and the legacy runtime remain deferred.
 const forbiddenStartupModules = new Set([
   "src/extension/initialization.ts",
   "src/commands/handlers.ts",
   "src/commands/onboarding-state.ts",
   "src/auth/mcp-auth-flow.ts",
-  "src/auth/mcp-auth.ts",
-  "src/auth/mcp-bearer-store.ts",
   "src/auth/mcp-oauth-provider.ts",
   "src/auth/mcp-callback-server.ts",
   "src/auth/oauth-handler.ts",
@@ -157,7 +156,7 @@ function getRuntimeClosure(graph: Map<string, Set<string>>, root: string): Set<s
 }
 
 describe("startup runtime import graph", () => {
-  it("keeps the extension startup closure free of deferred runtime modules", () => {
+  it("keeps the extension startup closure free of deferred legacy runtime modules", () => {
     const graph = buildRuntimeGraph();
     const closure = getRuntimeClosure(graph, "index.ts");
     const forbidden = [...closure].filter((fileName) => forbiddenStartupModules.has(fileName));

@@ -18,8 +18,8 @@ const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf
 };
 
 const hostPeerPackages = {
-  "@earendil-works/pi-ai": { peer: "^0.84.1", dev: "0.84.1" },
-  "@earendil-works/pi-tui": { peer: "*", dev: "0.84.1" },
+  "@earendil-works/pi-ai": { peer: "^1.2.0", dev: "1.2.0" },
+  "@earendil-works/pi-tui": { peer: "^1.2.0", dev: "1.2.0" },
   "typebox": { peer: "*", dev: "1.3.3" },
 };
 
