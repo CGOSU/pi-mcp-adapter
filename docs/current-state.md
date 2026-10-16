@@ -1,56 +1,40 @@
 # 当前状态
 
-## 进行中的 Pi 原生 MCP 迁移
+## 项目与迁移
 
-迁移任务、顺序、依赖及恢复条件见唯一详细待办 [`docs/todo.md`](todo.md)；已交付能力的完整清单与用户前置条件见 [`README.md`](../README.md) 「Required Pi host」与「Behavior changes under the native owner」。历史 `native-management-api` 源码未恢复；本轮已从固定 Pi 1.2.0 基线重建 session-scoped 原生 API（已完成、不重做），定向测试通过，`npm run check` 受基线缺失模型数据影响而未通过；实现与 adapter 契约审计见 [`docs/native-mcp-evidence.md`](native-mcp-evidence.md)。用户已确认 trust、keyring/OAuth、“暂不支持原生 2026-07-28 远程协议”与 directTools 持久化四项决策，见 [`docs/decisions.md`](decisions.md)。迁移的十二项任务已全部完成：前六项原生能力、`directTools` 持久化与面板迁移、真实同会话回归、干净基线补丁/公共产物交付、文档与 Git 收尾。早期被阻塞的旧面板任务未重试、未伪报完成，其澄清与副作用记录保留在 [`docs/session-log.md`](session-log.md)。
+- 项目：`pi-mcp-adapter`，版本 `2.27.1`；技术栈为 Node.js、TypeScript、Pi 扩展 API 和 Vitest。
+- Pi 原生 MCP 迁移的十二项工作均已完成，包括原生管理能力、配置与信任边界、系统密钥环凭据衔接、`directTools` 持久化、面板迁移、同会话回归，以及固定版本补丁和发布产物交付。唯一详细实施顺序与恢复条件见 [`docs/todo.md`](todo.md)；适配器与 Pi 原生管理 API 的对应关系见 [`docs/native-mcp-evidence.md`](native-mcp-evidence.md) 和 [`docs/native-mcp-protocol.md`](native-mcp-protocol.md)。
+- 早先因业务契约冲突而暂停的 `native-panel-status-and-live-catalog` 未重试，也未宣称完成；澄清和副作用记录保留在 [`docs/session-log.md`](session-log.md)。
 
-交付边界：adapter 的 `dist/**` 由 `npm run build:public` 在 patched Pi 1.2.0 环境下可重复生成（当前 18 个文件），发布入口为 native-only；stock Pi 1.2.0 缺少管理 API 时 adapter 显式失败，不 fallback 到旧 runtime。旧自包含 adapter 运行时对应的 `src/**` 模块仍在仓库中并由各自测试覆盖，但已不从 `dist/index.js` 可达；`mcp-script-worker.mjs` 与 `app-bridge.bundle.js` 已不再随包发布。
+## 运行与兼容边界
 
-## 项目
+- Pi 原生 MCP 运行时是唯一的连接、OAuth 和工具执行方。发布入口 `dist/index.js` 只接入原生管理方，不再启动第二套适配器运行时，也不回退到旧运行时；未打补丁的 Pi 1.2.0 缺少所需管理 API 时会明确失败。
+- 原生入口只注册 `/mcp-adapter`；Pi 自带的 `/mcp` 仍由 Pi 原生 MCP 扩展负责。
+- 保留的旧适配器运行时源码仍位于 `src/**`，并由对应测试覆盖，但不会从 `dist/index.js` 加载，也不包含在发布包中。
+- `scriptMode`、`disableProxyTool`、`autoAuth`、`trace`、`oauthDir` 和服务器级 `debug`/`trace` 在原生管理方下不生效；配置仍予保留，不会静默删除。完整用户可见边界见 [`README.md`](../README.md) 中的 “必需的 Pi 宿主版本”和“原生管理方下的行为变化” 两节。
+- Pi 上游补丁以固定基线 `06a466935536f8c9bcacb2d5efc0fc021be1bdff` 和 Pi 1.2.0 为准；补丁、清单与复现方法见 [`docs/native-mcp-patch.md`](native-mcp-patch.md)。Pi 上游工作区未提交、未推送、未发布或打标签。
 
-- 名称：`pi-mcp-adapter`
-- 技术栈：Node.js、TypeScript、Pi 扩展 API、Vitest；Pi 扩展入口仍为根目录 `index.ts`。
-- 版本：`2.27.1`；本轮发布修复版本已更新。
+## 源码、启动与发布布局
 
-## 最终源码与加载边界
+- 根目录保留 `index.ts`、`config.ts`、`metadata-cache.ts`、`types.ts`、`oauth.ts` 和 `cli.js` 作为公共兼容入口；实现位于 `src/contracts`、`src/catalog`、`src/config`、`src/runtime`、`src/auth`、`src/tools`、`src/ui`、`src/commands` 和 `src/extension`。已删除 53 个未发布的根目录转发文件；内部模块直接依赖所属领域路径，不反向依赖公共聚合入口。
+- `index.ts` 的静态依赖包括配置读取、元数据缓存、JSON Schema、工具表面、注册代码，以及原生管理方所需的同步密钥环和 bearer 令牌凭据适配层（`src/auth/mcp-auth.ts`、`src/auth/mcp-bearer-store.ts`）。OAuth 流程与提供方、命令、旧运行时工具、脚本执行和 UI 运行时仍通过缓存的 `import()` 延迟加载。
+- 有效且完全采用延迟加载模式的元数据缓存可跳过 `session_start` 的完整运行时初始化；启动时连接、保持连接、冷缓存和 `MCP_DIRECT_TOOLS` 的既有语义保留。目录索引与 `MetadataCatalogSnapshot` 会在一次目录构建或同步中复用。
+- 发布包包含五个 ESM（ECMAScript 模块）入口：包根、`types`、`config`、`metadata-cache` 和 `oauth`；Pi 扩展由 `extensions/index.js` 转发到 `dist/index.js`，命令行入口为 `dist/cli.js`。`package.json` 不发布 `src/**` 或测试目录。
+- 最新 `npm pack --ignore-scripts --dry-run --json` 检查得到 25 个文件，包含构建后的 `dist`、`mcp-keyring-helper.cjs` 和扩展入口；不包含 `src/**`、`test/**`、源代码映射文件、`mcp-script-worker.mjs` 或 `app-bridge.bundle.js`。
 
-- 根目录源码保留 `index.ts`、`config.ts`、`metadata-cache.ts`、`types.ts`、`oauth.ts` 和 `cli.js` 公共兼容入口；已删除 53 个未发布转发 facade，剩余入口不被内部领域模块反向依赖。
-- 领域实现位于 `src/contracts`、`src/catalog`、`src/config`、`src/runtime`、`src/auth`、`src/tools`、`src/ui`、`src/commands` 和 `src/extension`。
-- `index.ts` 的静态闭包保留配置读取、metadata cache、Schema、工具表面、注册代码，以及 native owner 所需的同步 keyring/bearer credential bridge（`src/auth/mcp-auth.ts`、`src/auth/mcp-bearer-store.ts`）。OAuth flows/providers、命令处理、gateway/direct 执行、script worker、UI server/runtime 仍通过缓存的原生 `dynamic import()` 按需加载。
-- 有效且全为 lazy 的 metadata cache 会跳过 `session_start` 的完整 runtime 初始化；eager、keep-alive、冷缓存和 `MCP_DIRECT_TOOLS` 语义保持。
-- `src/catalog` 的 selector index 和 `MetadataCatalogSnapshot` 在一次 catalog/sync 中复用，避免跨服务器重复扫描和重复读取缓存。
+## 测试、发布与验证结果
 
-## 测试与发布布局
+- 测试按 `test/unit`、`test/integration`、`test/node` 和 `test/fixtures` 分区；仓库根目录不保留测试文件或 `__tests__` 目录。
+- 本机 Node `v26.11.1`：构建 interactive-visualizer 示例后，`npm run test:vitest` 为 119 个测试文件、1,350 项全部通过；随后针对本轮修改的 5 个文件、34 项测试也全部通过。
+- 固定 Pi 补丁上的原生管理方定向测试为 4 个文件、57 项通过；`npm run test:public-types -- --pi-source <已打补丁的 Pi 源码目录>` 的适配器类型检查、公共产物与导出检查、声明消费者编译均通过，并同步了 18 个 `dist` 文件；`npm run test:patched-native-session -- --pi-source <已打补丁的 Pi 源码目录>` 的真实同会话测试 1 项通过。
+- `npm run test:oauth` 的 141 项测试曾全部通过；仅安装生产依赖后的临时安装、公共子路径导入和命令行冒烟检查也有通过记录。详细命令及当时的验证范围见 [`docs/session-log.md`](session-log.md)。
+- Pi 上游完整 `npm run check` 尚未通过：固定基线缺少生成的模型数据，另有与本次 MCP 改动无关的类型错误；不得把定向测试或 `--noCheck` 产物构建描述成完整上游检查通过。
+- 最终 3 次启动基准中，源码与发布包的模块导入/主流程/总耗时中位数分别为 `437/475/1128ms` 和 `199/228/754ms`，未出现可重复的 15% 以上回退；静态启动依赖检查通过。目录基准 `npm run benchmark:catalog -- --runs 5` 中，5×100、20×100、50×100 项时，direct 与 live 共用索引的测量值分别为 `4.72/4.45ms`、`18.73/17.43ms`、`45.07/45.05ms`；旧的逐服务器索引 50×100 项对照为 `989.27ms`。一万工具搜索冷启动为 `50.28ms`，5 次热运行中位数为 `5.73ms`，结果正确。
+- Windows 完整 Vitest 可能受全局配置污染、Linux 密钥环、`taskkill`、符号链接、Unix 套接字、文件权限和命令行 shebang 等平台差异影响；这些限制不代表源码布局回归，相关环境应使用针对性验证。
+- `.github/workflows/ci.yml` 已改为检出固定 Pi 基线、应用仓库补丁，再运行原生管理方测试、适配器公共类型/产物检查和同会话回归。远端 GitHub Actions 尚未运行；本机通过不能代替远端持续集成结果。
 
-- Vitest 测试按 `test/unit`、`test/integration` 分域；Node 原生测试和 package/export runner 位于 `test/node`；共享 server/worker fixture 位于 `test/fixtures`。根目录不再保留测试文件或 `__tests__` 目录。
-- `package.json` 只发布 Pi extension wrapper、构建后的 `dist`、CLI、skills 和 UI 资源，不发布 `src/**` 或测试目录。`prepack` 执行 `build:public`；tracked `dist` 可由同一脚本复现。
-- 包根及 `types`、`config`、`metadata-cache`、`oauth` 五个公共入口均解析到 ESM `dist` 文件；入口内部保留 native `dynamic import()` code-splitting。Pi 扩展默认加载 `extensions/index.js` 转发到 `dist/index.js`；CLI 仍为 `dist/cli.js`。该目录布局让 Pi 的紧凑扩展标签显示为包源名称，不再追加 `:dist`。
+## 尚待完成的交付
 
-## 最终验证状态
-
-- `npm run typecheck`、package manifest、public exports、OAuth Node tests、打包、production-only 临时安装和静态启动导入图均已执行并通过，具体结果见 [`docs/session-log.md`](session-log.md)。最近一次全量 Vitest 在构建 interactive visualizer example 后为 119 个文件、1,350 项通过。
-- 最终 source-vs-bundle 3-run fresh RPC benchmark：source 的 module/main/wall 中位数为 `437ms`/`475ms`/`1128ms`，bundle 为 `199ms`/`228ms`/`754ms`；bundle 未出现超过 15% 的可重复回退，且静态启动闭包门禁通过。
-- `npm run benchmark:catalog -- --runs 5`：5×100 direct/live shared 为 `4.72ms`/`4.45ms`，20×100 为 `18.73ms`/`17.43ms`，50×100 为 `45.07ms`/`45.05ms`；旧 per-server 50×100 对照为 `989.27ms`。
-- 10,000 工具搜索压测 cold 为 `50.28ms`，5 次 warm median 为 `5.73ms`，结果正确。
-- OAuth Node runner 为 141 个测试全部通过；本轮相关 catalog、package、startup、direct、namespace、proxy 行为集合为 10 个文件、111 个测试通过。
-- `npm pack --dry-run --json` 与 tarball 回归均确认发布包为 51 个文件（不超过 60），不含 `src/**`、`test/**`、source map 或已删除 facade；worker、keyring helper、AppBridge 资源均存在。production-only 临时安装成功，四个独立 Node subpath 入口及已安装 CLI smoke test 通过；包根入口在带 Pi `typebox` peer 的公共 exports 测试中通过。
-- 完整 Windows Vitest 仍可能受全局配置污染、Linux keyring、`taskkill`、symlink、Unix socket/file mode 和 CLI shebang 等宿主限制；相关限制不代表源码布局回归，已用针对性行为、Node、public export、静态边界和发布检查覆盖。
-
-## 未完成与交付边界
-
-- 本轮迁移的 adapter 改动已在工作区；提交与 push 结果见 [`docs/session-log.md`](session-log.md) 最新记录。tracked `dist` 由 `npm run build:public` 在 patched Pi 1.2.0 下同步；该脚本现先在 `.tmp-public-build-*` 暂存目录完成构建、全部成功后才原子替换 `dist/`，因此失败不会再损失现有生成物，但 stock Pi 1.2.0 缺少管理 API 时仍会以声明发射错误失败，重新生成发布产物请用 `npm run test:public-types -- --pi-source <patched checkout>`。
-- 未激活的 adapter 设置（`scriptMode`、`disableProxyTool`、`autoAuth`、`trace`、`oauthDir` 及 server 级 `debug`/`trace`）仍保留在配置中但不由 native owner 生效，属于有意保留的边界；详见 README。
-- `AGENTS.md` 与 `docs/clean-code.md` 已在 commit `4b7f17c` 纳入版本控制，本任务未修改它们（`git status` 无变化），也不属于本次迁移改动。
-
-## 最近一次更新
-
-- 2026-10-16：CI 保留工作流并按原生迁移前置条件调整验证：checkout 固定 Pi 1.2.0 基线、应用仓库 patch、运行上游 native owner 定向测试、patched public-type/build 检查及同会话集成测试；Vitest 中旧 runtime 回归测试显式加载保留的 `src/extension/install.ts`，package manifest expectation 同步到 Pi 1.2.0。完整本地 Vitest 为 119 个文件、1,350 项通过；GitHub Actions 尚未实际运行。
-- 2026-10-16：修复 `build:public` 在构建失败时丢失已提交 `dist/` 生成物的隐患（`7f5cfe8`，已 push）。构建改为在 `.tmp-public-build-*` 暂存目录完成后原子替换 `dist/`，失败时还原旧目录；stock Pi 1.2.0 下构建仍以声明发射错误失败，但 `dist/` 18 个文件 SHA-256 不变。唯一决定见 [`docs/decisions.md`](decisions.md)，失败路径与恢复方式见 [`docs/pitfalls.md`](pitfalls.md)，实际命令见 [`docs/session-log.md`](session-log.md)。
-- 2026-10-16：迁移已提交并 push 到 adapter 主仓库 `main`：commit `05c4a3f1023f2d0ce7458515d1782fc72370ed69`（`迁移 MCP 扩展到 Pi 1.2.0 原生管理协议`，104 个文件，仓库本地身份 CGOSU/dev@cgosu.com），远端 `origin/main` 已与本地一致（无强推、未重放）。Pi 上游未提交、未 push、未发布。真实命令与结果见 [`docs/session-log.md`](session-log.md)。
-- 2026-10-16：完成最终文档与 adapter Git 交付准备。在独立干净 checkout（`git clone --no-hardlinks`，detached `06a466935536f8c9bcacb2d5efc0fc021be1bdff`，Pi `1.2.0`，apply 前 worktree clean）上重复验证：`git apply --check` 与真实 `git apply` 均成功且得到与 manifest 一致的 48 个路径，`npm ci --ignore-scripts` 装 299 个包，4 文件/57 项 native 测试通过，`test:public-types` 与 `test:patched-native-session` 均通过并同步 18 个 `dist` 文件；patch SHA-256 与 manifest 一致。用户文档新增 patched Pi 前置条件、`/mcp` 与 `/mcp-adapter` 分工、trust/keyring/生命周期/缓存与在 native owner 下保留/不激活的功能边界；详细命令、真实结果与限制见 [`docs/session-log.md`](session-log.md)。
-- 2026-10-16：真实 patched Pi native MCP extension 与 adapter 在同一 harness session 的回归 runner 已通过；覆盖本地 fixture 的 live tool/resource/prompt catalog、执行及失败、管理刷新/读取、持久化与 session-only 策略、未信任项目拒绝、runtime registration、session reload 后旧 handle 失效，以及 adapter status v1/命令状态。runner 与实际命令、限制和详细结果见 [`docs/session-log.md`](session-log.md)。
-- 2026-10-16：用户确认「保留 directTools 选择语义并扩展原生管理 API 持久化」（唯一决定见 [`docs/decisions.md`](decisions.md)）。该决定源自暂停的 `native-panel-status-and-live-catalog`：原生 `setExecutionPolicy` 不持久化、`setToolExposure` 写的是 `toolExposure` 且被 direct 选择覆盖，与面板既有保存语义不等价。[`docs/todo.md`](todo.md) 新增任务 `native-direct-tools-persistence`（第 8 项）作为面板迁移的直接前置，后续任务顺延为 12 项；[`docs/native-mcp-protocol.md`](native-mcp-protocol.md) 新增“待实现：directTools 持久化”目标契约段。本轮只更新文档，未改生产代码、未运行测试或上游命令，源码未提交、未 push。
-- 2026-10-15：用户确认“先不支持”原生 `2026-07-28` 远程 MCP 协议；新增决定见 [`docs/decisions.md`](decisions.md)，[`docs/todo.md`](todo.md) 的传输任务协议验收改为结构化不支持（不降级、不删配置）。本轮只更新文档，未运行代码测试或上游命令，源码未提交、未 push。
-- 2026-10-14：用户确认全部推荐方案（项目级配置统一经过 Pi project-trust，未信任可展示但不连接/执行；保留 keyring 存储与既有 OAuth 登录连续性，不自动明文迁移）。两项决策已固化到 [`docs/decisions.md`](decisions.md)，[`docs/todo.md`](todo.md) 已重排为 11 项剩余任务并明确入口切换前置条件；已完成 API 不重做。本轮只更新文档，未运行代码测试或上游命令，adapter/native 源码未提交、未 push。
-- 2026-10-14：在独立固定基线 Pi 1.2.0 源码工作区重建 session-scoped 原生 MCP 管理协议；历史实现未恢复。定向测试通过，完整 check 被缺失的上游模型数据阻断。docs-commit 已完成契约审计。详见 [`docs/native-mcp-evidence.md`](native-mcp-evidence.md)、[`docs/todo.md`](todo.md) 和 [`docs/session-log.md`](session-log.md)。
-- 2026-08-31：删除宿主专属 MCP 配置探测、兼容 imports、setup 采用流程和 CLI `init`；遗留字段被忽略，标准配置层与 token CLI 保留。已完成 typecheck、定向 UI/命令/CLI 测试和 CLI 删除命令验证；发布构建与 package/public export 验证见 [`docs/session-log.md`](session-log.md)。
+- 本地 `main` 有两个尚未推送的提交，较 `origin/main` 超前 2 个：`6dcb08316ee3428eecfec956ad914826acf08219`（持续集成验证调整）及其后的文档状态记录。迁移和构建安全修复的既有提交已推送。这两个新提交尚未推送，远端持续集成仍待触发。
+- 在已打补丁的 Pi 1.2.0 环境重新生成发布文件时，使用 `npm run test:public-types -- --pi-source <已打补丁的 Pi 源码目录>`。不要在未打补丁的 Pi 1.2.0 下直接执行 `npm run build:public`；它会因缺少原生管理 API 类型而失败。构建脚本现会保留旧 `dist/`，但不会把该失败伪装为成功。详见 [`docs/pitfalls.md`](pitfalls.md)。
+- `AGENTS.md` 和 `docs/clean-code.md` 未在本轮修改。

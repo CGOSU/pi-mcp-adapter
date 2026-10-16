@@ -2,95 +2,91 @@
   <img src="banner.png" alt="pi-mcp-adapter" width="1100">
 </p>
 
-# Pi MCP Adapter
+# Pi MCP 适配器
 
-Use MCP servers with [Pi](https://github.com/badlogic/pi-mono/) without burning your context window.
+在 Pi 中使用 MCP 服务器，同时减少工具定义对上下文窗口的占用。
 
-https://github.com/user-attachments/assets/4b7c66ff-e27e-4639-b195-22c3db406a5a
+<https://github.com/user-attachments/assets/4b7c66ff-e27e-4639-b195-22c3db406a5a>
 
-## Why This Exists
+## 为什么需要它
 
-Mario wrote about [why you might not need MCP](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/). The problem: tool definitions are verbose. A single MCP server can burn 10k+ tokens, and you're paying that cost whether you use those tools or not. Connect a few servers and you've burned half your context window before the conversation starts.
+Mario 曾写过一篇文章讨论[你是否真的需要 MCP](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/)。问题在于：工具定义很冗长。一个 MCP 服务器就可能占用一万多个 token；无论是否使用这些工具，这部分成本都会一直存在。连接几个服务器后，对话甚至还没开始，上下文窗口就可能已经消耗了一半。
 
-His take: skip MCP entirely, write simple CLI tools instead.
+他的建议是完全跳过 MCP，改用简单的命令行工具。
 
-But the MCP ecosystem has useful stuff - databases, browsers, APIs. This adapter gives you access without the bloat. One proxy tool (~200 tokens) instead of hundreds. The agent discovers what it needs on-demand. Servers only start when you actually use them.
+但 MCP 生态中也有数据库、浏览器和 API 等实用工具。本适配器让 Pi 按需发现和调用这些工具，避免一开始就把所有定义塞进上下文。在旧版适配器运行时中，模型只需看到一个约 200 token 的代理工具，而不是数百个工具；服务器也只会在真正使用时启动。
 
-## Install
+## 安装
 
-```bash
-pi install npm:pi-mcp-adapter
-```
-
-For a Git checkout of the current development version:
+从 Git 仓库安装当前开发版本：
 
 ```bash
 pi install git:github.com/CGOSU/pi-mcp-adapter.git
 ```
 
-Git-based Pi installs do not compile TypeScript during the production-only dependency install. The public Node helpers are shipped as a committed build and are rebuilt automatically before npm packaging.
+通过 Git 安装的 Pi 扩展不会在仅安装生产依赖时编译 TypeScript。公共 Node 辅助入口随仓库提交了构建产物，并会在 npm 打包前重新构建。
 
-Restart Pi after installation.
+安装后重启 Pi。
 
-### Required Pi host
+### 必需的 Pi 宿主版本
 
-This version requires a **patched Pi 1.2.0** host. Stock Pi 1.2.0 does not expose the native MCP management API this adapter is built on, and the adapter does not fall back to a second runtime. Against a stock or incomplete host, `/mcp-adapter` reports `This Pi host does not expose the patched native MCP management API. Install the patched Pi 1.2.0 package; adapter runtime fallback is disabled.` and no MCP server is connected.
+此版本要求使用**应用了本仓库补丁的 Pi 1.2.0**。未打补丁的 Pi 1.2.0 没有本适配器所需的原生 MCP 管理 API；本适配器也不会回退到第二套运行时。若宿主缺少该 API，`/mcp-adapter` 会报告：`This Pi host does not expose the patched native MCP management API. Install the patched Pi 1.2.0 package; adapter runtime fallback is disabled.` 此时不会连接任何 MCP 服务器。
 
-Prerequisites and the reproducible patch workflow are documented in:
+前置条件和可复现的补丁流程见：
 
-- [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md) — fixed baseline, apply steps, native tests, and public-artifact verification;
-- [`patches/pi-1.2.0-native-mcp-management.json`](patches/pi-1.2.0-native-mcp-management.json) — machine-readable baseline, patch SHA-256, capabilities, and verified commands;
-- [`docs/native-mcp-protocol.md`](docs/native-mcp-protocol.md) — the versioned `pi.mcp-management` v1 contract.
+- [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md)：固定基线、补丁步骤、原生测试和公共产物验证；
+- [`patches/pi-1.2.0-native-mcp-management.json`](patches/pi-1.2.0-native-mcp-management.json)：基线、补丁 SHA-256、能力和已验证命令的机器可读清单；
+- [`docs/native-mcp-protocol.md`](docs/native-mcp-protocol.md)：版本化的 `pi.mcp-management` v1 契约。
 
-The fixed inputs are Pi source baseline `06a466935536f8c9bcacb2d5efc0fc021be1bdff` and `@earendil-works/pi-coding-agent` `1.2.0` (Node `>=22.19.0`). The patch adds 48 files and changes no npm dependency. Pi's built-in MCP owner remains the only connection, OAuth, and execution runtime; the adapter is an opt-in assembly plus UI over it.
+固定输入为 Pi 源码基线 `06a466935536f8c9bcacb2d5efc0fc021be1bdff` 和 `@earendil-works/pi-coding-agent` `1.2.0`（Node.js `>=22.19.0`）。补丁新增 48 个文件，不改变 npm 依赖。Pi 内置的 MCP 管理方仍是唯一的连接、OAuth 和工具执行运行时；本适配器只提供选择加入的组装接入和界面。
 
-### Entry points on a patched host
+### 打过补丁的宿主上的入口
 
-| Surface | Owned by | Purpose |
-|---------|----------|---------|
-| `/mcp` | Pi built-in | Native MCP manager: `login <server>`, `logout <server>`, `reconnect <server>`, plus the interactive enable/disable/exposure manager |
-| `/mcp-adapter` | This adapter | Enhanced panel with tool/resource search, source and trust display, direct-tool selection and save, reconnect, and sign-in |
+| 界面             | 负责方     | 用途                                                                                |
+| -------------- | ------- | --------------------------------------------------------------------------------- |
+| `/mcp`         | Pi 内置扩展 | 原生 MCP 管理：`login <server>`、`logout <server>`、`reconnect <server>`，以及交互式启用、禁用和曝光管理 |
+| `/mcp-adapter` | 本适配器    | 增强面板：搜索工具和资源、查看来源与信任状态、选择并保存直接工具、重连和登录                                            |
 
-The adapter entry registers exactly one command, `/mcp-adapter`, and no tool of its own: MCP tools, resources, and prompts are surfaced by the native owner's pipeline.
+适配器入口只注册一个命令 `/mcp-adapter`，不注册自己的工具。MCP 工具、资源和提示由 Pi 原生管理方的执行链路提供。
 
-MCP tools from adapter-managed servers keep the adapter's naming and exposure semantics: `settings.toolPrefix` / `toolPrefix` (default `server`, so `<server>_<tool>`) and native `exposure` (`codemode` by default, plus `deferred`, `direct`, `hidden`) with `toolExposure` per-tool overrides. The adapter does not register a duplicate MCP proxy or script tool. `/mcp-adapter` runs in TUI sessions; in non-TUI sessions it prints the same status as text, with a project-trust notice when project MCP sources are being withheld.
+适配器管理的 MCP 工具继续使用适配器的命名与曝光语义：`settings.toolPrefix` / `toolPrefix`（默认 `server`，命名形式为 `<server>_<tool>`），以及原生 `exposure`（默认 `codemode`，也支持 `deferred`、`direct`、`hidden`），单工具覆盖项为 `toolExposure`。适配器不会重复注册 MCP 代理工具或脚本工具。`/mcp-adapter` 在 TUI 会话中显示面板；非 TUI 会话会输出相同状态文本，并在项目 MCP 来源被信任机制屏蔽时给出提示。
 
-### Behavior changes under the native owner
+### 原生管理方下的行为变化
 
-The patched host is the only MCP runtime, so a few adapter features are retired rather than reimplemented on a second client:
+打过补丁的 Pi 是唯一 MCP 运行时。以下旧适配器功能不会在第二个客户端中重新实现：
 
-- **Retained:** config discovery, precedence, and provenance; direct-tool selection and persistence; include/exclude filtering; `toolPrefix`; search keywords; lifecycle and `idleTimeout`; per-request `requestHeadersCommand`; stdio/HTTP/socket transports; bearer tokens, `literalEnv`, and `pluginDataDir`; `approveTools`; `outputGuard`; sampling, auto-approve, and elicitation; resources and prompts; OAuth via the adapter keyring; the read-only `MCP_STATUS_EVENT` v1 snapshots; `createMcpAdapter`, `registerMcpServer`, and the five public subpaths.
-- **Not activated by the native owner:** `settings.scriptMode` / `disableProxyTool` / `autoAuth` / `trace` / `oauthDir` and the `debug`/`trace` server fields. These are left untouched in configuration and reported as retained-but-inactive instead of silently dropped; `scriptMode` and `disableProxyTool` stay off because the native owner must not gain a second MCP script or proxy execution surface, and `oauthDir` stays inactive because it must not trigger plaintext credential migration. The adapter no longer ships the `mcp-script-worker.mjs` or `app-bridge.bundle.js` runtime resources that backed the old script and MCP UI paths.
-- **Trust:** project-level sources (shared `.mcp.json`, project `.agents`/`.pi`) are gated by Pi's real project trust. In an untrusted project the servers are withheld from the live snapshot, are not connected, and `setDirectTools` refuses to write. Do not expect a self-declared trusted flag or a global rewrite to bypass this.
-- **Credentials:** the adapter's OS keyring stays the store for its own servers, reached through the native OAuth owner; the native default `mcp-auth.json` is not written by this path, and no stored token is ever migrated to plaintext.
-- **Protocol scope:** native MCP only supports Pi 1.2.0's `initialize`-era wire protocol. A configured `protocolVersion` of `2026-07-28` or `auto` is reported as a structured unsupported result before connecting, and the configuration is not rewritten.
+- **保留：** 配置发现、优先级和来源追踪；直接工具选择与持久化；包含/排除过滤；`toolPrefix`；搜索关键词；生命周期和 `idleTimeout`；逐请求 `requestHeadersCommand`；stdio/HTTP/socket 传输；Bearer token、`literalEnv` 和 `pluginDataDir`；`approveTools`；`outputGuard`；sampling、自动批准和 elicitation；资源与 prompt；通过适配器系统密钥环进行 OAuth；只读的 `MCP_STATUS_EVENT` v1 快照；`createMcpAdapter`、`registerMcpServer` 和五个公共子路径。
+- **不由原生管理方启用：** `settings.scriptMode`、`disableProxyTool`、`autoAuth`、`trace`、`oauthDir`，以及服务器级 `debug`/`trace`。这些配置保持原样，并明确作为“保留但不生效”处理，不会静默丢弃。`scriptMode` 和 `disableProxyTool` 保持关闭，避免原生管理方再增加 MCP 脚本或代理执行面；`oauthDir` 不启用，避免触发明文凭据迁移。旧脚本与 MCP UI 路径使用的 `mcp-script-worker.mjs` 和 `app-bridge.bundle.js` 不再随包发布。
+- **信任：** 项目级来源（共享 `.mcp.json`、项目 `.agents`/`.pi`）受 Pi 的真实项目可信度检查控制。项目不受信任时，服务器不会进入活动快照、不会连接，`setDirectTools` 也会拒绝写入。不能用调用方自行声明的 trusted 标记或把来源改写成全局配置来绕过此检查。
+- **凭据：** 适配器服务器的凭据继续保存在操作系统密钥环中，并通过原生 OAuth 管理方使用；此路径不会写入原生默认的 `mcp-auth.json`，也不会把已存令牌迁移到明文文件。
+- **协议范围：** 原生 MCP 仅支持 Pi 1.2.0 的 `initialize` 时代线协议。若配置 `protocolVersion: "2026-07-28"` 或 `"auto"`，连接前会返回结构化的不支持结果，且不改写配置。
 
-### Published package layout
+### 发布包布局
 
-The repository keeps the modular implementation under `src/**`; the npm package publishes the reproducible `dist/` build instead of the source tree. The build has five compatible ESM public entries:
+源码仓库将模块化实现保留在 `src/**`；npm 包发布可复现的 `dist/` 构建产物，而非源码目录。构建产物提供五个兼容的 ESM 公共入口：
 
-- `pi-mcp-adapter` — the Pi extension and SDK API (`createMcpAdapter`, `registerMcpServer`, `MCP_STATUS_EVENT`, and reference/protocol helpers)
-- `pi-mcp-adapter/types`
-- `pi-mcp-adapter/config`
-- `pi-mcp-adapter/metadata-cache`
-- `pi-mcp-adapter/oauth`
+- `pi-mcp-adapter`：Pi 扩展和 SDK API（`createMcpAdapter`、`registerMcpServer`、`MCP_STATUS_EVENT`，以及 reference/protocol helpers）；
+- `pi-mcp-adapter/types`；
+- `pi-mcp-adapter/config`；
+- `pi-mcp-adapter/metadata-cache`；
+- `pi-mcp-adapter/oauth`。
 
-The entries retain native `dynamic import()` boundaries and are emitted as code-splitting chunks, so the extension does not eagerly load the MCP connection runtime, OAuth, commands, script worker, or UI runtime. The package carries the independently loaded `mcp-keyring-helper.cjs` resource beside the chunks that resolve it. `npm run build:public` reproduces `dist/`; `prepack` runs that build before npm packaging. The published CLI is `dist/cli.js`.
+各入口保留原生 `dynamic import()` 边界，并拆分为代码块，因此扩展启动时不会急切加载 MCP 连接运行时、OAuth、命令、脚本执行或 UI 运行时。包会把独立加载的 `mcp-keyring-helper.cjs` 放在相关代码块旁。`npm run build:public` 可重新生成 `dist/`；npm 打包前的 `prepack` 会执行该构建。已发布的命令行入口为 `dist/cli.js`。
 
-> **Note:** the published extension entry is native-only (see [Required Pi host](#required-pi-host) and [Behavior changes under the native owner](#behavior-changes-under-the-native-owner)). The `src/**` modules for the older self-contained adapter runtime remain in the repository and are covered by their own tests, but they are no longer reachable from `dist/index.js`, and the `mcp-script-worker.mjs` and `app-bridge.bundle.js` runtime resources are no longer published. Sections below that describe the `mcp` proxy tool, `mcpScript`, `/mcp setup` and the other `/mcp` subcommands, or the MCP UI bridge document that older implementation rather than the current Pi extension entry.
+> **注意：** 当前已发布扩展入口只接入原生 MCP 管理方（见[必需的 Pi 宿主版本](#必需的-pi-宿主版本)和[原生管理方下的行为变化](#原生管理方下的行为变化)）。仓库仍保留旧的自包含适配器运行时源码并由其专属测试覆盖，但它已无法从 `dist/index.js` 到达；`mcp-script-worker.mjs` 和 `app-bridge.bundle.js` 也不再发布。下文若提到 `mcp` 代理工具、`mcpScript`、`/mcp setup`、其他旧 `/mcp` 子命令或 MCP UI bridge，描述的是仓库中保留的旧实现，不代表当前 Pi 扩展入口提供这些功能。
 
-## What happens on first run
+## 首次运行时会发生什么
 
-The adapter reads standard MCP files automatically. No extra setup needed if you already have them.
+适配器会自动读取标准 MCP 配置文件。如果你已经有这些文件，无需额外设置。
 
-| You already have... | What happens |
-|---------------------|--------------|
-| `.mcp.json` or `~/.config/mcp/mcp.json` | Pi uses it immediately. The first time you open `/mcp`, you'll see a short heads-up explaining which file Pi detected and that Pi only writes adapter-specific overrides to its own files. |
-| Nothing configured yet | Run `/mcp setup` to scaffold a minimal `.mcp.json`, add a curated known server, or quick-add RepoPrompt. |
+| 现有配置                                   | 处理方式                                                                                 |
+| -------------------------------------- | ------------------------------------------------------------------------------------ |
+| `.mcp.json` 或 `~/.config/mcp/mcp.json` | Pi 会立即读取。首次打开 `/mcp` 时会简要说明检测到的文件，以及 Pi 只会把适配器专用覆盖项写入 Pi 自己的配置文件。                    |
+| 尚未配置                                   | 旧版 `/mcp setup` 可创建最简 `.mcp.json`、添加精选服务器或快速添加 RepoPrompt；当前原生入口以 Pi 自带 `/mcp` 管理为准。 |
 
-## Quick Start
+## 快速开始
 
-Preferred project config: `.mcp.json`
+推荐的项目配置文件：`.mcp.json`
 
 ```json
 {
@@ -103,16 +99,16 @@ Preferred project config: `.mcp.json`
 }
 ```
 
-Preferred user-global shared config: `~/.config/mcp/mcp.json`. Pi also reads the tool-agnostic global paths `~/.agents/mcp.json` and `~/.agents/mcp/mcp.json`.
+推荐的用户全局共享配置：`~/.config/mcp/mcp.json`。Pi 也会读取工具无关的全局路径 `~/.agents/mcp.json` 和 `~/.agents/mcp/mcp.json`。
 
-Pi also reads Pi-owned override files:
+Pi 还会读取 Pi 自己的覆盖文件：
 
-- `<Pi agent dir>/mcp.json` — Pi global override (`~/.pi/agent/mcp.json` by default)
-- `.pi/mcp.json` — Pi project override
+- `<Pi agent dir>/mcp.json`：Pi 全局覆盖项（默认是 `~/.pi/agent/mcp.json`）；
+- `.pi/mcp.json`：Pi 项目覆盖项。
 
-The adapter reads only the standard MCP sources listed above and these Pi-owned overrides. Unknown legacy fields such as `imports` and `settings.hostConfigDiscovery` are ignored.
+适配器只读取上述标准 MCP 来源和 Pi 自己的覆盖文件。`imports`、`settings.hostConfigDiscovery` 等未知旧字段会被忽略。
 
-Precedence is:
+优先级从低到高为：
 
 1. `~/.config/mcp/mcp.json`
 2. `~/.agents/mcp.json`
@@ -121,51 +117,59 @@ Precedence is:
 5. `.mcp.json`
 6. `.pi/mcp.json`
 
-`/mcp disable <server>` and `/mcp enable <server>` persist only the `disabled` field in the project-local `.pi/mcp.json`, which is the highest-precedence Pi layer. Enabling removes the project flag when lower layers are enabled, or writes `false` when needed to override a disabled lower source. This applies even when the effective server came from a shared global/project file, an imported host config, or `configPath`; the source file is never rewritten and credentials are never copied. Run `/reload` after changing the flag so registered tool surfaces are refreshed. The manual equivalent is to add `{ "disabled": true }` to a server in any normal MCP config. Supplied in-memory `createMcpAdapter({ config })` configurations are isolated and do not read or write this project override; the commands are unavailable in that mode.
+旧版 `/mcp disable <server>` 和 `/mcp enable <server>` 只会把 `disabled` 字段写入项目级 `.pi/mcp.json`，它是优先级最高的 Pi 配置层。若较低层已启用，启用操作会移除项目覆盖；若较低层禁用了服务器，则必要时写入 `false` 进行覆盖。操作不会改写共享配置文件，也不会复制凭据。修改后运行 `/reload`，刷新已注册的工具界面。手动操作时，可在任意标准 MCP 配置的服务器条目中设置 `{ "disabled": true }`。通过 `createMcpAdapter({ config })` 提供的内存配置彼此隔离，不会读取或写入此项目覆盖；这种模式下也没有这些命令。
 
-Servers are **lazy by default** — they won't connect until you actually call one of their tools. The adapter caches tool metadata so search and describe work without live connections.
+服务器默认采用 lazy（按需连接）模式：只有实际调用工具时才连接。适配器会缓存工具元数据，因此即使没有实时连接，也可以搜索和描述工具。
 
-When a valid metadata cache covers only lazy servers, the extension also defers importing its full MCP runtime during `session_start`; the first MCP operation pays that one-time runtime-load and connection cost. Eager and keep-alive servers, empty or invalid caches, and explicit direct-tool startup retain their existing initialization behavior. This moves startup work later—it does not make the connection cost disappear.
+当有效元数据缓存只覆盖 lazy 服务器时，扩展也会在 `session_start` 阶段延迟导入完整 MCP 运行时；第一次 MCP 操作才承担一次性的运行时加载和连接成本。eager、keep-alive、空缓存或无效缓存，以及显式直接工具启动仍保留原有初始化行为。这只是把启动工作推迟，并不会消除连接成本。
 
-```
+以下示例描述旧运行时中的 `mcp` 代理工具；当前原生入口不注册该工具：
+
+```js
 mcp({ search: "screenshot" })
 ```
-```
-chrome_devtools_take_screenshot
-  Take a screenshot of the page or element.
 
-  Parameters:
-    format (enum: "png", "jpeg", "webp") [default: "png"]
-    fullPage (boolean) - Full page instead of viewport
+旧代理工具可能返回如下工具说明：
+
+```text
+chrome_devtools_take_screenshot
+  对页面或元素截图。
+
+  参数：
+    format (enum: "png", "jpeg", "webp") [默认: "png"]
+    fullPage (boolean) - 截取整页，而非当前视口
 ```
-```
+
+旧运行时的调用形式：
+
+```js
 mcp({ tool: "chrome_devtools_take_screenshot", args: { format: "png" } })
 ```
 
-`args` can be a JSON object or a JSON string. Prefer the object form when your model handles it reliably; the string form remains supported for providers that need simpler schemas.
+`args` 可以是 JSON 对象或 JSON 字符串。若模型能稳定处理，优先使用对象；对需要更简单 schema 的提供方，仍支持字符串形式。
 
-Two calls instead of 26 tools cluttering the context.
+这样可用两次代理调用代替把 26 个工具定义都放入上下文。
 
-## Config
+## 配置
 
-### File Layout
+### 配置文件布局
 
-Use the shared MCP files when you want one setup to work across hosts, and Pi-owned files when you need Pi-specific overrides or settings.
+希望多种宿主共享设置时使用共享 MCP 文件；需要 Pi 专属覆盖项时使用 Pi 自己的配置文件。
 
-| File | Purpose |
-|------|---------|
-| `~/.config/mcp/mcp.json` | User-global shared MCP config |
-| `~/.agents/mcp.json` | User-global tool-agnostic MCP config |
-| `~/.agents/mcp/mcp.json` | User-global tool-agnostic MCP config |
-| `.mcp.json` | Project-local shared MCP config |
-| `<Pi agent dir>/mcp.json` | Pi global override (`~/.pi/agent/mcp.json` by default) |
-| `.pi/mcp.json` | Pi project override |
+| 文件                        | 用途                                  |
+| ------------------------- | ----------------------------------- |
+| `~/.config/mcp/mcp.json`  | 用户全局共享 MCP 配置                       |
+| `~/.agents/mcp.json`      | 用户全局、与工具无关的 MCP 配置                  |
+| `~/.agents/mcp/mcp.json`  | 用户全局、与工具无关的 MCP 配置                  |
+| `.mcp.json`               | 项目本地共享 MCP 配置                       |
+| `<Pi agent dir>/mcp.json` | Pi 全局覆盖项（默认 `~/.pi/agent/mcp.json`） |
+| `.pi/mcp.json`            | Pi 项目覆盖项                            |
 
-Pi-specific files are the write targets for shared global servers when Pi needs to persist adapter-only settings such as `directTools`.
+当 Pi 需要保存 `directTools` 等适配器专用设置时，共享全局服务器的 Pi 专属写入目标是 Pi 自己的配置文件。
 
 ### Agent Plugins
 
-The adapter can load MCP servers from [Agent Plugins](https://agent-plugins.org/) packages when you list plugin directories in `settings.agentPluginPaths`:
+可在 `settings.agentPluginPaths` 中列出 Agent Plugins 包目录，让适配器从这些包加载 MCP 服务器：
 
 ```json
 {
@@ -176,13 +180,13 @@ The adapter can load MCP servers from [Agent Plugins](https://agent-plugins.org/
 }
 ```
 
-Each directory must contain a valid Agent Plugins 1.0 `plugin.json`. If it also has a root `mcp.json`, the adapter loads its `mcpServers` entries and prefixes them as `<plugin>__<server>`. The loader uses the Agent Plugins transport declared by each server `type` and skips invalid entries without blocking other servers. For stdio plugin servers, `${PLUGIN_ROOT}` and `${PLUGIN_DATA}` are expanded only in `args`, `env`, and `cwd`; the adapter sets both variables for the child process and stores plugin data under the Pi agent directory.
+每个目录必须包含有效的 Agent Plugins 1.0 `plugin.json`。若目录根部还有 `mcp.json`，适配器会读取其中的 `mcpServers` 并将服务器名改为 `<plugin>__<server>`。加载器按服务器的 `type` 使用 Agent Plugins 声明的传输类型；无效条目会被跳过，不影响其他服务器。对于 stdio 插件服务器，只会在 `args`、`env` 和 `cwd` 中展开 `${PLUGIN_ROOT}` 与 `${PLUGIN_DATA}`；适配器会为子进程设置这两个变量，并将插件数据保存在 Pi agent 目录下。
 
-Agent Plugins is a portable package format. Native Pi MCP config remains `.mcp.json`, `~/.config/mcp/mcp.json`, and Pi-owned overrides.
+Agent Plugins 是可移植的包格式。Pi 原生 MCP 配置仍使用 `.mcp.json`、`~/.config/mcp/mcp.json` 和 Pi 自己的覆盖文件。
 
-### Pi package manifests
+### Pi 包清单
 
-A Pi package can ship MCP servers for the installed adapter without requiring a separate MCP config file. Declare a package-relative config in its `package.json`:
+Pi 包可以为已安装的适配器提供 MCP 服务器，无需另建 MCP 配置文件。可在包的 `package.json` 中声明相对路径：
 
 ```json
 {
@@ -192,11 +196,11 @@ A Pi package can ship MCP servers for the installed adapter without requiring a 
 }
 ```
 
-`pi.mcp` can also be an array of package-relative paths. Each file uses the normal `mcpServers` object shape, but package manifests load only server entries; package `settings` are ignored. Server names are prefixed with the sanitized package name, such as `acme_tools__docs`, and user/global/project MCP config has higher precedence. The adapter loads only Pi packages listed in Pi settings; it does not scan `node_modules`.
+`pi.mcp` 也可以是包内相对路径数组。文件采用标准 `mcpServers` 对象格式，但包清单只加载服务器条目，忽略包内 `settings`。服务器名会加上经过净化的包名作为前缀，例如 `acme_tools__docs`；用户、全局和项目 MCP 配置优先级更高。适配器只加载 Pi 设置中列出的 Pi 包，不扫描 `node_modules`。
 
-### Runtime registration from other extensions
+### 由其他扩展动态注册
 
-An extension can register MCP servers with the installed adapter at runtime, for example a plugin host that discovers plugins after load:
+扩展可以在运行时向已安装的适配器注册 MCP 服务器，例如在加载后才发现插件的插件宿主：
 
 ```ts
 import { registerMcpServer } from "pi-mcp-adapter";
@@ -209,16 +213,16 @@ export default function pluginHost(pi) {
       url: "https://mcp.example.com/mcp",
     },
   });
-  // Later, when the plugin is uninstalled:
+  // 稍后在卸载插件时：
   await registration.dispose();
 }
 ```
 
-Runtime registrations are session scoped and never written to config files. Duplicate server names fail closed against configured servers and other registrations. Registered servers use the normal lazy connection, OAuth, approval, and shutdown behavior, but they are proxy-tool-only and their tools become visible at the next tool sync. To change a definition, dispose the registration and register again. Registration throws when no adapter is installed for the given Pi instance.
+动态注册只对当前会话有效，不会写入配置文件。若服务器名与配置项或其他注册重复，会安全失败。注册服务器沿用普通的按需连接、OAuth、审批和关闭行为；其工具会在下一次工具同步时出现。若要更改定义，先 dispose 再重新注册。当前 Pi 实例没有安装适配器时，注册会抛出错误。
 
-### SDK configuration
+### SDK 配置
 
-Use `createMcpAdapter` when an SDK or server integration already owns its MCP configuration:
+若 SDK 或服务器集成已经负责提供 MCP 配置，可使用 `createMcpAdapter`：
 
 ```ts
 import { createMcpAdapter } from "pi-mcp-adapter";
@@ -234,16 +238,16 @@ const extension = createMcpAdapter({
   },
 });
 
-// Register `extension` with the host SDK.
+// 将 `extension` 注册到宿主 SDK。
 ```
 
-The published package exposes built ESM entries, so standalone Node consumers can import the public helpers without a TypeScript loader. The repository's root `.ts` files remain source-compatibility entries for local development; the Pi package and npm exports resolve to `dist/`.
+已发布的包提供构建好的 ESM 入口，因此独立 Node.js 消费者无需 TypeScript 加载器即可导入公共辅助函数。仓库根目录的 `.ts` 文件仍作为本地开发时的源码兼容入口；Pi 扩展和 npm exports 均解析到 `dist/`。
 
-A supplied `config` is a complete, isolated snapshot. It is not merged with files, imports, global config, project config, or `--mcp-config`, and it is never mutated. Each adapter factory and session receives its own clone, so separate integrations can use different servers and settings safely. In this mode, server status, reconnect, explicit `/mcp-auth <server>`, proxy calls, and direct tools continue to work; setup and no-argument auth/status panels report the limitation instead of discovering or writing ambient config.
+传入的 `config` 是完整且隔离的配置快照，不会与文件、imports、全局配置、项目配置或 `--mcp-config` 合并，也不会被修改。每个适配器工厂和会话都会获得自己的副本，因此不同集成可以安全使用不同的服务器与设置。在该模式下，服务器状态、重连、明确指定服务器的 `/mcp-auth <server>`、代理调用和直接工具仍可使用；设置向导以及无参数认证/状态面板会明确报告配置隔离限制，不会擅自发现或写入环境配置。
 
-With `configPath` and no `config`, the adapter keeps normal file merge behavior, and that path takes precedence over argv and `--mcp-config`. The default export keeps the normal file-based behavior. OAuth credentials are stored in the operating system credential store and keyed by the configured server name; URL binding prevents credentials from being accepted for a different server URL. `settings.oauthDir` and `MCP_OAUTH_DIR` are used only as legacy plaintext import locations for older `tokens.json` files, not as credential namespaces. CSRF state and PKCE verifiers are flow-local, so concurrent authorization flows do not share transient secrets.
+只传 `configPath` 而不传 `config` 时，适配器仍按普通文件规则合并配置，且该路径优先于 argv 和 `--mcp-config`。默认导出仍采用普通文件配置。OAuth 凭据保存在操作系统凭据存储中，并按服务器名索引；URL 绑定可防止凭据被用于不同的服务器地址。`settings.oauthDir` 和 `MCP_OAUTH_DIR` 仅用作旧版 `tokens.json` 明文文件的导入位置，不是凭据命名空间。CSRF 状态和 PKCE verifier 属于单独的认证流程，并发流程不会共享临时秘密。
 
-Cooperating Pi extensions can use `pi-mcp-adapter/oauth` to reuse URL-bound OAuth tokens without deep-importing private files:
+协作扩展可以导入 `pi-mcp-adapter/oauth`，按 URL 复用 OAuth token，而不必深层导入私有文件：
 
 ```ts
 import { getMcpOAuthTokensForUrl, updateMcpOAuthTokensForUrl } from "pi-mcp-adapter/oauth";
@@ -252,27 +256,27 @@ const tokens = await getMcpOAuthTokensForUrl("jira", "https://jira.example.com/m
 updateMcpOAuthTokensForUrl("jira", "https://jira.example.com/mcp", { accessToken: "..." });
 ```
 
-The public subpath exposes only token read/update helpers plus a status helper. The async read path uses the adapter's refresh logic before it returns tokens. The helpers keep secure-store storage, URL binding, refresh persistence, chunk handling, legacy import, and fail-closed credential-store errors. They do not expose client registration secrets, PKCE verifiers, or OAuth state.
+该公共子路径只暴露 token 读取/更新和状态查询辅助函数。异步读取会先运行适配器的刷新逻辑。辅助函数负责安全存储、URL 绑定、刷新持久化、分块处理、旧格式导入，以及在凭据存储不可用时安全失败；不会暴露客户端注册秘密、PKCE verifier 或 OAuth state。
 
-### Runtime status snapshots
+### 运行时状态快照
 
-Extensions can subscribe to the adapter's versioned shared event-bus channel instead of parsing `/mcp` or `mcp({})` output:
+扩展可以订阅版本化共享事件通道，而不必解析 `/mcp` 或 `mcp({})` 的文本输出：
 
 ```ts
 import { MCP_STATUS_EVENT, type McpStatusSnapshot } from "pi-mcp-adapter";
 
 pi.events.on(MCP_STATUS_EVENT, (snapshot) => {
   const status = snapshot as McpStatusSnapshot;
-  // status.servers contains connected, cached, failed, needs-auth,
-  // not-connected, or disabled entries.
+  // status.servers 包含 connected、cached、failed、needs-auth、
+  // not-connected 或 disabled 状态的条目。
 });
 ```
 
-The snapshot is read-only machine-readable data with copied per-server entries. It includes `totalTools`, `totalResources`, `connectedCount`, and `disabledCount`; each server includes `name`, `status`, `toolCount`, and `disabled`, with `resourceCount` when known and `failedAgoSeconds` only for an active failure. Reading status never connects a lazy server, starts authentication, or exposes SDK clients, transports, credentials, or server definitions. An initial snapshot is emitted after initialization, updates are emitted for status and metadata changes, and an empty snapshot is emitted when the session shuts down. Initialization withholds that first snapshot until authoritative metadata has been reconciled into Pi's active direct-tool registry. A `connected` snapshot therefore follows model-facing tool-surface synchronization, including removal of stale cached tools when the authoritative catalog is empty.
+快照是只读、机器可读的数据，每台服务器的条目均为副本。快照包含 `totalTools`、`totalResources`、`connectedCount` 和 `disabledCount`；每台服务器包含 `name`、`status`、`toolCount` 和 `disabled`，已知时还包含 `resourceCount`，仅在失败仍有效时包含 `failedAgoSeconds`。读取状态不会连接按需启动的服务器、开始认证，也不会暴露 SDK client、transport、凭据或服务器定义。初始化后会发布首个快照；状态或元数据变化时会发布更新；会话关闭时会发布空快照。初始化会等权威元数据同步到 Pi 当前直接工具注册表后，才发布首个快照。因此 `connected` 状态表示面向模型的工具界面已经同步，包括权威目录为空时撤下过期缓存工具。
 
-In the configuration examples below, `30000` is illustrative only. If `requestTimeoutMs` is omitted or set to `<= 0`, the MCP SDK default timeout is used.
+下方配置示例中的 `30000` 仅为说明用途。省略 `requestTimeoutMs` 或将其设为 `<= 0` 时，使用 MCP SDK 默认超时。
 
-### Server Options
+### 服务器选项
 
 ```json
 {
@@ -288,63 +292,62 @@ In the configuration examples below, `30000` is illustrative only. If `requestTi
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| `command` | Executable for stdio transport; mutually exclusive with `url` and `socket` |
-| `args` | Command arguments |
-| `socket` | Explicit `rmcp-mux` Unix-domain socket path; supports `${VAR}`, `$env:VAR`, and `~` expansion and is mutually exclusive with `command` and `url` |
-| `env` | Environment variables; supports `${VAR}` and `$env:VAR` interpolation. A value beginning with `!` runs a command when the stdio server connects; use `!!` for a literal leading `!`. |
-| `cwd` | Working directory; supports `${VAR}`, `$env:VAR`, and `~` expansion |
-| `url` | HTTP endpoint (StreamableHTTP with SSE fallback); supports raw `${VAR}` and `$env:VAR` interpolation, and missing URL variables fail before any request is sent |
-| `headers` | HTTP headers; supports `${VAR}` and `$env:VAR` interpolation. A value beginning with `!` runs a command when the HTTP server connects or OAuth authenticates; use `!!` for a literal leading `!`. |
-| `requestHeadersCommand` | Trusted executable run for every HTTP request. It receives a versioned JSON envelope containing `method`, `url`, and the exact `bodyBase64` on stdin, and must return a JSON object of headers on stdout. `command`, `args`, and `env` support environment interpolation. Use for caller-bound request signatures; failures stop the request. |
-| `auth` | `"bearer"` or `"oauth"` |
-| `oauth.grantType` | `"authorization_code"` (default) or `"client_credentials"` for non-interactive machine auth |
-| `oauth.clientId` | Pre-registered OAuth client ID. MCP 2026 prefers pre-registered clients or Client ID Metadata Documents; this adapter falls back to Dynamic Client Registration when the ID is omitted and the server supports it. |
-| `oauth.clientSecret` | OAuth client secret for confidential clients; a value beginning with `!` runs a command when OAuth authenticates, while `!!` escapes a literal leading `!` |
-| `oauth.scope` | Requested OAuth scopes |
-| `oauth.redirectUri` | Exact localhost redirect URI for browser OAuth, including port and path, for providers that pre-register callbacks |
-| `oauth.clientName` | Client display name advertised during Dynamic Client Registration fallback |
-| `oauth.clientUri` | Client homepage URI advertised during Dynamic Client Registration fallback. Defaults to `piConfig.clientUri` from the host's manifest when set, and is omitted rather than guessed under a rebranded host |
-| `oauth.logoUri` | Client logo URL advertised during Dynamic Client Registration fallback (RFC 7591 `logo_uri`). Must be an absolute `http(s)` URL — consent screens fetch it server-side, so local paths render nothing. Omitted from the registration request when unset |
-| `oauth.skipIssuerMetadataValidation` | `true` disables the OAuth authorization-server metadata issuer check for this server. This weakens OAuth mix-up protection and should only be used for known-misconfigured internal servers while their metadata is being fixed. |
-| `bearerToken` / `bearerTokenEnv` | Token or env var name; `bearerToken` supports `${VAR}` and `$env:VAR` interpolation. A leading `!` in `bearerToken` runs a command when the HTTP server connects; use `!!` for a literal leading `!`. |
-| `bearerTokenStore` | Set to `true` to read a static bearer token from the adapter-owned OS credential store when `auth` is `"bearer"` and no `bearerToken` or `bearerTokenEnv` is configured. Stored records are keyed only by the server name, bind to the resolved server URL, and are never named by config. Store a token with `pi-mcp-adapter token set <server>`, which reads it from a masked prompt or stdin pipe and never from an argument. `/mcp token status <server>` and `/mcp token remove <server>` manage non-secret state inside Pi; `/mcp token set` stays disabled until Pi exposes masked secret input. |
-| `lifecycle` | `"lazy"` (default), `"eager"`, `"keep-alive"`, or `"lazy-keep-alive"` |
-| `idleTimeout` | Minutes before idle disconnect (overrides global) |
-| `requestTimeoutMs` | Request timeout in milliseconds for live MCP calls (overrides global; if omitted or `<= 0`, the MCP SDK default timeout is used) |
-| `protocolVersion` | `"legacy"` (default), `"auto"`, or `"2026-07-28"`; modern negotiation is opt-in |
-| `exposeResources` | Expose MCP resources as tools (default: true) |
-| `directTools` | `true`, `string[]`, or `false` — register tools individually instead of through proxy |
-| `toolPrefix` | Override global `settings.toolPrefix` for this server (`"server"`, `"short"`, `"none"`, or `"mcp"`) |
-| `includeTools` | `string[]` of tool names or glob patterns to expose (matches original names like `get_screenshot`, generated resource names like `read_figjam`, and prefixed names like `figma_get_screenshot`) |
-| `excludeTools` | `string[]` of tool names or glob patterns to hide (applied after `includeTools`) |
-| `searchKeywords` | `{ "tool-or-glob": ["keyword", ...] }` — extra keywords that boost `mcp({ search })` ranking for matching tools; never shown to the model |
-| `debug` | Show server stderr (default: false) |
-| `trace` | Enable metadata-only JSONL protocol tracing for this server; payloads, prompts, tool arguments/results, authorization data, and URLs are never persisted |
-| `disabled` | Keep the server visible in config and status, but prevent connections, authentication, tools, and resource calls (only literal `true` disables it) |
 
-#### Protocol version negotiation
+| 字段 | 说明 |
+| --- | --- |
+| `command` | stdio 传输使用的可执行程序；不能与 `url` 或 `socket` 同时设置。 |
+| `args` | 命令行参数。 |
+| `socket` | 显式指定的 `rmcp-mux` Unix domain socket 路径；支持 `${VAR}`、`$env:VAR` 和 `~` 展开，且不能与 `command` 或 `url` 同时设置。 |
+| `env` | 环境变量；支持 `${VAR}` 和 `$env:VAR` 插值。值以 `!` 开头时，会在 stdio 服务器连接时执行命令；用 `!!` 表示字面量开头的 `!`。 |
+| `cwd` | 工作目录；支持 `${VAR}`、`$env:VAR` 和 `~` 展开。 |
+| `url` | HTTP 端点（Streamable HTTP，必要时回退 SSE）；支持原样 `${VAR}` 和 `$env:VAR` 插值。URL 变量缺失时会在发送请求前失败。 |
+| `headers` | HTTP 请求头；支持 `${VAR}` 和 `$env:VAR` 插值。值以 `!` 开头时，会在 HTTP 服务器连接或 OAuth 认证时执行命令；用 `!!` 表示字面量 `!`。 |
+| `requestHeadersCommand` | 每次 HTTP 请求都会执行的可信命令。stdin 接收包含 `method`、`url` 和精确 `bodyBase64` 的版本化 JSON envelope；stdout 必须返回 JSON 请求头对象。`command`、`args` 和 `env` 支持环境变量插值。可用于绑定调用内容的请求签名；命令失败会中止请求。 |
+| `auth` | `"bearer"` 或 `"oauth"`。 |
+| `oauth.grantType` | `"authorization_code"`（默认）或用于非交互机器认证的 `"client_credentials"`。 |
+| `oauth.clientId` | 预注册 OAuth 客户端 ID。MCP 2026 优先使用预注册客户端或 Client ID Metadata Document；若未提供 ID 且服务器支持，旧运行时会回退到动态客户端注册。 |
+| `oauth.clientSecret` | 保密客户端的 OAuth client secret。值以 `!` 开头时，会在 OAuth 认证时执行命令；用 `!!` 表示字面量 `!`。 |
+| `oauth.scope` | 请求的 OAuth scope。 |
+| `oauth.redirectUri` | 浏览器 OAuth 使用的精确 localhost 回调地址，包括端口和路径；用于提供方要求预注册回调的场景。 |
+| `oauth.clientName` | 动态客户端注册回退时向服务器公布的客户端显示名称。 |
+| `oauth.clientUri` | 动态客户端注册回退时公布的客户端主页。若宿主清单配置了 `piConfig.clientUri`，默认使用该值；若宿主已重新命名而未提供该字段，则省略，不猜测。 |
+| `oauth.logoUri` | 动态客户端注册回退时公布的客户端 logo URL（RFC 7591 `logo_uri`）。必须是绝对 `http(s)` URL；同意页由服务端抓取，提供本地路径不会显示图片。未设置时不发送该字段。 |
+| `oauth.skipIssuerMetadataValidation` | 设为 `true` 可跳过该服务器的 OAuth authorization-server metadata issuer 校验。这会削弱 OAuth mix-up 防护，只应临时用于已知配置错误且正在修复的内部服务器。 |
+| `bearerToken` / `bearerTokenEnv` | token 或环境变量名；`bearerToken` 支持 `${VAR}` 和 `$env:VAR` 插值。值以 `!` 开头时，会在 HTTP 服务器连接时执行命令；用 `!!` 表示字面量 `!`。 |
+| `bearerTokenStore` | 设为 `true` 时，若 `auth` 为 `"bearer"` 且未配置 `bearerToken` 或 `bearerTokenEnv`，从适配器自己的操作系统凭据存储读取静态 Bearer token。记录只按服务器名索引、绑定解析后的服务器 URL，绝不以配置内容命名。使用 `pi-mcp-adapter token set <server>` 保存；可从遮蔽输入提示或 stdin 管道读取 token，绝不从命令参数读取。Pi 内可用 `/mcp token status <server>` 和 `/mcp token remove <server>` 管理非秘密状态；Pi 提供遮蔽秘密输入前，`/mcp token set` 保持禁用。 |
+| `lifecycle` | `"lazy"`（默认）、`"eager"`、`"keep-alive"` 或 `"lazy-keep-alive"`。 |
+| `idleTimeout` | 空闲断开前等待的分钟数（覆盖全局值）。 |
+| `requestTimeoutMs` | 实时 MCP 调用的超时毫秒数（覆盖全局值；省略或 `<= 0` 时使用 MCP SDK 默认值）。 |
+| `protocolVersion` | 旧适配器运行时曾支持 `"legacy"`（默认）、`"auto"` 或 `"2026-07-28"`。当前 Pi 原生管理方不支持后两者，见下方“当前协议支持范围”。 |
+| `exposeResources` | 是否将 MCP 资源作为工具暴露（默认 `true`）。 |
+| `directTools` | `true`、`string[]` 或 `false`：逐个注册工具，而不是仅通过代理访问。 |
+| `toolPrefix` | 覆盖该服务器的全局 `settings.toolPrefix`（`"server"`、`"short"`、`"none"` 或 `"mcp"`）。 |
+| `includeTools` | 要暴露的工具名或 glob 模式数组；匹配原始名（如 `get_screenshot`）、生成的资源工具名（如 `read_figjam`）和带前缀名称（如 `figma_get_screenshot`）。 |
+| `excludeTools` | 要隐藏的工具名或 glob 模式数组；在 `includeTools` 之后应用。 |
+| `searchKeywords` | `{ "tool-or-glob": ["keyword", ...] }`：为匹配工具增加搜索关键词，以提高 `mcp({ search })` 排名；不会显示给模型。 |
+| `debug` | 是否显示服务器 stderr（默认 `false`）。 |
+| `trace` | 是否为该服务器启用仅记录元数据的 JSONL 协议追踪；不保存 payload、prompt、工具参数/结果、认证信息或 URL。 |
+| `disabled` | 服务器仍显示在配置和状态中，但禁止连接、认证、工具和资源调用；仅字面量 `true` 会禁用服务器。 |
 
-The adapter defaults to `protocolVersion: "legacy"`. Omitting the field uses the classic MCP initialize sequence without `server/discover` or 2026 headers, preserving compatibility with deployed 2025-era servers.
+#### 当前协议支持范围
 
-Use `"auto"` to probe for MCP 2026-07-28 and conservatively fall back to the classic handshake when the server provides legacy evidence. Set it for Cloudflare Workers `createMcpHandler` and other MCP SDK v2 stateless servers. The adapter keeps `"legacy"` as the global default for compatibility. For stdio servers, the SDK probes with a short-lived sibling process before starting the session process, so each fresh auto connection adds one process spawn and can wait for the configured request timeout. Explicit Unix sockets are custom transports and probe in place. HTTP auto negotiation uses the actual Streamable HTTP connection; the adapter falls back to legacy SSE only when the endpoint definitively rejects Streamable HTTP (for example 404/405/406/415), never for authentication failures, cancellation, timeouts, or server errors.
+当前发布入口使用 Pi 1.2.0 的原生 MCP client，只支持 `initialize` 时代线协议。未设置 `protocolVersion` 时按 Pi 原生默认行为处理。若明确设置 `"2026-07-28"`，或设置 `"auto"` 而需要协商现代协议，适配器会在连接或执行前返回结构化“不支持”结果；不会静默回退到旧协议，也不会改写配置。
 
-Use `"2026-07-28"` to pin that revision. Pinning has no legacy or SSE fallback and fails if the server does not offer the requested version.
+以下内容仅描述仓库保留的旧适配器运行时，不适用于当前 Pi 原生扩展入口：旧版本可选择 `"auto"` 探测 MCP 2026-07-28，再根据服务器证据回退到经典握手；也可显式固定为 `"2026-07-28"`，此时不回退到 legacy 或 SSE。
 
-The stable SDK handles era-specific request envelopes, result decoding, list-changed subscriptions, cancellation, and multi-round-trip sampling/elicitation. The adapter keeps strict OAuth issuer validation in every mode. Adapter-level roots support, standard MCP logging presentation, and configuration/UI for protocol cache hints are not yet implemented.
+在旧运行时中，SDK 负责不同时代的请求封套、结果解码、list-changed 订阅、取消、多轮 sampling/elicitation。适配器仍严格校验 OAuth issuer。适配器级 roots、标准 MCP logging 展示，以及协议缓存提示的配置/UI 尚未实现。
 
-For pre-registered browser OAuth clients, set `oauth.redirectUri` to the exact callback registered with the provider, for example `"http://localhost:3118/callback"`. Dynamic clients normally omit it and use a lazy OS-assigned localhost callback port.
+预注册的浏览器 OAuth 客户端应将 `oauth.redirectUri` 设置为提供方登记的精确回调地址，例如 `"http://localhost:3118/callback"`。动态客户端通常省略该字段，并使用操作系统分配的 localhost 端口。
 
-If an internal authorization server publishes mismatched OAuth metadata and cannot be fixed immediately, set `oauth.skipIssuerMetadataValidation: true` on that server only. This is security-weakening. It disables the RFC 8414 issuer echo check and should not be used for public or untrusted servers.
+若内部 authorization server 发布了不匹配的 OAuth metadata 且暂时无法修复，可只对该服务器设置 `oauth.skipIssuerMetadataValidation: true`。这会削弱安全性：它会关闭 RFC 8414 issuer 回显检查，不应对公共或不受信任服务器启用。
 
-Secret values in `headers`, `bearerToken`, `oauth.clientSecret`, and stdio `env` may use a leading `!command` to obtain their value at connection or authentication time. The command runs with stdin and stderr suppressed, stdout is limited to 1 MiB and trimmed, and it must finish within 10 seconds with non-empty output; failures stop the connection or authentication flow. Commands are not run during OAuth discovery or while reading, merging, previewing, hashing, or rendering configuration. Use `!!` to escape a literal leading `!`; ordinary and escaped values retain environment interpolation.
+`headers`、`bearerToken`、`oauth.clientSecret` 和 stdio `env` 中的秘密值可用前缀 `!command` 在连接或认证时读取。命令执行时会隐藏 stdin 和 stderr，stdout 上限为 1 MiB 并会去除首尾空白，必须在 10 秒内完成且输出非空；失败会终止连接或认证。读取、合并、预览、计算哈希或渲染配置时不会执行命令。用 `!!` 表示字面量 `!`；普通值和转义值仍支持环境变量插值。
 
-For local desktop bearer tokens, `bearerTokenStore: true` can opt in to the adapter-owned credential-store namespace. It never falls back to plaintext if the store is unavailable, if the stored record is malformed, or if the stored URL differs from the effective server URL. Literal tokens, command tokens, and environment tokens keep precedence so existing configs do not change. Create or rotate a stored token with `pi-mcp-adapter token set <server>` (masked prompt on a terminal, or piped stdin such as `security find-generic-password -s my-token -w | pi-mcp-adapter token set <server>`); the record binds to the effective configured URL at write time. Token commands need Node 22.18+.
+本地桌面环境可设置 `bearerTokenStore: true`，选择适配器自己的凭据存储空间。凭据存储不可用、记录格式错误或保存的 URL 与当前有效 URL 不同时，不会回退到明文。字面量 token、命令生成的 token 和环境变量 token 优先级更高，现有配置行为不变。使用 `pi-mcp-adapter token set <server>` 创建或轮换 token（终端中使用遮蔽提示；也可使用 `security find-generic-password -s my-token -w | pi-mcp-adapter token set <server>` 通过 stdin 传入）。记录会绑定写入时的有效服务器 URL。token 命令要求 Node.js 22.18 或更新版本。
 
-### Shared MCP processes with rmcp-mux
+### 使用 rmcp-mux 共享 MCP 进程
 
-To share one stdio MCP server across Pi sessions, run it under [`rmcp-mux`](https://github.com/VetCoders/rmcp-mux) and point each session at the service socket:
+若希望多个 Pi 会话共享同一个 stdio MCP 服务器，可通过 [`rmcp-mux`](https://github.com/VetCoders/rmcp-mux) 运行服务器，再把每个会话指向服务 socket：
 
 ```json
 {
@@ -356,21 +359,25 @@ To share one stdio MCP server across Pi sessions, run it under [`rmcp-mux`](http
 }
 ```
 
-The adapter owns only its client socket and closes that connection when the Pi runtime stops. `rmcp-mux` owns the upstream process, request routing, initialization cache, restart policy, client limits, and socket permissions. Start and configure the mux separately; the adapter never discovers, starts, adopts, or stops its daemon. A socket is an explicit trusted local endpoint, so do not point unrelated projects or users at a mux service unless its tools, state, credentials, and filesystem access are intended to be shared.
+适配器只拥有自己的客户端 socket，并在 Pi 运行时停止时关闭该连接。上游进程、请求路由、初始化缓存、重启策略、客户端限制和 socket 权限由 `rmcp-mux` 管理。需单独启动和配置 mux；适配器不会发现、启动、接管或停止其守护进程。socket 是明确指定的本地可信端点；除非你确实希望共享工具、状态、凭据和文件访问权限，否则不要让无关项目或用户连接同一 mux 服务。
 
-### Remote/headless OAuth
+### 远程/无头环境中的 OAuth（旧运行时）
 
-If Pi is running on a remote server, `/mcp-auth <server>` shows a clickable authorization URL first. Open it in your local browser and approve access, then select **Yes** in Pi to open the callback input. The browser may fail to load the localhost callback page because localhost refers to your workstation; copy the full URL from its address bar and paste it into Pi. The authorization screen closes automatically instead when the browser can reach Pi's callback directly.
+以下流程描述旧适配器运行时；当前入口的原生 OAuth 交互由 Pi 自带的 `/mcp` 管理。
 
-The same flow is available through the proxy tool for non-interactive clients. Persistent OAuth still requires an available OS credential store; on headless Linux that usually means an unlocked Secret Service/libsecret keyring. The adapter fails closed instead of falling back to plaintext credentials when the secure store is unavailable.
+Pi 在远程服务器运行时，`/mcp-auth <server>` 会先显示可点击的授权 URL。在本地浏览器打开并授权后，回到 Pi 选择 **Yes** 打开回调输入框。浏览器可能无法加载 localhost 回调页，因为其中的 localhost 指向你的工作站；此时复制地址栏中的完整 URL 并粘贴回 Pi。如果浏览器可以直接访问 Pi 的回调，授权页会自动关闭。
 
-On Linux, if credential access fails because Pi inherited a revoked session keyring, the adapter uses a best-effort recovery path through `keyctl session - node <packaged helper>` so explicit re-authentication can write fresh credentials without killing a long-lived tmux server. This path requires `keyctl` and `node` on `PATH`; missing, locked, or otherwise unavailable credential stores still fail closed.
+无头客户端也可通过代理工具完成相同流程。持久化 OAuth 仍要求操作系统凭据存储可用；无头 Linux 通常需要已解锁的 Secret Service/libsecret 密钥环。安全存储不可用时，适配器会安全失败，不会退回明文凭据。
+
+在 Linux 上，如果 Pi 继承了已撤销的会话密钥环而导致凭据访问失败，适配器会尝试通过 `keyctl session - node <packaged helper>` 恢复会话，使显式重新认证可以写入新凭据，而无需终止长期运行的 tmux 服务。此路径要求 `keyctl` 和 `node` 位于 `PATH`；凭据存储缺失、锁定或不可用时仍会安全失败。
+
+旧运行时可通过以下方式启动授权：
 
 ```js
 mcp({ action: "auth-start", server: "linear-server" })
 ```
 
-Open the returned authorization URL in your local browser. After approval, your browser redirects to a localhost URL. On a remote server that local page may fail to load; copy the full URL from the browser address bar anyway and complete the flow in the same Pi session:
+在本地浏览器打开返回的授权 URL。授权后浏览器会跳转到 localhost 地址。远程服务器上该页面可能无法加载；仍应复制浏览器地址栏中的完整 URL，并在同一个 Pi 会话中完成流程：
 
 ```js
 mcp({
@@ -380,20 +387,22 @@ mcp({
 })
 ```
 
-You can also pass only the `code` query parameter with `args: { code: "..." }`. Treat authorization URLs and codes as sensitive; they can grant access to the MCP server until the flow expires or completes.
+也可以只传 `code` 查询参数：`args: { code: "..." }`。授权 URL 和 code 都是敏感信息；在流程过期或完成前，它们可能授予 MCP 服务器访问权限。
 
-### Lifecycle Modes
+### 生命周期模式
 
-- **`lazy`** (default) — Don't connect at startup. Connect on first tool call. Disconnect after idle timeout. Cached metadata keeps search/list working without connections.
-- **`eager`** — Connect at startup but don't auto-reconnect if the connection drops. No idle timeout by default (set `idleTimeout` explicitly to enable).
-- **`keep-alive`** — Connect at startup. Remote HTTP servers refresh their tool catalog during health checks, before user input, and before adapter-triggered turns, reconnecting when the server reports that the session expired. No idle timeout. Use for servers you always need available.
-- **`lazy-keep-alive`** — Don't connect at startup. Connect on first tool call (like `lazy`). Once spawned, never idle-shut down and use the same catalog refresh and reconnect checks as `keep-alive`. Use for servers that are expensive to start but should stay resident after their first use.
+以下是旧适配器运行时的完整生命周期说明；当前入口中的连接生命周期由 Pi 原生管理方控制。
 
-For remote HTTP keep-alive servers, the authoritative `tools/list` refresh is also the fallback when `list_changed` notifications are unavailable or their stream is lost. Each `tools/list` or `ping` request is capped at 5 seconds, up to 10 servers are checked concurrently, and transient failures use bounded backoff. A successful refresh updates metadata without reconnecting; a response proving that the HTTP session expired triggers a full reconnect and reinstalls the notification handlers. Dynamic direct-tool registration follows the refreshed metadata unless `freezeDirectTools` is enabled.
+- **`lazy`（按需）**：启动时不连接；首次调用工具时连接；空闲超时后断开。缓存元数据可在无连接时支持搜索和列表。
+- **`eager`（启动时连接）**：启动时连接，但断开后不自动重连。默认不启用空闲超时；可显式设置 `idleTimeout`。
+- **`keep-alive`（保持连接）**：启动时连接。远程 HTTP 服务器会在健康检查、用户输入前和适配器触发的回合前刷新工具目录；若服务器报告会话过期，则会重连。没有空闲超时。适用于始终需要在线的服务器。
+- **`lazy-keep-alive`（按需后保持）**：启动时不连接；首次调用工具时连接。启动后不因空闲而关闭，并采用与 `keep-alive` 相同的目录刷新和重连检查。适用于启动成本较高、但首次使用后应保持运行的服务器。
 
-When any enabled server uses `eager` or `keep-alive`, initialization also starts when the extension loads. This supports hosts that embed Pi programmatically and never emit `session_start`; if a session does start later, the session-owned runtime supersedes the load-time runtime.
+对远程 HTTP keep-alive 服务器，如果没有 `list_changed` 通知或通知流丢失，权威的 `tools/list` 刷新也会作为后备。每个 `tools/list` 或 `ping` 请求最多等待 5 秒，同时检查的服务器最多 10 个；临时失败采用有上限的退避策略。成功刷新只更新元数据，不重连；只有确认 HTTP 会话已过期时才完整重连并重新安装通知处理器。除非启用了 `freezeDirectTools`，动态直接工具注册会跟随刷新后的元数据。
 
-### Settings
+只要有启用的服务器使用 `eager` 或 `keep-alive`，扩展加载时也会开始初始化。这支持以编程方式嵌入 Pi、且从不发出 `session_start` 的宿主；若之后启动了会话，则会话所有的运行时会取代加载时运行时。
+
+### 全局设置
 
 ```json
 {
@@ -416,43 +425,42 @@ When any enabled server uses `eager` or `keep-alive`, initialization also starts
       "maxEvents": 10000
     }
   },
-  "mcpServers": { }
+  "mcpServers": {}
 }
 ```
 
-| Setting | Description |
-|---------|-------------|
-| `toolPrefix` | `"server"` (default), `"short"` (strips `-mcp` suffix), `"none"`, or `"mcp"` (prefixes with `mcp__`, using server-mode normalization). Per-server `toolPrefix` overrides this for that server. |
-| `idleTimeout` | Global idle timeout in minutes (default: 10, 0 to disable) |
-| `requestTimeoutMs` | Global request timeout in milliseconds for live MCP calls (if omitted or `<= 0`, the MCP SDK default timeout is used) |
-| `showStatusIcon` | Show the plug icon in MCP status and connection text (default: `true`). Set to `false` for plain `MCP: ...` text. |
-| `mcpFooterStatus` | MCP footer verbosity: `"full"` (default), `"compact"` for `MCP connected/enabled`, or `"off"` to clear the persistent footer status. `/mcp status` remains available. |
-| `toolResultRendering` | MCP tool result row style: `"compact"` (default) uses self-rendered rows, or `"boxed"` restores the legacy Pi boxed tool row. |
-| `collapsedResultLines` | Number of result text lines to show before expansion: `1`, `2`, or `3`. Defaults to `1` in compact mode and `3` in boxed mode. |
-| `notifyOnStartupConnect` | Show successful startup connection notices (default: `true`). Set to `false` to suppress routine `MCP: N servers connected (M tools)` notices. Connection errors and authentication warnings remain visible. |
-| `agentPluginPaths` | Agent Plugins package directories to load MCP servers from. Relative paths resolve from the active project cwd. |
-| `approveTools` | `true` to require approval before every MCP tool call, or an array of glob patterns such as `["github_delete_*", "notion_update_*"]`. Per-server `approveTools` overrides this. |
-| `oauthDir` | Legacy OAuth `tokens.json` import directory for this MCP config. Relative paths resolve from the active project cwd. `MCP_OAUTH_DIR` still wins when set. Persistent OAuth credentials are stored in the OS credential store, not this directory. |
-| `mcpServers.<name>.oauth.authorizationParams` | Extra authorization URL parameters for provider-specific OAuth extensions. Flow-owned parameters such as `client_id`, `redirect_uri`, `scope`, `state`, `code_challenge`, `response_type`, and `resource` cannot be overridden. |
-| `directTools` | Global default for all servers (default: false). Per-server overrides this. |
-| `strictDirectToolArguments` | Validate direct-tool inputs against their advertised schemas and recover one JSON string layer for object and array properties (default: false). |
-| `directToolResultDetails` | Direct-tool result details: `"lean"` (default) or `"bounded"` to retain the guarded raw MCP result. |
-| `warnOnLargeDirectTools` | Show the advisory when 75 or more direct tools resolve (default: `true`). Set to `false` to suppress only this advisory. |
-| `freezeDirectTools` | Keep direct-tool registration stable after the initial sync so automatic reconnects and list-change notifications do not rebuild the system prompt. Use `mcp({ connect: "server" })` or `/mcp reconnect <server>` to refresh deliberately. Default: false. |
-| `scriptMode` | Register the MCP-only `mcpScript` plain-JavaScript tool (default: true). Set to `false` to hide it. |
-| `disableProxyTool` | Hide the `mcp` proxy tool once configured direct tools are fully available from cache. |
-| `autoAuth` | Auto-run OAuth on `connect`/tool calls when a server needs auth, then retry once (default: false). |
-| `sampling` | Allow MCP servers to sample through Pi models, honoring `modelPreferences.hints` before current/default fallback (default: true when UI approval is available). |
-| `samplingAutoApprove` | Skip sampling confirmation prompts. Required for sampling in non-UI sessions (default: false). |
-| `elicitation` | Allow MCP servers to request user input through Pi dialogs (default: true when Pi UI is available). |
-| `outputGuard` | Guard oversized MCP output: `true` (default), `false`, or `{ maxBytes, maxLines, detailsMaxBytes }`. See [Output Guard](#output-guard). |
-| `trace` | Opt-in metadata-only protocol tracing. Set `{ enabled: true }` globally or `trace: true` on a server. The per-session JSONL file defaults to `.pi/mcp-traces/`; `file`, `maxBytes` (default 262144), and `maxEvents` (default 10000) can be set. Raw MCP payloads, prompts, tool arguments/results, auth data, and URLs are never persisted. |
+| 设置项 | 说明 |
+| --- | --- |
+| `toolPrefix` | `"server"`（默认）、`"short"`（去掉 `-mcp` 后缀）、`"none"` 或 `"mcp"`（使用服务器模式规范化，并加上 `mcp__` 前缀）。服务器级 `toolPrefix` 可覆盖全局设置。 |
+| `idleTimeout` | 全局空闲超时分钟数（默认 10；设为 0 可禁用）。 |
+| `requestTimeoutMs` | 实时 MCP 调用的全局超时毫秒数（省略或 `<= 0` 时使用 MCP SDK 默认值）。 |
+| `showStatusIcon` | 是否在 MCP 状态和连接文本中显示插头图标（默认 `true`）；设为 `false` 后显示纯文本 `MCP: ...`。 |
+| `mcpFooterStatus` | 页脚状态详细程度：`"full"`（默认）、`"compact"`（仅显示 `MCP connected/enabled`）或 `"off"`（清除常驻页脚状态）。`/mcp status` 仍可使用。 |
+| `toolResultRendering` | MCP 工具结果行样式：`"compact"`（默认）使用自绘行；`"boxed"` 恢复 Pi 旧版带框工具行。 |
+| `collapsedResultLines` | 折叠时显示的结果文本行数：`1`、`2` 或 `3`。compact 模式默认 1 行，boxed 模式默认 3 行。 |
+| `notifyOnStartupConnect` | 是否通知启动时成功的连接（默认 `true`）。设为 `false` 可隐藏常规的 `MCP: N servers connected (M tools)` 通知；连接错误和认证警告仍会显示。 |
+| `agentPluginPaths` | 要加载 MCP 服务器的 Agent Plugins 包目录；相对路径以当前项目工作目录为基准。 |
+| `approveTools` | 设为 `true` 可要求每次 MCP 工具调用都经批准；也可用 glob 数组，例如 `["github_delete_*", "notion_update_*"]`。服务器级 `approveTools` 会覆盖全局值。 |
+| `oauthDir` | 旧 OAuth `tokens.json` 的导入目录；相对路径以当前项目工作目录为基准。设置 `MCP_OAUTH_DIR` 时以环境变量为准。当前原生管理方不启用此目录，避免凭据明文迁移。 |
+| `mcpServers.<name>.directTools` | 全局直接工具默认值（默认 `false`）；服务器级设置会覆盖。 |
+| `strictDirectToolArguments` | 校验直接工具输入，并对 schema 声明为对象/数组的属性恢复一层 JSON 字符串（默认 `false`）。 |
+| `directToolResultDetails` | 直接工具结果详情：`"lean"`（默认）或 `"bounded"`（保留经过限制的原始 MCP 结果）。 |
+| `warnOnLargeDirectTools` | 当解析出的直接工具达到 75 个或更多时显示提醒（默认 `true`）；设为 `false` 仅隐藏此提醒。 |
+| `freezeDirectTools` | 初次同步后保持直接工具注册稳定，避免自动重连和列表变更通知重建系统提示。使用 `mcp({ connect: "server" })` 或 `/mcp reconnect <server>` 可主动刷新。默认 `false`。 |
+| `scriptMode` | 旧运行时是否注册仅供 MCP 使用的 `mcpScript` JavaScript 工具（默认 `true`）；设为 `false` 可隐藏。当前原生入口不注册该工具。 |
+| `disableProxyTool` | 当缓存中已完整提供配置的直接工具时，旧运行时是否隐藏 `mcp` 代理工具。 |
+| `autoAuth` | 旧运行时在 `connect`/工具调用需要认证时是否自动执行 OAuth 并重试一次（默认 `false`）。当前原生管理方不启用。 |
+| `sampling` | 是否允许 MCP 服务器通过 Pi 模型执行 sampling；会优先考虑 `modelPreferences.hints`，再使用当前/默认模型（默认：存在 UI 批准能力时开启）。 |
+| `samplingAutoApprove` | 是否跳过 sampling 确认提示。无 UI 会话要启用 sampling 必须设置此项（默认 `false`）。 |
+| `elicitation` | 是否允许 MCP 服务器通过 Pi 对话框请求用户输入（默认：Pi UI 可用时开启）。 |
+| `outputGuard` | 是否限制过大的 MCP 输出：`true`（默认）、`false` 或 `{ maxBytes, maxLines, detailsMaxBytes }`。见[输出保护](#输出保护)。 |
+| `trace` | 是否启用仅记录元数据的协议追踪。全局可设 `{ enabled: true }`，也可在服务器上设 `trace: true`。每会话 JSONL 文件默认写入 `.pi/mcp-traces/`；可设置 `file`、`maxBytes`（默认 262144）和 `maxEvents`（默认 10000）。不会保存原始 MCP payload、prompt、工具参数/结果、认证信息或 URL。 |
 
-Per-server `idleTimeout`, `requestTimeoutMs`, and `approveTools` override the global settings. `debug` remains stderr display and is unrelated to protocol tracing.
+服务器级 `idleTimeout`、`requestTimeoutMs` 和 `approveTools` 会覆盖全局设置。`debug` 只控制 stderr 显示，与协议追踪无关。
 
-### Tool Approval
+### 工具调用审批
 
-Use `approveTools` when a tool should stay visible but not run without confirmation. This is useful for destructive or high-cost actions where hiding the tool would make planning harder, but running it silently is too risky.
+可使用 `approveTools` 让工具继续显示，但在执行前要求确认。适用于破坏性或成本较高的操作：隐藏工具会妨碍计划，而静默执行又风险太高。
 
 ```json
 {
@@ -466,9 +474,10 @@ Use `approveTools` when a tool should stay visible but not run without confirmat
 }
 ```
 
-When a matching tool is called from the proxy tool, a direct MCP tool, a resource call, or an MCP UI iframe, Pi asks: **Allow once**, **Allow for session**, or **Deny**. Session approvals are kept in memory only. In headless sessions, matching calls fail closed with an `approval_required` result instead of running. `excludeTools` still removes tools entirely; `approveTools` only gates visible tools at call time.
+当匹配的工具通过代理工具、直接 MCP 工具、资源调用或 MCP UI iframe 调用时，Pi 会询问：**仅允许一次**、**本会话允许**或**拒绝**。会话审批只保存在内存中。无 UI 会话中匹配的调用会以 `approval_required` 结果安全失败，而不是执行。`excludeTools` 会完全移除工具；`approveTools` 只在调用时限制仍可见的工具。
 
-Permission extensions can broker these decisions by listening on `pi-mcp-adapter:tool-approval-request` and claiming the request synchronously:
+
+权限扩展可监听 `pi-mcp-adapter:tool-approval-request` 并同步认领审批请求：
 
 ```ts
 import {
@@ -483,18 +492,18 @@ pi.events.on(MCP_TOOL_APPROVAL_REQUEST_EVENT, (request: McpToolApprovalRequest) 
 });
 ```
 
-The request includes `serverName`, `originalToolName`, `prefixedToolName`, `args`, `origin`, and optional `signal`. The first synchronous claim wins. `allow_for_session` updates the same in-memory approval cache as the built-in dialog; `deny` blocks the MCP call; `abstain` or no claim preserves the fallback behavior above. Brokered approval runs for every uncached MCP call regardless of `approveTools` configuration, across proxy, direct, `mcpScript`, resource, and iframe origins.
+请求包含 `serverName`、`originalToolName`、`prefixedToolName`、`args`、`origin` 和可选的 `signal`。最先同步认领的处理器生效。`allow_for_session` 会更新与内置对话框相同的内存审批缓存；`deny` 会阻止调用；`abstain` 或无人认领则沿用默认行为。无论 `approveTools` 如何配置，未缓存的 MCP 调用都会经过代理、直接工具、`mcpScript`、资源和 iframe 审批来源的 broker。
 
-### Output Guard
+### 输出保护
 
-Oversized MCP tool/resource results are guarded by default so a single huge response can't blow up the model context window or the session file:
+MCP 工具或资源返回过大时，默认启用输出保护，避免单次响应耗尽模型上下文或会话文件：
 
-- Inline text output is capped at **50 KiB / 2,000 lines** (matching Pi's built-in `bash` guard). Larger output is truncated to a head preview and the full text is saved to a temp file whose path is included in the result, so the agent can `read`/`grep` it.
-- **Image content blocks pass through unchanged** — only text output is guarded. Images are delivered to the provider as native image content.
-- Binary resource blobs up to **10 MiB** are decoded to private temp files and replaced with file references. Each session is limited to **100 MiB** and **10,000 files**. The files are removed at session teardown.
-- In proxy mode, `details.mcpResult` is kept raw when its JSON is **≤ 16 KiB**; larger results are replaced with a compact summary (block counts, sizes, key previews) and the raw JSON is saved to a temp file. Direct tools keep lean details unless `settings.directToolResultDetails` is set to `"bounded"`, which applies the same guarded `mcpResult` limit.
+- 内联文本最多 **50 KiB / 2,000 行**（与 Pi 内置 `bash` 限制一致）。超出部分会被截断为首部预览，完整文本保存到临时文件，并在结果中给出路径，供 agent 使用 `read`/`grep`；
+- **图片内容块原样传递**，只限制文本输出；图片仍以原生图片内容交给 provider；
+- 最多 **10 MiB** 的二进制资源会解码到私有临时文件并替换为文件引用。每个会话最多 **100 MiB**、**10,000 个文件**；会话结束时删除这些文件；
+- 代理模式下，JSON 不超过 **16 KiB** 的 `details.mcpResult` 保留原始值；更大的结果会变成紧凑摘要（块数量、大小、键预览），原始 JSON 保存到临时文件。直接工具默认仅保留精简详情；设置 `settings.directToolResultDetails: "bounded"` 后，`mcpResult` 也采用相同保护。
 
-Tune the text and details limits with the object form:
+可通过对象形式调整文本和详情限制：
 
 ```json
 {
@@ -504,13 +513,13 @@ Tune the text and details limits with the object form:
 }
 ```
 
-Set `"outputGuard": false` — or the env kill switch `MCP_OUTPUT_GUARD=0` — to disable text and details guarding. Binary resource materialization and its safety limits remain active. Output-guard spill files are created with mode `0600` under the system temp directory and are not cleaned up automatically; note that spilled MCP output may contain sensitive data.
+设置 `"outputGuard": false` 或环境变量 `MCP_OUTPUT_GUARD=0` 可关闭文本和详情保护。二进制资源物化及其安全限制仍然启用。输出保护生成的溢出文件位于系统临时目录，权限为 `0600`，不会自动清理；其中可能包含敏感 MCP 输出。
 
-### MCP Scripting
+### MCP 脚本工具（旧运行时）
 
-For multi-call MCP work, write ordinary JavaScript: discover, inspect, call, loop, filter, chain, or fan out, then return one result. Run that code with the default-on `mcpScript` tool. For a single MCP call, search, describe, status check, or auth action, use `mcp` instead. Set `settings.scriptMode` to `false` to hide the scripting tool.
+旧版多次 MCP 调用可使用普通 JavaScript：发现、检查、调用、循环、过滤、串联或并发处理，最后返回一个结果。默认开启的旧版 `mcpScript` 工具会执行这些代码。单次 MCP 调用、搜索、描述、状态检查或认证操作应使用 `mcp`。设置 `settings.scriptMode` 为 `false` 可隐藏脚本工具。当前 Pi 原生入口不注册 `mcpScript`。
 
-The bundled `mcp-scripting` skill is a separate Pi package resource. To hide that skill while keeping the adapter extension installed, replace the package entry in Pi settings with the object form and disable package skills:
+随包提供的 `mcp-scripting` skill 是独立 Pi 包资源。若要保留扩展但隐藏该 skill，可在 Pi 设置中用对象形式替换包条目并禁用包内 skills：
 
 ```json
 {
@@ -520,9 +529,9 @@ The bundled `mcp-scripting` skill is a separate Pi package resource. To hide tha
 }
 ```
 
-Preserve any version pin in `source` if your existing package entry has one. You can also disable package resources through `pi config`.
+如果现有包条目的 `source` 带有版本固定值，请保留它。也可通过 `pi config` 禁用包资源。
 
-For example, this is the JavaScript passed as the `code` argument to `mcpScript`:
+以下是传给 `mcpScript` 的 `code` 参数示例：
 
 ```js
 const { items } = await tools.search({ query: "search issues", server: "github" });
@@ -538,15 +547,15 @@ emit({ tool: details.path, completed: true });
 return result.data;
 ```
 
-See the bundled `mcp-scripting` skill for the complete workflow guide. The API is `await tools.search({ query, server?, limit?, offset? })`, `await tools.describe({ path })`, `tools.call(path, args)`, direct flat calls, `emit(value)`, and a captured `console`. Use ordinary JavaScript loops and Promise utilities for composition; fluent helpers such as `tools.find(...).one()`, `tools.parallel(...)`, and `tools.retry(...)` are not provided. MCP calls return `{ ok: true, data }` or `{ ok: false, error: { code, message } }`, so a failed call does not stop the rest of the script. Result details include a concise `calls` trace with each operation, its path or query, outcome, and duration. Emitted values and console output appear before the script's final return value, and the combined result uses the normal MCP output guard. The default timeout is 30 seconds; each script runs in a worker thread that is terminated at the deadline, including for infinite loops.
+完整工作流见随包提供的 `mcp-scripting` skill。API 为 `await tools.search({ query, server?, limit?, offset? })`、`await tools.describe({ path })`、`tools.call(path, args)`、直接平铺调用、`emit(value)` 和捕获的 `console`。组合逻辑使用普通 JavaScript 循环和 Promise 工具；不提供 `tools.find(...).one()`、`tools.parallel(...)` 或 `tools.retry(...)` 这类链式 helper。MCP 调用返回 `{ ok: true, data }` 或 `{ ok: false, error: { code, message } }`；一次失败不会终止脚本其他部分。结果详情包含简短的 `calls` 追踪，记录每次操作的路径或查询、结果和耗时。emit 值和 console 输出会排在最终返回值之前，组合结果仍受普通 MCP 输出保护限制。默认超时 30 秒；每个脚本运行在 worker thread 中，超时（包括死循环）时会终止 worker。
 
-For a tool-restricted subagent, launch the child Pi with its tool allowlist set to `["mcpScript"]`. Have the parent discover MCP tool names with `mcp({ search: "..." })` and include the relevant prefixed names in the child's task; the child can then loop, filter, and chain those MCP calls without filesystem, shell, or edit tools. The adapter's ordinary lazy connection, authentication, output guard, abort handling, and approval gates still apply to every call.
+若子 agent 只能使用指定工具，可将子 Pi 的工具白名单设为 `["mcpScript"]`。父 agent 先用 `mcp({ search: "..." })` 发现名称，并在任务中提供相关带前缀名称；随后子 agent 可在没有文件系统、shell 或编辑工具的情况下循环、过滤和串联 MCP 调用。适配器的按需连接、认证、输出保护、中止处理和审批门仍会应用于每次调用。
 
-`mcpScript` is a trusted agent-authored MCP scripting layer, not an isolation boundary. If you need isolation, run Pi in an isolated environment. It is distinct from Pi's code-mode skill: Pi's skill batches general Pi tools, while `mcpScript` exposes MCP calls only and can be the child's sole tool.
+`mcpScript` 是由 agent 编写并受信任的 MCP 脚本层，不是隔离边界。如需隔离，请在隔离环境中运行 Pi。它与 Pi 的 code-mode skill 不同：Pi skill 可批处理通用 Pi 工具；`mcpScript` 只暴露 MCP 调用，也可以作为子 agent 唯一的工具。
 
 ### MCP Prompts
 
-MCP servers can advertise prompt templates alongside tools and resources. The adapter registers cached prompt definitions as Pi slash commands under `/mcp__<server>__<prompt>`, and refreshes their metadata whenever a server connects. Arguments support positional and `key=value` forms with quoting; required arguments are validated before `prompts/get` is called.
+MCP 服务器可在工具和资源之外公布 prompt 模板。旧适配器运行时会将缓存的 prompt 定义注册为 Pi slash command：`/mcp__<server>__<prompt>`；服务器连接后会刷新其元数据。参数支持位置形式和 `key=value` 形式，可加引号；调用 `prompts/get` 前会校验必填参数。
 
 ```text
 /mcp__agent_board__create_plan "harden retry policy"
@@ -554,19 +563,19 @@ MCP servers can advertise prompt templates alongside tools and resources. The ad
 /mcp prompts
 ```
 
-Prompt results are flattened into one user message, preserving `[user]` and `[assistant]` role markers for multi-message results. Servers without the `prompts` capability are not probed.
+Prompt 结果会合并成一条 user message；多消息结果会保留 `[user]` 和 `[assistant]` 角色标记。不具备 `prompts` capability 的服务器不会被探测。
 
 ### MCP Elicitation
 
-When Pi exposes dialog-capable UI, the adapter advertises form elicitation support. Forms use Pi's stock `select()` and `input()` dialogs, validate the response, and provide a review/edit step before submission. Empty forms use one confirmation dialog. Explicit refusal maps to MCP `decline`; dismissing a dialog maps to `cancel`.
+Pi 提供可显示对话框的 UI 时，适配器会公布表单 elicitation 支持。表单使用 Pi 自带的 `select()` 和 `input()` 对话框，校验响应，并在提交前提供复核/编辑步骤。空表单使用确认对话框。显式拒绝会映射为 MCP `decline`；关闭对话框会映射为 `cancel`。
 
-URL mode is advertised only in TUI mode. The adapter displays the requesting server, target host, and full URL, and always requires consent before opening the browser. It also handles URL-required tool errors (`-32042`) and completion notifications; after completing the browser interaction, retry the original tool call.
+URL 模式只在 TUI 中公布。适配器会显示请求服务器、目标主机和完整 URL，并始终在打开浏览器前征得同意。它也会处理 URL-required 工具错误（`-32042`）及完成通知；浏览器交互完成后，应重新调用原工具。
 
-### Direct Tools
+### 直接工具
 
-By default, all MCP tools are accessed through the single `mcp` proxy tool. This keeps context small but means the LLM has to discover MCP tools via proxy search. If you want specific tools to show up directly in the agent's tool list — alongside `read`, `bash`, `edit`, etc. — add `directTools` to your config.
+默认情况下，所有 MCP 工具都通过单一的 `mcp` 代理工具访问。这样能保持上下文精简，但模型需要先通过代理搜索发现工具。若希望指定工具直接出现在 agent 工具列表中（与 `read`、`bash`、`edit` 等并列），可在配置中添加 `directTools`。
 
-Per-server:
+按服务器设置：
 
 ```json
 {
@@ -589,13 +598,13 @@ Per-server:
 }
 ```
 
-| Value | Behavior |
-|-------|----------|
-| `true` | Register all tools from this server as individual Pi tools |
-| `["tool_a", "tool_b"]` | Register only these tools (use original MCP names) |
-| Omitted or `false` | Proxy only (default) |
+| 值 | 行为 |
+| --- | --- |
+| `true` | 将该服务器的所有工具分别注册为 Pi 工具。 |
+| `["tool_a", "tool_b"]` | 只注册这些工具（使用原始 MCP 工具名）。 |
+| 省略或 `false` | 仅通过代理访问（默认）。 |
 
-To set a global default for all servers:
+要为所有服务器设置全局默认值：
 
 ```json
 {
@@ -610,9 +619,9 @@ To set a global default for all servers:
 }
 ```
 
-Per-server `directTools` overrides the global setting. The example above registers direct tools for every server except `huge-server`.
+服务器级 `directTools` 会覆盖全局设置。上例会为除 `huge-server` 外的所有服务器注册直接工具。
 
-To expose only a subset of a noisy server, add `includeTools` on the server. Values can be exact original names, generated resource names such as `read_<resource>`, prefixed names, or simple glob patterns:
+若只想暴露某个繁杂服务器的一部分工具，可设置服务器级 `includeTools`。值可以是原始名称、`read_<resource>` 这类生成资源名、带前缀名称或简单 glob 模式：
 
 ```json
 {
@@ -626,7 +635,7 @@ To expose only a subset of a noisy server, add `includeTools` on the server. Val
 }
 ```
 
-To hide specific tools while still using `directTools: true`, add `excludeTools` on the server. `excludeTools` is applied after `includeTools`:
+若保持 `directTools: true` 但隐藏特定工具，可设置 `excludeTools`。它会在 `includeTools` 之后应用：
 
 ```json
 {
@@ -640,78 +649,80 @@ To hide specific tools while still using `directTools: true`, add `excludeTools`
 }
 ```
 
-`includeTools` and `excludeTools` filter direct tools, proxy search/list/describe, and the `/mcp` panel view.
+`includeTools` 和 `excludeTools` 会同时过滤直接工具、代理搜索/列表/描述结果和旧版 `/mcp` 面板视图。
 
-Each direct tool costs ~150-300 tokens in the system prompt (name + description + schema). Good for targeted sets of 5-20 tools. For servers with 75+ tools, stick with the proxy or pick specific tools with a `string[]`. If 75+ direct tools resolve, the adapter prints an advisory but still registers the tools you configured. Set `settings.warnOnLargeDirectTools` to `false` to suppress this advisory.
+每个直接工具会在系统提示中占用约 150–300 个 token（名称、描述和 schema）。适合有针对性地选择 5–20 个工具。服务器提供 75 个或更多工具时，建议继续使用代理，或通过 `string[]` 挑选少数工具。若解析出 75 个或更多直接工具，适配器会给出提醒，但仍会注册已配置的工具。将 `settings.warnOnLargeDirectTools` 设为 `false` 可只隐藏该提醒。
 
-Direct tools register from the metadata cache in the Pi agent dir (`~/.pi/agent/mcp-cache.json` by default, or `$PI_CODING_AGENT_DIR/mcp-cache.json` when set), so no server connections are needed at startup. On the first session after adding `directTools` to a new server, the cache won't exist yet — tools fall back to proxy-only while the cache populates, then the extension hot-loads the refreshed direct tools into the current session. Servers that advertise MCP list-change notifications refresh the current session when their tool or resource list changes. On Pi versions that expose `pi.unregisterTool()`, stale direct tools are removed from the registry during refresh; older Pi versions still deactivate them from the active tool set. To force a refresh: `/mcp reconnect <server>`.
+直接工具会从 Pi agent 目录中的元数据缓存注册（默认 `~/.pi/agent/mcp-cache.json`，也可通过 `$PI_CODING_AGENT_DIR/mcp-cache.json` 指定），启动时不需要连接服务器。新服务器首次添加 `directTools` 后尚无缓存，因此会暂时只通过代理提供工具；缓存建立后，扩展会把直接工具热加载到当前会话。支持 MCP list-change 通知的服务器，在工具或资源列表变化时会刷新当前会话。在提供 `pi.unregisterTool()` 的 Pi 版本中，刷新会从注册表移除旧直接工具；较旧 Pi 版本至少会将其从活动工具集停用。可运行 `/mcp reconnect <server>` 强制刷新。
 
-Models sometimes encode an object or array argument as a JSON string. Set `settings.strictDirectToolArguments` to `true` to recover one such layer for schema-declared object and array properties, then validate the complete input against the advertised schema before execution.
+模型有时会把对象或数组参数编码为 JSON 字符串。将 `settings.strictDirectToolArguments` 设为 `true` 后，适配器会对 schema 声明为对象/数组的属性恢复一层，再依据公布的 schema 校验完整输入。
 
-Set `settings.directToolResultDetails` to `"bounded"` when an extension needs structured MCP result fields in Pi's direct-tool result details. The same output guard limits apply. Small leading structured fields stay available, while large fields receive bounded summaries and the complete guarded result follows the output guard's spill-file policy. The default `"lean"` mode keeps the existing server and tool metadata only.
+若扩展需要 Pi 直接工具结果详情中的结构化 MCP 字段，可将 `settings.directToolResultDetails` 设为 `"bounded"`。它仍受相同输出保护限制；较小的前置结构字段会保留，较大字段会被限制为摘要，完整的受保护结果遵循输出保护的溢出文件规则。默认 `"lean"` 只保留服务器和工具元数据。
 
-If prompt-cache stability matters more than automatic direct-tool hot-loading, set `settings.freezeDirectTools` to `true`. The initial direct-tool sync still runs, but later automatic reconnects, lazy-connects, and list-change notifications keep the registered tool surface unchanged. Deliberate refreshes through `mcp({ connect: "server" })` or `/mcp reconnect <server>` still update direct tools.
+若提示缓存稳定性比自动热加载更重要，可将 `settings.freezeDirectTools` 设为 `true`。初次同步仍会运行；之后自动重连、按需连接和列表变化通知不会改变已注册工具界面。通过 `mcp({ connect: "server" })` 或 `/mcp reconnect <server>` 主动刷新仍会更新直接工具。
 
-When you change direct-tool toggles in `/mcp`, the extension updates direct tool registration in the current session. Broader setup writes from `/mcp setup` still use Pi's normal reload flow because they can add or restructure MCP config files.
+旧 `/mcp` 面板改变直接工具开关时，扩展会更新当前会话中的直接工具注册。通过 `/mcp setup` 写入更广泛的设置仍使用 Pi 的正常 reload 流程，因为它可能新增或重组 MCP 配置文件。
 
-**Interactive configuration:** Run `/mcp` to open an interactive panel showing all servers with connection status, tools, and direct/proxy toggles. You can reconnect servers and toggle tools between direct and proxy from the same overlay. For OAuth, press Enter on a server that needs auth or `ctrl+a` on any OAuth server. The Save action defaults to `ctrl+s` and can be remapped with the `mcp.panel.save` keybinding.
+### 交互式配置和旧版命令
 
-**Guided first-run setup:** Run `/mcp setup` to inspect standard MCP config paths, preview exact before/after file diffs for writes, scaffold a minimal project `.mcp.json`, add a curated known server (DeepWiki, Context7, Notion, GitHub, or Chrome DevTools), or quick-add RepoPrompt into a standard/shared MCP file.
+**交互式配置：** 旧版 `/mcp` 会打开交互面板，展示服务器、连接状态、工具和直接/代理切换。可在同一界面重连服务器或切换工具。OAuth 操作可在服务器上按 Enter，或对任意 OAuth 服务器按 `ctrl+a`。保存操作默认使用 `ctrl+s`，可通过 `mcp.panel.save` keybinding 重映射。
 
-**Subagent integration:** If you use the subagent extension, agents can request direct MCP tools in their frontmatter with `mcp:server-name` syntax. See the subagent README for details.
+**首次运行设置向导：** 旧版 `/mcp setup` 可检查标准 MCP 配置路径、预览写入前后的文件差异、创建最简项目 `.mcp.json`、添加精选服务器（DeepWiki、Context7、Notion、GitHub、Chrome DevTools），或快速将 RepoPrompt 加入标准/共享 MCP 文件。
 
-### MCP UI Integration
+**子代理集成：** 使用 subagent 扩展时，agent 可在 frontmatter 中用 `mcp:server-name` 语法请求直接 MCP 工具。详情见 subagent README。
 
-MCP servers can ship interactive UIs via the [MCP UI](https://github.com/MCP-UI-Org/mcp-ui) standard. When you call a tool that has a UI resource, the adapter opens it in a native macOS window via [Glimpse](https://github.com/hazat/glimpse) if available, otherwise falls back to the browser.
+### MCP UI 集成（旧运行时）
 
-**How it works:**
+MCP 服务器可通过 [MCP UI](https://github.com/MCP-UI-Org/mcp-ui) 标准提供交互界面。旧适配器运行时在工具具有 UI resource 时，会优先通过 [Glimpse](https://github.com/hazat/glimpse) 在原生 macOS 窗口打开；不可用时回退到浏览器。当前已发布的 native-only 入口不提供这条 UI bridge。
 
-1. Agent calls a tool like `launch_dashboard`
-2. The tool's metadata includes `_meta.ui.resourceUri` pointing to a UI resource
-3. pi-mcp-adapter fetches the UI HTML and opens it in an iframe
-4. The UI can call MCP tools and send messages back to the agent
+**工作流程：**
 
-**Native rendering:** On macOS, if [Glimpse](https://github.com/hazat/glimpse) is installed (`pi install npm:glimpseui`), UIs open in a native WKWebView window instead of a browser tab. Set `MCP_UI_VIEWER=browser` to force the browser, `MCP_UI_VIEWER=glimpse` to require native rendering, or `MCP_UI_VIEWER=none` (also accepts `off` / `disabled`) to suppress the window entirely — the tool still runs and its inline result is returned to the agent, but no browser or native window opens. This is useful for headless setups, CI, or users who want the tool output delivered inline as text only. When suppressed, a one-line info notification shows the UI URL so it can still be opened manually if needed.
+1. Agent 调用 `launch_dashboard` 之类的工具；
+2. 工具元数据中的 `_meta.ui.resourceUri` 指向 UI resource；
+3. pi-mcp-adapter 获取 UI HTML 并在 iframe 中打开；
+4. UI 可调用 MCP 工具并向 agent 发送消息。
 
-**Bidirectional communication:** The UI talks back. When it sends a prompt or intent, the message is stored and `triggerTurn()` wakes the agent. The agent retrieves messages via `mcp({ action: "ui-messages" })` and responds, enabling conversational UIs where the app and agent collaborate in real-time.
+**原生窗口：** macOS 上若已安装 [Glimpse](https://github.com/hazat/glimpse)（`pi install npm:glimpseui`），界面会在原生 WKWebView 窗口打开，而不是浏览器标签页。设置 `MCP_UI_VIEWER=browser` 强制使用浏览器，`MCP_UI_VIEWER=glimpse` 要求原生渲染，`MCP_UI_VIEWER=none`（也接受 `off` / `disabled`）则完全不打开窗口。工具仍会运行，内联结果仍会返回 agent，只是不打开浏览器或原生窗口。适用于无头环境、CI 或只希望以内联文本接收结果的场景。屏蔽窗口时会显示一行 URL 通知，仍可手动打开。
 
-**Session reuse:** When the agent calls the same tool again while its UI is already open, the adapter pushes the new result to the existing window instead of replacing it. This enables live updates — the agent can refine a chart, add data, or respond to user input without losing the current view. Different tools still replace the session as before.
+**双向通信：** UI 发出 prompt 或 intent 后，消息会被保存并调用 `triggerTurn()` 唤醒 agent。Agent 可通过 `mcp({ action: "ui-messages" })` 读取消息，从而支持应用和 agent 实时协作。
 
-**Message types from UI:**
+**会话复用：** Agent 再次调用同一工具且 UI 已打开时，适配器会把新结果推送到现有窗口，而不是替换窗口，以便实时更新图表或响应用户输入。不同工具仍会替换会话。
 
-| Type | Purpose |
-|------|---------|
-| `prompt` | User message that triggers an agent response |
-| `intent` | Structured action with name + params |
-| `notify` | Fire-and-forget notification |
-| `message` | Generic message payload |
-| (custom) | Any other type forwarded as intent |
+**UI 消息类型：**
 
-**Retrieving UI messages:**
+| 类型 | 用途 |
+| --- | --- |
+| `prompt` | 触发 agent 响应的用户消息。 |
+| `intent` | 带名称和参数的结构化动作。 |
+| `notify` | 发出即忘的通知。 |
+| `message` | 通用消息负载。 |
+| 自定义类型 | 作为 intent 转发的其他类型。 |
 
-```
+**读取 UI 消息：**
+
+```js
 mcp({ action: "ui-messages" })
 ```
 
-Returns accumulated messages from UI sessions. Each message includes `type`, `sessionId`, `serverName`, `toolName`, and `timestamp`. Prompt messages include `prompt`, intent messages include `intent` and `params`.
+返回 UI 会话中累积的消息。每条消息包含 `type`、`sessionId`、`serverName`、`toolName` 和 `timestamp`。`prompt` 类型包含 `prompt`；`intent` 类型包含 `intent` 和 `params`。
 
-**Browser controls:**
+**浏览器控制：**
 
-- **Cmd/Ctrl+Enter** — Complete and close
-- **Escape** — Cancel and close
-- **Done/Cancel buttons** — Same as keyboard shortcuts
+- **Cmd/Ctrl+Enter**：完成并关闭；
+- **Escape**：取消并关闭；
+- **Done/Cancel 按钮**：与键盘快捷键效果相同。
 
-**Technical notes:**
+**技术说明：**
 
-- Tool consent gates whether UIs can call MCP tools (never/once-per-server/always)
-- `_meta.ui.visibility` controls audience: tools marked app-only stay out of the model tool list, and tools marked model-only cannot be called from the UI iframe.
-- Works with both stdio and HTTP MCP servers
-- Uses a local 408KB AppBridge bundle (MCP SDK + Zod) for browser↔server communication
-- Enforces CSP from standard `_meta.ui.csp` and OpenAI-compatible `_meta["openai/widgetCSP"]` metadata in the response header while preserving provider HTML.
+- 工具 consent gate 控制 UI 是否可调用 MCP 工具（never/once-per-server/always）；
+- `_meta.ui.visibility` 控制受众：标记为 app-only 的工具不会进入模型工具列表；标记为 model-only 的工具不能由 UI iframe 调用；
+- 支持 stdio 和 HTTP MCP 服务器；
+- 使用本地 408KB AppBridge bundle（MCP SDK + Zod）进行浏览器与服务器通信；
+- 从响应头中的标准 `_meta.ui.csp` 和兼容 OpenAI 的 `_meta["openai/widgetCSP"]` 元数据读取 CSP，同时保留 provider HTML。
 
-### Local Example: Interactive Visualizer
+### 本地示例：交互式可视化器
 
-A minimal MCP UI example at `examples/interactive-visualizer` demonstrating charts, bidirectional messaging, and streaming. From that directory:
+`examples/interactive-visualizer` 中有一个最简 MCP UI 示例，演示图表、双向消息和流式更新。在该目录中运行：
 
 ```bash
 npm install
@@ -719,38 +730,41 @@ npm run build
 npm run install-local
 ```
 
-Restart pi, then ask the agent to show a chart — it calls `show_chart` and opens the UI in Glimpse (macOS) or the browser. Use `npm run uninstall-local` to remove the MCP entry.
+重启 Pi 后，让 agent 展示图表；它会调用 `show_chart`，并在 macOS 的 Glimpse 或浏览器中打开界面。运行 `npm run uninstall-local` 可移除 MCP 条目。
 
-### Project Config
+### 项目配置
 
-Prefer `.mcp.json` for project-local shared MCP config. Use `.pi/mcp.json` only when you need a Pi-specific project override. Project files override both user-global shared MCP config and Pi global overrides.
+项目共享配置优先使用 `.mcp.json`。只有需要 Pi 专属项目覆盖时才使用 `.pi/mcp.json`。项目文件的优先级高于用户全局共享配置和 Pi 全局覆盖。
 
-## Usage
+## 使用方式
 
-| Mode | Example |
-|------|---------|
-| Status | `mcp({ })` |
-| List server | `mcp({ server: "name" })` |
-| Search | `mcp({ search: "screenshot navigate", limit: 12, offset: 0 })` |
-| Describe | `mcp({ describe: "tool_name" })` |
-| Instructions | `mcp({ instructions: "name" })` |
-| Call | `mcp({ tool: "...", args: { key: "value" } })` |
-| Connect | `mcp({ connect: "server-name" })` |
-| UI messages | `mcp({ action: "ui-messages" })` |
-| Auth start | `mcp({ action: "auth-start", server: "name" })` |
-| Auth complete | `mcp({ action: "auth-complete", server: "name", args: { redirectUrl: "..." } })` |
+下表中的 `mcp` 代理调用属于旧运行时示例；当前 Pi 原生入口不注册该代理工具。
 
-`mcp({ connect: "server-name" })` refreshes an already connected server, so new tools, resources, prompts, and instructions can load without restarting Pi.
+| 模式 | 示例 |
+| --- | --- |
+| 状态 | `mcp({ })` |
+| 列出服务器 | `mcp({ server: "name" })` |
+| 搜索 | `mcp({ search: "screenshot navigate", limit: 12, offset: 0 })` |
+| 描述工具 | `mcp({ describe: "tool_name" })` |
+| 获取说明 | `mcp({ instructions: "name" })` |
+| 调用工具 | `mcp({ tool: "...", args: { key: "value" } })` |
+| 连接 | `mcp({ connect: "server-name" })` |
+| UI 消息 | `mcp({ action: "ui-messages" })` |
+| 开始认证 | `mcp({ action: "auth-start", server: "name" })` |
+| 完成认证 | `mcp({ action: "auth-complete", server: "name", args: { redirectUrl: "..." } })` |
 
-MCP proxy and direct-tool results use compact self-rendered rows by default. Collapsed success output shows the call title, a bounded one-line input preview when arguments exist, and the first result line, with a `Ctrl+O to expand` hint when more text is hidden. The full result remains available when expanded and is still returned unchanged to the model. Set `settings.toolResultRendering` to `"boxed"` to restore the legacy boxed Pi row, or set `settings.collapsedResultLines` to `2` or `3` when you want more collapsed text.
+在旧运行时中，`mcp({ connect: "server-name" })` 也会刷新已连接服务器，以便无需重启 Pi 就能加载新工具、资源、prompt 和 instructions。
 
-Search includes both MCP tools and Pi tools (from extensions). Pi tools appear first with `[pi tool]` prefix. Space-separated words are ranked by weighted matches across name, server, description, and any configured `searchKeywords`, then returned one page at a time (`limit` defaults to 12). Use `details.nextOffset` for the next page. Regex search is still available with `regex: true`, but regex results are paginated without ranking.
+MCP 代理和直接工具结果默认采用紧凑自绘行。折叠的成功结果会显示调用标题、有参数时显示受限的一行输入预览，并显示首行结果；若还有隐藏文本，会提示 `Ctrl+O to expand`。展开后可查看完整结果，返回模型的内容不变。将 `settings.toolResultRendering` 设为 `"boxed"` 可恢复 Pi 旧版带框行；设置 `settings.collapsedResultLines` 为 `2` 或 `3` 可显示更多折叠文本。
 
-Tool names are fuzzy-matched on hyphens and underscores — `context7_resolve_library_id` finds `context7_resolve-library-id`. When `describe` or `tool` cannot resolve a name, the result includes top suggestions so the agent can correct a typo or missing prefix in the same turn.
+旧代理搜索同时包含 MCP 工具和 Pi 工具（来自扩展）。Pi 工具会带 `[pi tool]` 前缀并排在前面。以空格分隔的查询词会按名称、服务器、描述和配置的 `searchKeywords` 加权排序，再按页返回（`limit` 默认 12）。下一页使用 `details.nextOffset`。仍支持 `regex: true`，但正则结果不排序，只分页。
 
-### Search keywords
 
-Search uses literal matching so a tool whose name and description use different vocabulary than the query won't be found. Per-server `searchKeywords` adds extra vocabulary for matching tools:
+工具名会对连字符和下划线进行模糊匹配：`context7_resolve_library_id` 可以匹配 `context7_resolve-library-id`。若 `describe` 或 `tool` 无法解析名称，结果会带上最接近的候选项，方便 agent 在同一轮修正拼写或前缀。
+
+### 搜索关键词
+
+搜索采用字面匹配，因此查询词若与工具名称和描述使用不同词汇，可能找不到该工具。服务器级 `searchKeywords` 可为匹配工具增加词汇：
 
 ```json
 {
@@ -767,84 +781,86 @@ Search uses literal matching so a tool whose name and description use different 
 }
 ```
 
-With this config, `mcp({ search: "grep" })` finds `github_search_code` even though neither its name nor description contains that word. Similarly, `mcp({ search: "gh" })` finds all tools provided by the github server.
+使用此配置时，`mcp({ search: "grep" })` 即使在 `github_search_code` 的名称和描述中都没有该词，也能找到工具。同理，`mcp({ search: "gh" })` 会找到 github 服务器的所有工具。
 
-Keys match a tool's original name, prefixed name, or a glob (`*` applies to every tool on the server) and all matching entries combine. Keywords are weighted like description text, with an extra boost when the query exactly matches a configured phrase. They affect ranked and regex search only (including `tools.search` in `mcpScript`): they never appear in tool schemas, `describe` output, direct-tool registration, or the metadata cache, and search with keywords works offline from cached metadata.
+键可匹配工具原始名、带前缀名称或 glob（`*` 匹配该服务器的所有工具）；匹配到的条目会合并。关键词的权重与描述文本相同，查询与配置短语完全一致时会额外加权。关键词只影响排序搜索和正则搜索（包括 `mcpScript` 内的 `tools.search`）；不会进入工具 schema、`describe` 输出、直接工具注册或元数据缓存。基于关键词的搜索可离线使用缓存元数据。
 
-When `includeSchemas` is enabled, search and describe render common JSON Schema parameters as compact TypeScript shapes like `{ query: string; limit?: number; }`, with the older schema formatter retained as a fallback for unsupported schemas.
+启用 `includeSchemas` 后，搜索和描述会把常见 JSON Schema 参数渲染成紧凑 TypeScript 形状，例如 `{ query: string; limit?: number; }`；不支持的 schema 会回退到旧格式器。
 
-For HTTP servers, Pi reports HTTP 503 as temporary unavailability and does not add another immediate retry loop. Keep-alive servers keep cached metadata available and retry after 30 seconds, backing off to 5 minutes. Other failed connects run a one-request shape probe that can turn opaque transport errors into setup hints such as `endpoint returned HTML (200) — this URL does not appear to speak MCP`. Healthy connections are not probed.
+对于 HTTP 服务器，Pi 会将 HTTP 503 视为暂时不可用，不会立即增加另一层重试循环。keep-alive 服务器会保留缓存元数据，并在 30 秒后重试，最长退避至 5 分钟。其他连接失败会执行一次请求形状探测，将不明确的传输错误转换为诸如 `endpoint returned HTML (200) — this URL does not appear to speak MCP` 的设置提示。健康连接不会探测。
 
-Servers that provide usage guidance via the MCP `instructions` field surface it through discovery paths: `mcp({ server: "name" })` includes a preview, and `mcp({ instructions: "name" })` returns the full text. Instructions are captured at connect time and cached alongside tool metadata, so they stay available without a live connection.
+若服务器通过 MCP `instructions` 字段提供使用指南，旧发现路径会展示摘要：`mcp({ server: "name" })` 返回预览，`mcp({ instructions: "name" })` 返回全文。说明在连接时捕获，并与工具元数据一起缓存，因此无需保持实时连接也可读取。
 
-## Commands
+## 命令
 
-| Command | What it does |
-|---------|--------------|
-| `/mcp` | Interactive panel and first-run onboarding surface |
-| `/pi-mcp` | Alias for `/mcp` when the host reserves `/mcp` |
-| `/mcp setup` | Guided setup for a minimal `.mcp.json`, curated known servers, RepoPrompt quick-add, and config-path inspection |
-| `/mcp tools` | List all tools |
-| `/mcp prompts` | List all MCP prompts registered as slash commands |
-| `/mcp reconnect` | Reconnect all servers |
-| `/mcp reconnect <server>` | Connect or reconnect a single server |
-| `/mcp disable <server>` | Disable a server in the project-local `.pi/mcp.json` (requires `/reload` to apply) |
-| `/mcp enable <server>` | Enable through the project-local override layer (requires `/reload` to apply) |
-| `/mcp logout <server>` | Clear stored OAuth credentials for a server and disconnect it |
-| `/mcp-auth` | Open an OAuth server picker in interactive UI sessions |
-| `/mcp-auth <server>` | OAuth setup for a specific server |
+下表中的 `/mcp` 旧版子命令属于原适配器运行时。当前 `/mcp` 由 Pi 内置 MCP 扩展管理；`/mcp-adapter` 用于适配器增强面板。
 
-If `settings.autoAuth` is `true`, `mcp({ connect: ... })`, `mcp({ tool: ... })`, and direct tool calls automatically run OAuth when needed and retry once.
+| 命令 | 用途 |
+| --- | --- |
+| `/mcp` | 交互式面板和首次设置入口。 |
+| `/pi-mcp` | 当宿主占用 `/mcp` 时作为别名。 |
+| `/mcp setup` | 引导创建最简 `.mcp.json`、添加精选服务器、快速添加 RepoPrompt 和检查配置路径。 |
+| `/mcp tools` | 列出所有工具。 |
+| `/mcp prompts` | 列出注册为 slash command 的 MCP prompts。 |
+| `/mcp reconnect` | 重连所有服务器。 |
+| `/mcp reconnect <server>` | 连接或重连指定服务器。 |
+| `/mcp disable <server>` | 在项目 `.pi/mcp.json` 中禁用服务器（需 `/reload` 生效）。 |
+| `/mcp enable <server>` | 通过项目覆盖层启用服务器（需 `/reload` 生效）。 |
+| `/mcp logout <server>` | 清除服务器的 OAuth 凭据并断开连接。 |
+| `/mcp-auth` | 在交互式 UI 会话中打开 OAuth 服务器选择器。 |
+| `/mcp-auth <server>` | 为指定服务器设置 OAuth。 |
 
-In interactive sessions, you can also authenticate from `/mcp` with `ctrl+a` or Enter on a server that needs auth. In remote/headless sessions, use the proxy tool's `auth-start` and `auth-complete` actions to copy the authorization URL locally and paste the redirect URL back into Pi. `/mcp-auth` without a server only opens a picker in the interactive UI.
+若旧运行时的 `settings.autoAuth` 为 `true`，`mcp({ connect: ... })`、`mcp({ tool: ... })` 和直接工具调用会在需要时自动执行 OAuth 并重试一次。
 
-### MCP output schemas
+交互会话还可在 `/mcp` 中对需要认证的服务器按 `ctrl+a` 或 Enter。远程/无头会话使用代理工具的 `auth-start` 和 `auth-complete` action：先复制授权 URL 到本地浏览器，再将回调 URL 粘贴回 Pi。无服务器参数的 `/mcp-auth` 只会在交互式 UI 中打开选择器。
 
-Advertised tool `outputSchema` values support JSON Schema draft-07 and 2020-12. Unstamped schemas use the SDK's 2020-12 default. Returned `structuredContent` is validated against the advertised schema for both proxy and direct-tool calls.
+### MCP 输出 schema
 
-## Startup benchmark
+服务器公布的工具 `outputSchema` 支持 JSON Schema draft-07 和 2020-12。未标注版本的 schema 使用 SDK 的 2020-12 默认值。代理和直接工具调用都会依据已公布 schema 校验返回的 `structuredContent`。
 
-Run the cross-platform startup comparison from a checkout with Pi available on `PATH`:
+## 启动基准
+
+在 `PATH` 中可以找到 Pi 的源码检出目录下运行跨平台启动对比：
 
 ```bash
 npm run benchmark:startup -- --runs 3
 ```
 
-The command launches fresh Pi RPC processes with an isolated config directory and reports baseline, cold (`JITI_FS_CACHE=0`) and cached extension medians for module import, Pi's `main TOTAL`, and wall time. Results depend on the host and cache state; the deferred runtime work is paid by the first MCP operation rather than removed.
+该命令会启动配置目录彼此隔离的全新 Pi RPC 进程，并报告基准、冷启动（`JITI_FS_CACHE=0`）和缓存命中的扩展中位数，包括模块导入、Pi 的 `main TOTAL` 和总耗时。结果受宿主与缓存状态影响；延迟加载只是把运行时成本转移到第一次 MCP 操作，不会消除成本。
 
-## Source layout and startup boundary
+## 源码布局与启动边界
 
-The public Pi extension entry point remains the root `index.ts`. Root `config.ts`, `metadata-cache.ts`, `types.ts`, and `oauth.ts` are compatibility facades for public consumers; internal modules import their exact domain paths instead of importing those aggregate facades.
+Pi 扩展公共入口仍是根目录的 `index.ts`。根目录的 `config.ts`、`metadata-cache.ts`、`types.ts` 和 `oauth.ts` 是公共消费者的兼容入口；内部模块直接导入所属领域路径，不依赖聚合入口。
 
-Implementation is organized by responsibility:
+实现按职责分布在：
 
-- `src/contracts` — lightweight public/runtime contracts and status/UI schemas;
-- `src/catalog` — metadata caches, catalog snapshots, tool names, and selector indexes;
-- `src/config` — config paths, reads, merges, discovery, writes, and package/plugin loaders;
-- `src/runtime` — MCP connections, lifecycle, recovery, probes, transports, and handlers;
-- `src/auth` — OAuth, bearer credentials, callback handling, and keyring helpers;
-- `src/tools` — direct, namespace, proxy, script, prompt, resource, approval, and rendering tools;
-- `src/ui` and `src/commands` — UI servers/panels and command handlers;
-- `src/extension` — installation, session state, ownership, initialization, and tool-surface coordination.
+- `src/contracts`：轻量公共/运行时契约和状态/UI schema；
+- `src/catalog`：元数据缓存、目录快照、工具名和选择器索引；
+- `src/config`：配置路径、读取、合并、发现、写入及包/插件加载器；
+- `src/runtime`：MCP 连接、生命周期、恢复、探测、传输和处理器；
+- `src/auth`：OAuth、Bearer 凭据、回调处理和密钥环辅助程序；
+- `src/tools`：直接、命名空间、代理、脚本、prompt、资源、审批和渲染工具；
+- `src/ui` 与 `src/commands`：UI 服务/面板与命令处理器；
+- `src/extension`：安装、会话状态、所有权、初始化和工具界面协调。
 
-Startup statically loads only configuration reads, cached metadata, lightweight schemas, registration helpers, and the tool surface. MCP runtime connections, OAuth flow/storage, command handlers, gateway/direct execution, script workers, and UI runtime stay behind cached native `dynamic import()` boundaries. A valid all-lazy metadata cache can therefore skip full runtime initialization at `session_start`; eager, keep-alive, cold-cache, and explicit direct-tool behavior retain their existing semantics.
+启动时静态加载配置读取、缓存元数据、轻量 schema、注册辅助函数和工具表面，以及原生管理方同步读取既有系统密钥环/Bearer 令牌存储所需的凭据适配层。MCP 连接运行时、OAuth 登录流程与提供方、命令处理器、gateway/direct 执行、脚本 worker 和 UI 运行时均在缓存的原生 `dynamic import()` 边界之后。有效的全 lazy 元数据缓存可在 `session_start` 跳过完整运行时初始化；eager、keep-alive、冷缓存和显式直接工具行为保持原有语义。
 
-Tests mirror these domains under `test/unit` and `test/integration`; native Node/public-package checks live under `test/node`, and reusable process fixtures live under `test/fixtures`. The repository keeps the root source compatibility entries, while the npm package publishes generated `dist`, CLI files, skills, and UI assets and excludes `src/**` and tests.
+测试按对应领域放在 `test/unit` 和 `test/integration`；Node 原生测试/公共包检查放在 `test/node`；可复用的进程夹具放在 `test/fixtures`。仓库保留根目录源码兼容入口；npm 包发布生成的 `dist`、CLI 文件、skills 和 UI 资源，不包含 `src/**` 和测试。
 
-## How It Works
+## 工作原理
 
-- One `mcp` tool in context (~200 tokens) instead of hundreds
-- Servers are lazy by default — they connect on first tool call, not at startup
-- Tool metadata is cached to disk so search/list/describe work without live connections
-- Idle servers disconnect after 10 minutes (configurable), reconnect automatically on next use
-- npx-based servers resolve to direct binary paths, skipping the ~143 MB npm parent process
-- MCP server validates arguments, not the adapter
-- Remote keep-alive servers force-refresh their tool catalog during health checks, before user input, and before adapter-triggered turns, with bounded reconnect backoff
-- Specific tools can be promoted from the proxy to first-class Pi tools via `directTools` config, so the LLM sees them directly instead of having to search
+- 上下文中只需一个约 200 token 的 `mcp` 工具，而不是数百个工具定义；
+- 服务器默认按需启动：首次调用工具时才连接；
+- 工具元数据会缓存到磁盘，因此无实时连接时也可搜索、列出和描述工具；
+- 空闲服务器在 10 分钟后断开（可配置），下次使用时自动重连；
+- 基于 npx 的服务器会解析为可执行文件直接路径，跳过约 143 MB 的 npm 父进程；
+- MCP 服务器负责校验参数，适配器不重复校验；
+- 远程 keep-alive 服务器会在健康检查、用户输入前和适配器触发的回合前刷新目录，并采用有上限的重连退避；
+- 可通过 `directTools` 将指定工具从代理提升为 Pi 一等工具，使 LLM 直接看到它们，而不必先搜索。
 
-## Limitations
+## 限制
 
-- Cross-session server sharing not yet implemented (each Pi session runs its own server processes)
-- Compact MCP result rendering summarizes text, but inline images are still controlled by Pi's image display settings and may render below the compact text summary.
-- Pi still owns one separator row before self-rendered tool output, so compact mode reduces adapter rendering height but cannot promise true zero-gap rows.
-- MCP sampling support is text-only; context inclusion, tools, stop sequences, audio, and image content are rejected with explicit errors.
+- 暂不支持跨会话共享服务器进程；每个 Pi 会话都会运行自己的服务器进程。
+- 紧凑 MCP 结果渲染会摘要显示文本，但内联图片仍由 Pi 的图片显示设置控制，可能显示在紧凑文本摘要下方。
+- Pi 在自绘工具输出前仍会保留一个分隔行，因此紧凑模式可以减少适配器渲染高度，但不能保证完全没有间隔。
+- MCP sampling 仅支持文本；context inclusion、tools、stop sequences、audio 和 image content 会返回明确错误。

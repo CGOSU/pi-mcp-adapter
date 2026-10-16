@@ -1,51 +1,45 @@
 # 开发踩坑记录
 
-本文件记录容易复发且不直观的问题。一次性报错、普通开发流水和未经验证的猜测不写入此处。
+本文件记录容易复发、且不直观的问题；不收录一次性报错、普通操作过程或未经验证的猜测。
 
 ## 记录格式
 
-每条记录包含：
-
-- 日期：发现或最后验证日期；
-- 现象：可观察到的错误或异常行为；
-- 根因：经过确认的直接原因；
-- 修复：已验证有效的处理方法；
-- 验证：复现、测试或检查命令及结果。
+每条记录应包含日期、现象、原因、处理方法和实际验证结果。
 
 ## 已知问题
 
 - 日期：2026-08-23；
-  现象：启动基准的 Jiti 缓存命中与冷缓存结果差异很大，若只运行普通 warm import，不能代表冷启动的 `module import` 成本；
-  根因：Jiti 会复用文件系统缓存，`PI_TIMING=1` 只负责显示计时，不会自动清除缓存；
-  修复：冷样本显式设置 `JITI_FS_CACHE=0`，并让 `npm run benchmark:startup` 为每次样本启动 fresh Pi RPC、隔离配置目录，同时分别报告冷/缓存中位数；
-  验证：`npm run benchmark:startup -- --runs 3` 实测冷 module import 中位数 363ms、缓存命中中位数 58ms。
+  现象：Pi 启动基准在缓存命中和冷启动时差异很大；只测普通缓存命中无法代表冷启动时的模块导入成本；
+  原因：Jiti 会复用文件系统缓存，`PI_TIMING=1` 只显示计时，不会清理缓存；
+  处理：冷启动样本显式设置 `JITI_FS_CACHE=0`，每个样本启动新的 Pi RPC 并隔离配置目录，同时分别报告冷启动和缓存命中的中位数；
+  验证：`npm run benchmark:startup -- --runs 3` 测得冷启动模块导入中位数 363ms、缓存命中 58ms。
 
 - 日期：2026-08-23；
-  现象：Windows 宿主的完整 Vitest 仍可能出现全局配置污染、Linux keyring、taskkill、Unix socket、symlink 或文件 mode 失败；本次针对性行为集合中唯一失败是期望 POSIX `0600`、实际 Windows mode `0666`；
-  根因：部分测试断言 Unix 权限/进程语义，另有测试读取宿主 HOME 下的 Codex/OpenCode/Penpot 配置；这些不是源码目录迁移造成的失败；
-  修复：Node runner 改用 npm 的真实 `npm_execpath`，public export fixture 改为复制布局，避免 Windows `.cmd`/symlink 限制；其余平台差异保留为测试环境边界，使用针对性 Vitest、typecheck、public build、静态导入图和独立 benchmark 验证代码；
-  验证：`npm run test:oauth` 141 个测试通过，`npm run test:public-exports` 通过；最终 tarball 回归为 51 个文件，行为集合和完整结果记录于 [`docs/session-log.md`](session-log.md)。
+  现象：Windows 上运行完整 Vitest 时，可能出现全局配置污染、Linux 系统密钥环、`taskkill`、Unix 套接字、符号链接或文件权限模式相关失败；曾有用例期望 POSIX `0600`，而 Windows 返回 `0666`；
+  原因：部分用例断言 Unix 专属权限或进程行为，另有用例读取运行机器 `HOME` 下的 Codex、OpenCode、Penpot 配置；这些环境差异不等同于源码布局回归；
+  处理：Node 测试运行器使用 npm 实际的 `npm_execpath`；公共导出测试夹具改为复制目录布局，避免依赖 Windows 目录符号链接。其余平台差异应使用针对性测试、类型检查、公共构建、静态导入图和独立基准分别核验，不要把未运行的完整测试套件说成通过；
+  验证：`npm run test:oauth` 的 141 项测试通过，`npm run test:public-exports` 通过；当时的发布包检查为 51 个文件。各次测试范围见 [`docs/session-log.md`](session-log.md)。
 
 - 日期：2026-08-23；
-  现象：通过 Git 安装 Pi 包时，`npm install --omit=dev` 在 `npm run build:public` 处失败，并报告大量缺少 Node/Pi 类型的 TypeScript 错误；
-  根因：npm 会对 Git 依赖执行 `prepare`，但 production-only 安装不会安装 TypeScript、`@types/node` 或 Pi 开发类型包；
-  修复：删除安装期 `prepare`，改用 `prepack`，并将公共 `dist` 构建纳入仓库；CI 增加生成物一致性和 Windows production-only 安装验证。发布测试同时必须检查 tarball 不含 `test/` 或 `__tests__/`；
-  验证：最终 tarball 回归为 51 个文件且无 `src/**`/`test/**`；临时干净副本执行 `npm install --omit=dev --no-audit --no-fund` 成功，并成功导入四个独立公共 Node subpaths；包根入口由带 Pi peer 的 public exports 测试覆盖。
+  现象：以 Git 依赖安装 Pi 扩展时，`npm install --omit=dev` 会在 `npm run build:public` 阶段失败，并报告缺少 Node.js 或 Pi 类型；
+  原因：npm 安装 Git 依赖时会执行 `prepare`，而仅安装生产依赖不会安装 TypeScript、`@types/node` 或 Pi 开发类型包；
+  处理：移除安装阶段的 `prepare`，改为打包前执行 `prepack`，并把已构建的公共 `dist` 纳入仓库。发布包测试还应确认没有 `test/` 或 `__tests__/`；
+  验证：当时的发布包包含 51 个文件且不含 `src/**`/`test/**`；干净副本通过 `npm install --omit=dev --no-audit --no-fund`，并成功导入四个独立公共子路径。包根入口由带 Pi peer 的公共导出测试覆盖。
 
 - 日期：2026-08-23；
-  现象：原生 keyring fallback 测试在 Windows 上把 POSIX `/tmp/...` 字符串与实现生成的 Windows 路径比较，导致平台无关的 fallback 逻辑被误报失败；
-  根因：测试 stub 的 `require.resolve` 返回值和 native binding 路径没有使用宿主路径规则；
-  修复：使用 `join(tmpdir(), ...)` 构造 package.json 与 native binding 路径，保留 fallback 分支和错误链断言不变；
-  验证：`npm run test:oauth` 的 141 个 Node tests 全部通过。
+  现象：Windows 上的系统密钥环回退测试把 POSIX `/tmp/...` 字符串与实现生成的 Windows 路径比较，错误地报告回退逻辑失败；
+  原因：测试替身中的 `require.resolve` 返回路径和本机 binding 路径没有使用当前系统的路径规则；
+  处理：使用 `join(tmpdir(), ...)` 构造 `package.json` 和本机 binding 路径，保留回退分支及错误链断言；
+  验证：`npm run test:oauth` 的 141 项 Node 测试全部通过。
 
 - 日期：2026-09-01；
-  现象：Pi 的包扩展紧凑标签显示为 `包源:dist`，而不是包源名称；
-  根因：Pi 会把包根下 `dist/index.js` 的父目录作为扩展标识的一部分；
-  修复：使用 `extensions/index.js` 作为 manifest 入口，并由 wrapper 转发到构建产物；
-  验证：Pi 0.84.4 紧凑标签检查输出 `CGOSU/pi-mcp-adapter`，发布 tarball 包含 wrapper。
+  现象：Pi 紧凑视图中的扩展标签显示为“包源:dist”，而非包源名称；
+  原因：Pi 会把包根目录下 `dist/index.js` 的父目录加入扩展标识；
+  处理：将 `extensions/index.js` 设为清单入口，由它转发到构建产物；
+  验证：Pi 0.84.4 的紧凑标签检查显示 `CGOSU/pi-mcp-adapter`，发布包包含该转发入口。
 
-- 日期：2026-10-16（当日已修复）；
-  现象：在 adapter 根目录执行 `npm run build:public`（或经 `npm run test:public-exports` 间接执行）在 stock Pi 1.2.0 工作区失败，并丢失 `dist/` 中的生成文件；
-  根因：`scripts/build-public.mjs` 曾在构建之前就 `rm -rf dist`，而 `src/native/*.ts` 引用 patched Pi 才有的管理 API 导出；在 stock 1.2.0 下声明发射阶段报 TS2305，且因为清空发生在失败之前，`dist/*.d.ts` 与 `mcp-keyring-helper.cjs` 被删除；
-  修复：构建脚本改为先在仓库内 `.tmp-public-build-*` 暂存目录完成 JS、声明与运行资源构建，全部成功后才用 `rename` 原子替换 `dist/`；替换失败会把旧目录还原，暂存目录在 `finally` 中清理；已加 `.gitignore` 条目。事故当时的恢复方式是改用 `npm run test:public-types -- --pi-source <patched-Pi-checkout>` 重新生成（它在临时副本中按 patched Pi 构建并仅在校验全部通过后同步生成文件）；该 runner 至今仍是重新生成发布产物的推荐途径；CI 必须先 checkout 固定 Pi 基线并应用仓库 patch，再运行 `test:public-types`；不得在 stock peer 环境直接运行 `build:public` 或会触发它的 `npm pack`。通过产物验证后，打包步骤使用 `npm pack --ignore-scripts`；
-  验证：2026-10-16 修复后在同一 stock Pi 1.2.0 工作区重跑 `npm run build:public`，仍以 `has no exported member` 失败（exit 1），但 `dist/` 保持 18 个文件且逐个 SHA-256 与构建前快照完全一致，仓库根无 `.tmp-public-build-*` 残留；`npm run test:public-types -- --pi-source /Users/cgosu/code/JavaScript/pi-upstream-native` 仍成功构建并通过 5 项产物检查。随后 CI workflow 改为在 patched 固定基线上执行上述 public-type/build 流程（远端 Actions 尚未运行）。
+- 日期：2026-10-16（数据损失问题已修复；未打补丁的 Pi 仍不能完成构建）；
+  现象：在适配器根目录执行 `npm run build:public`，或执行会间接触发它的 `npm run test:public-exports`，在未打补丁的 Pi 1.2.0 下会因缺少原生管理 API 类型而失败；旧构建脚本还会在失败前删除 `dist/` 中的文件；
+  原因：适配器的 `src/native/*.ts` 使用了仓库固定补丁新增的 Pi API，而 npm 发布版的 Pi 1.2.0 不含这些导出；原构建脚本先清空 `dist/`，再开始可能失败的步骤；
+  处理：`scripts/build-public.mjs` 现在先在 `.tmp-public-build-*` 暂存目录构建 JavaScript、声明和运行资源，全部成功后才替换 `dist/`；替换失败会尝试恢复旧目录，并在 `finally` 中清理暂存目录。恢复或更新产物时，使用 `npm run test:public-types -- --pi-source <已打补丁的 Pi 源码目录>`。持续集成必须检出固定 Pi 基线并应用仓库补丁后再构建；产物验证完成后，使用 `npm pack --ignore-scripts`，避免在未打补丁的宿主上触发 `prepack`；
+  验证：修复后在未打补丁的 Pi 1.2.0 下重跑 `npm run build:public`，命令仍因缺少导出而以非零状态退出，但 `dist/` 的 18 个文件 SHA-256 全部不变，且没有暂存目录残留。`npm run test:public-types -- --pi-source /Users/cgosu/code/JavaScript/pi-upstream-native` 通过，产物检查 5 项通过。后续持续集成已改为使用打过补丁的固定基线；远端 GitHub Actions 尚未运行。
