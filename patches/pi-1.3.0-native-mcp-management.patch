@@ -1883,10 +1883,10 @@ index 0000000000000000000000000000000000000000..cca55f8a7c40fd548269408c15a2bc31
 +}
 diff --git a/packages/coding-agent/src/extensions/mcp/assembly.ts b/packages/coding-agent/src/extensions/mcp/assembly.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..3c02828bde5f92b60c394ede60fbab70e5019d70
+index 0000000000000000000000000000000000000000..a8b701bf336c4f0dfc3756011da68d7a3828b982
 --- /dev/null
 +++ b/packages/coding-agent/src/extensions/mcp/assembly.ts
-@@ -0,0 +1,135 @@
+@@ -0,0 +1,196 @@
 +/**
 + * Assembly seam for the built-in MCP owner.
 + *
@@ -1896,6 +1896,7 @@ index 0000000000000000000000000000000000000000..3c02828bde5f92b60c394ede60fbab70
 + */
 +
 +import type { AuthStorageBackend } from "../../core/auth-storage.ts";
++import type { EventBus } from "../../core/event-bus.ts";
 +import type { ExtensionContext } from "../../core/extensions/types.ts";
 +import type { LoadedMcpConfig, McpServerConfigPatch, McpServerEntry } from "./config.ts";
 +import type { McpOAuthCredentialBackend } from "./oauth.ts";
@@ -1925,10 +1926,32 @@ index 0000000000000000000000000000000000000000..3c02828bde5f92b60c394ede60fbab70
 +interface InstalledAssembly {
 +	source: McpOwnerAssembly;
 +	assembly: McpOwnerAssembly;
++	eventBus?: EventBus;
++	unsubscribeRequest?: () => void;
 +	release: () => void;
 +}
 +
++const ASSEMBLY_REQUEST_EVENT = "pi:mcp-management:owner-assembly:request";
++const ASSEMBLY_INSTALL_EVENT = "pi:mcp-management:owner-assembly:install";
++const ASSEMBLY_RELEASE_EVENT = "pi:mcp-management:owner-assembly:release";
++
 +let installed: InstalledAssembly | undefined;
++
++function connectAssemblyToOwner(registration: InstalledAssembly, eventBus: EventBus): boolean {
++	try {
++		if (registration.eventBus !== eventBus) {
++			registration.unsubscribeRequest?.();
++			registration.eventBus = eventBus;
++			registration.unsubscribeRequest = eventBus.on(ASSEMBLY_REQUEST_EVENT, () => {
++				eventBus.emit(ASSEMBLY_INSTALL_EVENT, registration.source);
++			});
++		}
++		eventBus.emit(ASSEMBLY_INSTALL_EVENT, registration.source);
++		return true;
++	} catch {
++		return false;
++	}
++}
 +
 +function isRecord(value: unknown): value is Record<string, unknown> {
 +	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -1989,7 +2012,7 @@ index 0000000000000000000000000000000000000000..3c02828bde5f92b60c394ede60fbab70
 + * same object is idempotent. The returned disposer affects future sessions; an active session keeps
 + * the assembly it resolved until that session shuts down.
 + */
-+export function installMcpOwnerAssembly(assembly: McpOwnerAssembly): McpOwnerAssemblyResult {
++export function installMcpOwnerAssembly(assembly: McpOwnerAssembly, eventBus?: EventBus): McpOwnerAssemblyResult {
 +	let parsed: McpOwnerAssembly | McpOwnerAssemblyResult;
 +	try {
 +		parsed = parseAssembly(assembly);
@@ -1999,7 +2022,12 @@ index 0000000000000000000000000000000000000000..3c02828bde5f92b60c394ede60fbab70
 +	if ("ok" in parsed) return parsed;
 +
 +	if (installed) {
-+		if (installed.source === assembly) return { ok: true, value: installed.release };
++		if (installed.source === assembly) {
++			if (eventBus && !connectAssemblyToOwner(installed, eventBus)) {
++				return invalidAssembly("Pi's MCP owner event bus could not receive the installed assembly.");
++			}
++			return { ok: true, value: installed.release };
++		}
 +		return {
 +			ok: false,
 +			error: {
@@ -2012,15 +2040,48 @@ index 0000000000000000000000000000000000000000..3c02828bde5f92b60c394ede60fbab70
 +	let registration: InstalledAssembly;
 +	const release = () => {
 +		if (installed === registration) installed = undefined;
++		const currentEventBus = registration.eventBus;
++		registration.unsubscribeRequest?.();
++		registration.unsubscribeRequest = undefined;
++		registration.eventBus = undefined;
++		currentEventBus?.emit(ASSEMBLY_RELEASE_EVENT, registration.source);
 +	};
 +	registration = { source: assembly, assembly: parsed, release };
 +	installed = registration;
++	if (eventBus && !connectAssemblyToOwner(registration, eventBus)) {
++		release();
++		return invalidAssembly("Pi's MCP owner event bus could not receive the installed assembly.");
++	}
 +	return { ok: true, value: release };
 +}
 +
 +/** Assembly resolved by the built-in MCP factory; separate `createMcpExtension()` instances do not use it. */
 +export function getMcpOwnerAssembly(): McpOwnerAssembly | undefined {
 +	return installed?.assembly;
++}
++
++/** Bridges an adapter-installed assembly into this built-in owner's module instance. */
++export function listenForMcpOwnerAssembly(eventBus: EventBus): () => void {
++	let activeSource: McpOwnerAssembly | undefined;
++	let releaseActive: (() => void) | undefined;
++	const unsubscribeInstall = eventBus.on(ASSEMBLY_INSTALL_EVENT, (value) => {
++		const result = installMcpOwnerAssembly(value as McpOwnerAssembly);
++		if (!result.ok) return;
++		activeSource = value as McpOwnerAssembly;
++		releaseActive = result.value;
++	});
++	const unsubscribeRelease = eventBus.on(ASSEMBLY_RELEASE_EVENT, (value) => {
++		if (value !== activeSource) return;
++		releaseActive?.();
++		releaseActive = undefined;
++		activeSource = undefined;
++	});
++	eventBus.emit(ASSEMBLY_REQUEST_EVENT, undefined);
++	return () => {
++		unsubscribeInstall();
++		unsubscribeRelease();
++		releaseActive?.();
++	};
 +}
 diff --git a/packages/coding-agent/src/extensions/mcp/catalog-cache.ts b/packages/coding-agent/src/extensions/mcp/catalog-cache.ts
 new file mode 100644
@@ -3217,7 +3278,7 @@ index 0000000000000000000000000000000000000000..b004e7c0a44540735c3acc0e02efaabf
 +	return server.config.exposure ?? "codemode";
 +}
 diff --git a/packages/coding-agent/src/extensions/mcp/index.ts b/packages/coding-agent/src/extensions/mcp/index.ts
-index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccbadfed0e4d 100644
+index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..68bd38be8b6272a6a12a847e599e531115cea359 100644
 --- a/packages/coding-agent/src/extensions/mcp/index.ts
 +++ b/packages/coding-agent/src/extensions/mcp/index.ts
 @@ -26,10 +26,12 @@
@@ -3263,7 +3324,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  import { CODEMODE_TOOL_NAME } from "../codemode/tool.ts";
  import { TOOL_SEARCH_TOOL_NAME } from "../tool-search/tool.ts";
 +import { approveMcpToolCall } from "./approval.ts";
-+import { getMcpOwnerAssembly } from "./assembly.ts";
++import { getMcpOwnerAssembly, listenForMcpOwnerAssembly } from "./assembly.ts";
 +import { computeMcpCatalogConfigHash, McpCatalogSeedStore } from "./catalog-cache.ts";
  import {
  	getMcpToolExposure,
@@ -3398,7 +3459,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  }
  
  /** Whether some of the server's tools are declared to the model, so the first prompt waits for them. */
-@@ -271,12 +373,17 @@ function attentionRank(server: McpServer): number {
+@@ -271,13 +373,19 @@ function attentionRank(server: McpServer): number {
  function describeTransport(entry: McpServerEntry): string {
  	const { config } = entry;
  	if ("url" in config) return config.url;
@@ -3414,9 +3475,11 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
 +
 +function createMcpExtensionInstance(options: McpExtensionOptions, useInstalledAssembly: boolean): ExtensionFactory {
  	return (pi: ExtensionAPI) => {
++		if (useInstalledAssembly) listenForMcpOwnerAssembly(pi.events);
  		let servers: McpServer[] = [];
  		/** Servers from `mcp.json`, which take precedence over registered servers of the same name. */
-@@ -295,18 +402,15 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+ 		let configuredEntries: McpServerEntry[] = [];
+@@ -295,18 +403,15 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  		const startupWaitMs = options.startupWaitMs ?? DEFAULT_STARTUP_WAIT_MS;
  		/** Working directory of the session, for stdio servers. */
  		let sessionCwd = process.cwd();
@@ -3440,7 +3503,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  		/**
  		 * Lifetime of the current session: aborted on session_shutdown, and before the first session_start
  		 * (registrations before that are read on session_start). Work captures `session.signal` when it
-@@ -316,6 +420,10 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -316,6 +421,10 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  		 */
  		let session = new AbortController();
  		session.abort();
@@ -3451,7 +3514,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  		/** Work registered with `track`: manager actions opening or closing connections, and sign-ins. */
  		const backgroundActions = new Set<Promise<void>>();
  		const track = <T>(work: Promise<T>): Promise<T> => {
-@@ -340,6 +448,29 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -340,6 +449,29 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  
  		const connections = () => servers.flatMap((server) => (server.connection ? [server.connection] : []));
  		const findServer = (name: string) => servers.find((server) => server.entry.name === name);
@@ -3481,7 +3544,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  
  		/** Servers extensions registered, except names `mcp.json` defines, which take precedence. */
  		const registeredServers = (): { servers: McpServer[]; overridden: string[] } => {
-@@ -354,7 +485,12 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -354,7 +486,12 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  					continue;
  				}
  				registered.push({
@@ -3495,7 +3558,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  					registeredConfig: JSON.stringify(config),
  				});
  			}
-@@ -362,8 +498,15 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -362,8 +499,15 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  		};
  
  		const getCredentials = (runtime: typeof McpRuntime): McpOAuthCredentialStore => {
@@ -3513,7 +3576,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  		};
  
  		const getServerLog = (runtime: typeof McpRuntime): McpServerLog => {
-@@ -373,20 +516,38 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -373,20 +517,38 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  
  		/** pi tool name to the `<server>\0<tool>` it was assigned to, so names stay unique and stable. */
  		const toolOwners = new Map<string, string>();
@@ -3554,7 +3617,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			const description = entry.config.description?.trim();
  			const namespace = {
  				name: mcpNamespace(server),
-@@ -397,51 +558,160 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -397,51 +559,160 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  			};
  			const previous = serverTools.get(server) ?? new Set<string>();
  			const current = new Set<string>();
@@ -3729,7 +3792,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			}
  			serverTools.set(server, current);
  			// Tools cannot be unregistered, so tools the server dropped are re-registered as hidden. When
-@@ -463,10 +733,55 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -463,10 +734,55 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  			syncResourceTools();
  		};
  
@@ -3786,7 +3849,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			);
  		const resourceServers = (): McpServerConnection[] =>
  			serversWithResources().flatMap((server) => (server.connection ? [server.connection] : []));
-@@ -484,7 +799,36 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -484,7 +800,36 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  			if (next === resourceToolsExposure || (resourceToolsExposure === undefined && next === "hidden")) return;
  			const wasDirect = resourceToolsExposure === "direct";
  			resourceToolsExposure = next;
@@ -3824,7 +3887,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			for (const definition of resourceDefinitions) pi.registerTool(definition);
  			if (wasDirect) {
  				const names = new Set(resourceDefinitions.map((definition) => definition.name));
-@@ -503,7 +847,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -503,7 +848,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  			// their server's exposure.
  			const exposures = new Set<McpExposure>();
  			for (const server of servers) {
@@ -3833,7 +3896,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			}
  			const needsCodemode = exposures.has("codemode");
  			const needsToolSearch = exposures.has("deferred");
-@@ -542,6 +886,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -542,6 +887,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  		const tokensAtSignIn = new Map<McpServerConnection, string>();
  		const storedTokens = (connection: McpServerConnection): string => {
  			const url = connection.oauthUrl;
@@ -3841,7 +3904,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			return url && credentials ? JSON.stringify(credentials.tokens(connection.name, url) ?? null) : "null";
  		};
  		const onConnectionChange = (connection: McpServerConnection) => {
-@@ -562,9 +907,83 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -562,9 +908,83 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  		const createConnection = async (
  			server: McpServer,
  			isCurrent: () => boolean,
@@ -3925,7 +3988,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			const connection = new runtime.McpServerConnection({
  				entry: server.entry,
  				cwd: sessionCwd,
-@@ -572,12 +991,52 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -572,12 +992,52 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  				credentials: getCredentials(runtime),
  				providerToken: async (provider) => modelRegistry?.getApiKeyForProvider(provider),
  				log: getServerLog(runtime),
@@ -3981,7 +4044,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  				},
  			});
  			server.connection = connection;
-@@ -591,27 +1050,111 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -591,27 +1051,111 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  		 * meanwhile. The returned promise rejects when the MCP runtime cannot be loaded.
  		 */
  		const startConnection = (server: McpServer, after?: Promise<unknown>): Promise<void> => {
@@ -4097,7 +4160,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  				);
  				if (ready.length === 0 || signal?.aborted) return;
  				let onAbort: (() => void) | undefined;
-@@ -627,7 +1170,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -627,7 +1171,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  					signal?.aborted ||
  					ready.every(
  						(attempt) =>
@@ -4106,7 +4169,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  							!servers.includes(attempt.server) ||
  							attempt.ready === attempt.server.ready,
  					)
-@@ -659,16 +1202,26 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -659,16 +1203,26 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  		 * registered servers only apply to the current session. `inProject` adds a project override.
  		 */
  		const saveConfig = (server: McpServer, patch: McpServerConfigPatch, inProject = false): string | undefined => {
@@ -4135,7 +4198,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			return undefined;
  		};
  
-@@ -678,16 +1231,59 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -678,16 +1232,59 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  			prompt: McpSignInPrompt,
  			cancel?: AbortSignal,
  		): Promise<string | undefined> => {
@@ -4197,7 +4260,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  						settings: connection.oauthSettings(),
  						challenge: connection.challenge,
  						prompt,
-@@ -698,6 +1294,15 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -698,6 +1295,15 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  				if (error instanceof runtime.McpSignInCancelledError) return "Sign-in cancelled.";
  				return `Sign-in failed: ${errorMessage(error)}`;
  			}
@@ -4213,7 +4276,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			// The challenge that asked for this sign-in (for example for more scope) is answered.
  			connection.challenge = undefined;
  			try {
-@@ -709,28 +1314,65 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -709,28 +1315,65 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  		};
  
  		const signOut = async (server: McpServer): Promise<boolean> => {
@@ -4283,7 +4346,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			}
  		};
  
-@@ -744,7 +1386,11 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -744,7 +1387,11 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  			if (failed) return failed;
  			if (!enabled) {
  				const connection = server.connection;
@@ -4295,7 +4358,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  				server.connection = undefined;
  				if (connection) {
  					// A reconnect may already have detached its old client while awaiting transport
-@@ -765,9 +1411,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -765,9 +1412,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  			return undefined;
  		};
  
@@ -4306,7 +4369,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			if (server.connection?.state === "connected") registerTools(server.connection);
  			syncResourceTools();
  			// Tools no longer exposed directly leave the declared set; direct tools are activated on registration.
-@@ -780,9 +1424,845 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -780,9 +1425,845 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  			const tools = serverTools.get(server.entry.name) ?? new Set<string>();
  			pi.setActiveTools(pi.getActiveTools().filter((name) => !tools.has(name) || !indirect.has(name)));
  			emitChange();
@@ -5152,7 +5215,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  		// ---------------------------------------------------------------------------------------
  		// Manager (`/mcp` in the TUI)
  		// ---------------------------------------------------------------------------------------
-@@ -796,6 +2276,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -796,6 +2277,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  			title: "MCP servers",
  			error: notices().join("\n") || undefined,
  			items: [...servers]
@@ -5160,7 +5223,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  				.sort((a, b) => attentionRank(a) - attentionRank(b) || a.entry.name.localeCompare(b.entry.name))
  				.map((server) => ({
  					value: server.entry.name,
-@@ -809,7 +2290,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -809,7 +2291,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  
  		const serverMenu = (name: string): McpMenu => {
  			const server = findServer(name);
@@ -5169,7 +5232,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  				return {
  					title: name,
  					items: [],
-@@ -1018,7 +2499,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -1018,7 +2500,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  			if (servers.length === 0 && configErrors.length === 0 && overridden.length === 0) {
  				return `No MCP servers configured. Add them to ${resolve(getAgentDir(), "mcp.json")} or .pi/mcp.json.`;
  			}
@@ -5178,7 +5241,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  				const { name } = server.entry;
  				const exposure = exposureOf(server.entry);
  				const connection = server.connection;
-@@ -1049,11 +2530,11 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -1049,11 +2531,11 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  		): Promise<McpServer | undefined> => {
  			if (name) {
  				const server = findServer(name);
@@ -5193,7 +5256,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			if (candidates.length === 0) {
  				ctx.ui.notify(options.none, "info");
  				return undefined;
-@@ -1112,7 +2593,20 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -1112,7 +2594,20 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  		};
  
  		pi.on("session_start", (_event, ctx) => {
@@ -5215,7 +5278,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			configErrors = loaded.errors;
  			projectConfig = loaded.projectConfig;
  			autoEnableCodemode = loaded.autoEnableCodemode ?? true;
-@@ -1126,19 +2620,56 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -1126,19 +2621,56 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  			const registered = registeredServers();
  			overridden = registered.overridden;
  			servers = [...loaded.servers.map((entry) => ({ entry })), ...registered.servers];
@@ -5276,7 +5339,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  				.then(() => {
  					if (!signal.aborted) reportProblems(ctx);
  				})
-@@ -1157,7 +2688,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -1157,7 +2689,7 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  			if (waitedForStartup) return;
  			waitedForStartup = true;
  			const ready = servers.flatMap((server) =>
@@ -5285,7 +5348,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			);
  			if (ready.length === 0) return;
  			let timer: NodeJS.Timeout | undefined;
-@@ -1176,9 +2707,10 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -1176,9 +2708,10 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  		// Every prompt lists the servers in the `mcp_servers` section as they are when it starts. Pi
  		// appends the section to the conversation when it changed, for example after a server connected.
  		pi.on("before_agent_start", async (event, ctx) => {
@@ -5297,7 +5360,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			if (section) sections[MCP_SERVERS_SECTION] = section;
  			else delete sections[MCP_SERVERS_SECTION];
  		});
-@@ -1189,23 +2721,36 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -1189,23 +2722,36 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  		// tools reach every server, so they wait for all of them. Direct MCP calls wait only for their
  		// own server, including a reconnect still closing its old transport.
  		pi.on("tool_call", async (event, ctx) => {
@@ -5343,7 +5406,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  		});
  
  		// Pick up sign-ins done outside the session, such as `pi mcp login` run by the agent.
-@@ -1227,13 +2772,21 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -1227,13 +2773,21 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  					next.get(server.entry.name)?.registeredConfig !== server.registeredConfig,
  			);
  			servers = servers.filter((server) => !removed.includes(server));
@@ -5367,7 +5430,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  			if (signal.aborted || connecting.length === 0) return;
  			try {
  				await Promise.all(connecting.map((server) => startConnection(server)));
-@@ -1251,10 +2804,21 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -1251,10 +2805,21 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  
  		pi.on("session_shutdown", async () => {
  			session.abort();
@@ -5389,7 +5452,7 @@ index 8a97d7fb2fa32180ca6d034a5c49bbb77452b5e8..52a9f85e229d31e02e18641cfac6ccba
  		});
  
  		pi.registerCommand("mcp", {
-@@ -1340,8 +2904,31 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
+@@ -1340,8 +2905,31 @@ export function createMcpExtension(options: McpExtensionOptions = {}): Extension
  	};
  }
  
@@ -8034,6 +8097,26 @@ index 0b8fb1dd209d8064e083585dd862b4d592e45eb8..838559adfeabc23283bd068a960c856b
  export { createToolSearchExtension } from "./extensions/tool-search/index.ts";
  // Main entry point
  export { type MainOptions, main } from "./main.ts";
+diff --git a/packages/coding-agent/src/modes/interactive/interactive-mode.ts b/packages/coding-agent/src/modes/interactive/interactive-mode.ts
+index ce2398475b9780cbe7063da5d6b767224a0d217a..c8c4c6bb08621fae0e2a929f1cb678ee6b9c72c0 100644
+--- a/packages/coding-agent/src/modes/interactive/interactive-mode.ts
++++ b/packages/coding-agent/src/modes/interactive/interactive-mode.ts
+@@ -6403,7 +6403,14 @@ export class InteractiveMode {
+ 		const existing = servers.find(
+ 			(server) => "url" in server.config && normalizeUrl(server.config.url) === normalizeUrl(RADIUS_MCP_URL),
+ 		);
+-		if (existing && "url" in existing.config && existing.config.auth?.provider === providerId) return;
++		if (
++			existing &&
++			"url" in existing.config &&
++			typeof existing.config.auth === "object" &&
++			existing.config.auth !== null &&
++			existing.config.auth.provider === providerId
++		)
++			return;
+ 
+ 		let name = existing?.name ?? "radius";
+ 		if (!existing && servers.some((server) => server.name === name)) name = "radius-mcp";
 diff --git a/packages/coding-agent/test/mcp-approval.test.ts b/packages/coding-agent/test/mcp-approval.test.ts
 new file mode 100644
 index 0000000000000000000000000000000000000000..ad4b2c54dfbdd458a76cb8ed9b446c8a3f06bb4f
@@ -10994,16 +11077,17 @@ index e1ca939f187b46af8ea95eaa1806cdd1081fdc63..f7e28ccc540def00a70bb23e165acb56
  });
 diff --git a/packages/coding-agent/test/mcp-owner-assembly.test.ts b/packages/coding-agent/test/mcp-owner-assembly.test.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..fa2e0718f16106e49aec219b1cad89b17a86da3e
+index 0000000000000000000000000000000000000000..d8152fdf80791ff9d831d62919926b041373220b
 --- /dev/null
 +++ b/packages/coding-agent/test/mcp-owner-assembly.test.ts
-@@ -0,0 +1,471 @@
+@@ -0,0 +1,491 @@
 +import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 +import { createServer } from "node:http";
 +import type { AddressInfo } from "node:net";
 +import { tmpdir } from "node:os";
 +import { join } from "node:path";
 +import type { McpOAuthState } from "@earendil-works/pi-mcp/oauth";
++import { createJiti } from "jiti";
 +import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 +import { ENV_AGENT_DIR } from "../src/config.ts";
 +import { InMemoryAuthStorageBackend } from "../src/core/auth-storage.ts";
@@ -11051,15 +11135,15 @@ index 0000000000000000000000000000000000000000..fa2e0718f16106e49aec219b1cad89b1
 +});
 +
 +afterEach(async () => {
-+	for (const host of hosts.splice(0)) {
++	for (const host of hosts) {
 +		await host.emit("session_shutdown", { type: "session_shutdown", reason: "quit" });
-+		host.events.clear();
 +	}
++	for (const dispose of assemblyDisposers.splice(0)) dispose();
++	for (const host of hosts.splice(0)) host.events.clear();
 +	for (const server of httpServers.splice(0)) {
 +		if (server.listening)
 +			await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
 +	}
-+	for (const dispose of assemblyDisposers.splice(0)) dispose();
 +	vi.unstubAllEnvs();
 +	for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 +});
@@ -11187,6 +11271,25 @@ index 0000000000000000000000000000000000000000..fa2e0718f16106e49aec219b1cad89b1
 +		const replacement = installMcpOwnerAssembly({ loadConfig: () => loadedConfig([]) });
 +		expect(replacement.ok).toBe(true);
 +		if (replacement.ok) replacement.value();
++	});
++
++	it("shares its installed assembly with the built-in owner across extension-loader module instances", async () => {
++		const host = createFakePiHost();
++		const assembly: McpOwnerAssembly = { loadConfig: () => loadedConfig([disabledEntry]) };
++		const jiti = createJiti(import.meta.url, { moduleCache: false, tryNative: false });
++		const duplicate = (await jiti.import(
++			new URL("../src/extensions/mcp/assembly.ts", import.meta.url).href,
++		)) as typeof import("../src/extensions/mcp/assembly.ts");
++		const result = duplicate.installMcpOwnerAssembly(assembly, host.events);
++		expect(result.ok).toBe(true);
++		if (!result.ok) return;
++		assemblyDisposers.push(result.value);
++
++		const handle = await startBuiltInOwner(host);
++		expect(handle.snapshot()).toMatchObject({
++			ok: true,
++			value: { servers: [{ name: "assembled", enabled: false, connectionStatus: "disabled" }] },
++		});
 +	});
 +
 +	it("feeds the real built-in owner config and write-back from its assembly", async () => {

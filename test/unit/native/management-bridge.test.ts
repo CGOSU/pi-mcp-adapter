@@ -130,6 +130,37 @@ describe("NativeMcpManagementBridge", () => {
     bridge.stopSession();
   });
 
+  it("retries startup discovery when the native owner becomes available after an early request", async () => {
+    const events = new FakeEventBus();
+    const handle = makeHandle();
+    const requested = vi.fn();
+    let ownerReady = false;
+    events.on("pi:mcp-management:discover", (requestValue) => {
+      const request = requestValue as Record<string, unknown>;
+      requested(request);
+      if (!ownerReady) return;
+      events.emit(`pi:mcp-management:response:${request.requestId}`, nativeResponse(request, handle));
+    });
+    const onHandle = vi.fn();
+    const onUnavailable = vi.fn();
+    const bridge = new NativeMcpManagementBridge(makePi(events), onHandle, vi.fn(), onUnavailable);
+
+    bridge.startSession();
+    expect(requested).toHaveBeenCalledTimes(1);
+    ownerReady = true;
+    events.emit("pi:mcp-management:available", {
+      protocol: "pi.mcp-management",
+      version: 1,
+      available: true,
+      capabilities,
+    });
+
+    await vi.waitFor(() => expect(onHandle).toHaveBeenCalledWith(handle));
+    expect(requested).toHaveBeenCalledTimes(2);
+    expect(onUnavailable).not.toHaveBeenCalled();
+    bridge.stopSession();
+  });
+
   it("rejects a host response that omits a required capability", async () => {
     const events = new FakeEventBus();
     const handle = makeHandle();

@@ -49,3 +49,15 @@
   原因：Git 把补丁文件自身作为新增文本检查，补丁又逐字包含上游源文件格式，诊断针对的是 artifact 内容而非 adapter 的源码/文档/测试差量；直接格式化补丁会改变其 SHA-256 并破坏与固定基线的对应；
   处理：不要规范化或重写已校验的上游 patch。对 adapter 其他 staged 文件运行 `git diff --cached --check -- . ':(exclude)patches/*.patch'`，并分别核对 patch hash、固定基线 `git apply --check` 及 apply 后上游源码差量；
   验证：Pi 1.3 patch 的 adapter staged diff 出现上述 artifact 诊断；其 SHA-256 与 manifest 一致，固定 Pi 1.3.0 独立 checkout 的 apply 与上游 `git diff --check` 已通过。
+
+- 日期：2026-10-17；
+  现象：packed Pi CLI 与 adapter runtime test 即使 adapter app 使用 `npm install --omit=peer`，仍可能加载到 Pi peer，导致 extension 使用另一个旧 package instance，错误表现为 adapter assembly 未进入 bundled built-in owner；
+  原因：Node/Jiti 会沿实际模块路径向父目录搜索 `node_modules`；peer omitted 只保证 adapter app 自身没有该依赖，不能屏蔽 ancestor `node_modules`。此外，在临时 app 子目录没有自己的 `package.json` 时，`npm install` 可能向更上层 package root 安装依赖；
+  处理：给每个 isolated app 建立独立 `package.json`，把 CLI host 和 adapter 安装在不同目录，确认 adapter peer 缺失且没有任何 ancestor Pi `node_modules`。需要确认 resolver 时，可用 `JITI_DEBUG=1` 核对 `@earendil-works/pi-coding-agent` 命中 bundle 的 virtual module；最终证明仍以真实 packed CLI 运行观察为准；
+  验证：第一次 RPC test 在 ancestor `/tmp/.../runtime/node_modules` 存在 Pi package 时拿到空 owner snapshot；删除该目录并让 Pi 内置 owner通过事件总线请求/接收 assembly 后，fresh packed CLI 返回 programmatic fixture 的 connected/live catalog，且 EOF 后 fixture 退出。
+
+- 日期：2026-10-17；
+  现象：在 adapter 根目录直接 `npm pack` 会重新执行 `prepack`，并因管理 API 类型不存在而在 `build:public` 失败，即使 `test:public-types -- --pi-source <patched checkout>` 刚刚验证过 patched build；
+  原因：当前根 `node_modules` 的 development Pi 仍是 stock 1.2.0，缺少 patch 才增加的 public MCP management types；裸 `npm pack` 的生命周期脚本不会自动复用 `test:public-types` 的隔离 patched-Pi build；
+  处理：先对明确的固定 patched Pi checkout 运行 `npm run test:public-types -- --pi-source <patched-Pi-checkout>`，随后从该成功 build 的 `dist/` 使用 `npm pack --ignore-scripts`；不得跳过 fresh public-types/artifact verification 或对未验证 `dist` 直接打包；
+  验证：本轮裸 `npm pack` 的 `prepack` 因 stock 1.2.0 缺少 MCP management exports 失败；其后 `test:public-types` 的 typecheck、5 项 exports/package tests 和 packed consumer 通过，`npm pack --ignore-scripts` 生成 adapter tarball，SHA-256 `d4b6ee49f8f5d21b527779321b15e25aeeec22943a2327a9643198ef52f06428`。

@@ -3626,10 +3626,10 @@ function getNativeManagementRuntime() {
     }
   };
 }
-function installNativeMcpOwnerAssembly(assembly) {
+function installNativeMcpOwnerAssembly(assembly, events) {
   const runtime = getNativeManagementRuntime();
   if (!runtime.ok) return runtime;
-  const result = runtime.value.installAssembly(assembly);
+  const result = runtime.value.installAssembly(assembly, events);
   if (!result.ok) {
     return failure("invalid-public-api", result.error.message);
   }
@@ -3668,7 +3668,8 @@ var NativeMcpManagementBridge = class {
         this.onUnavailable({ code: "session-ended", message: "Pi native MCP management is no longer available in this session." });
         return;
       }
-      void this.discover(generation);
+      if (this.handle) return;
+      this.restartDiscovery(generation);
     });
     void this.discover(generation);
   }
@@ -3698,6 +3699,15 @@ var NativeMcpManagementBridge = class {
     this.unsubscribeHandle = void 0;
     this.handle = void 0;
   }
+  restartDiscovery(generation) {
+    if (this.pending) {
+      const cancel = this.cancelPending;
+      this.pending = void 0;
+      this.cancelPending = void 0;
+      cancel?.();
+    }
+    void this.discover(generation);
+  }
   discover(generation) {
     if (this.pending) return this.pending;
     const runtime = getNativeManagementRuntime();
@@ -3708,7 +3718,7 @@ var NativeMcpManagementBridge = class {
     const result = this.requestHandle(runtime.value, generation);
     this.pending = result;
     void result.then((discovery) => {
-      if (this.generation !== generation) return;
+      if (this.generation !== generation || this.pending !== result) return;
       this.pending = void 0;
       this.cancelPending = void 0;
       if (!discovery.ok) {
@@ -3855,7 +3865,7 @@ function installAdapter(pi, options) {
   const previous = adapters.get(pi);
   if (previous) return previous;
   const configAssembly = createNativeConfigAssembly(options);
-  const assemblyResult = installNativeMcpOwnerAssembly(configAssembly.assembly);
+  const assemblyResult = installNativeMcpOwnerAssembly(configAssembly.assembly, pi.events);
   let currentState;
   const bridge = new NativeMcpManagementBridge(
     pi,

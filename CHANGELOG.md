@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- **The extension now requires a patched Pi 1.2.0 host.** Pi's built-in MCP owner is the only connection, OAuth, and execution runtime; the adapter discovers it over the versioned public `pi.mcp-management` v1 protocol and negotiates every required capability up front. Stock or incomplete hosts fail explicitly with a structured error and no server is connected; the previous self-contained runtime is no longer used as a fallback. See [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md) for the fixed baseline (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`), the versioned patch, and the reproducible apply and verification steps.
+- **The extension requires one of two fixed patched Pi baselines:** Pi 1.2.0 at `06a466935536f8c9bcacb2d5efc0fc021be1bdff` or Pi 1.3.0 at `71023aec1546d6d677a65669c5665c0927ce0dd0`. Pi's built-in MCP owner remains the only connection, OAuth, and execution runtime; the adapter discovers it over the versioned public `pi.mcp-management` v1 protocol and negotiates every required capability up front. Stock or incomplete hosts fail explicitly with a structured error and no server is connected; the previous self-contained runtime is not used as a fallback. Other commits within the peer range are not implicitly covered. See [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md) for the fixed baselines, separate patches, and reproducible verification steps.
 - The adapter registers only `/mcp-adapter`; `/mcp` remains Pi's native MCP manager. MCP tools, resources, and prompts come from the native owner's pipeline, while adapter-managed servers keep the configured `toolPrefix`, `exposure`, `toolExposure`, include/exclude, approval, and output-guard semantics.
 - Peer dependencies and the development type baseline moved to the `1.2.0` Pi package family, and the Node engine requirement is `>=22.19.0`.
 - Project-level MCP sources are gated by Pi's real project trust: in an untrusted project they are withheld from the live snapshot, are not connected, and direct-tool persistence refuses to write.
@@ -16,13 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `server.set-direct-tools` management capability and `McpManagementHandle.setDirectTools`, which persists the server-level `directTools` selection through the native owner's provenance, writable-source, and project-trust rules. `setExecutionPolicy` remains session-only and `setToolExposure` still writes `toolExposure`; neither impersonates the persisted selection.
 - `npm run test:public-types` to rebuild and verify the public artifacts against a patched Pi checkout, and `npm run test:patched-native-session` to run the real patched native extension and this adapter in one harness session with local fixtures and a faux provider.
-- [`docs/native-mcp-protocol.md`](docs/native-mcp-protocol.md), [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md), and a machine-readable patch manifest under `patches/`.
+- Added a separately versioned Pi 1.3.0 fixed-baseline patch while preserving the Pi 1.2.0 patch and validation path; the two fixed commits are the only verified support targets.
+- [`docs/native-mcp-protocol.md`](docs/native-mcp-protocol.md), [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md), and machine-readable patch manifests under `patches/`.
 
 ### Removed
 - The `mcp-script-worker.mjs` and `app-bridge.bundle.js` runtime resources are no longer published. Related settings (`scriptMode`, `disableProxyTool`, `autoAuth`, `trace`, `oauthDir`, and the server-level `debug`/`trace` fields) are retained in configuration but are not activated by the native owner instead of being silently dropped.
 
 ### Fixed
 - `npm run build:public` no longer deletes the committed `dist/` before it knows the build succeeds. JavaScript, declarations, and runtime resources are emitted into a temporary directory and only published over `dist/` once every step passes, so a failed build (for example on a stock Pi host that lacks the patched management API) leaves the existing artifacts untouched.
+- Adapter owner assemblies now reach Pi's bundled built-in MCP owner through the shared extension event bus instead of relying on module-local state being shared across Jiti and bundled module instances. Management discovery also retries when that owner becomes available after the initial request.
 
 ## [2.27.1] - 2026-08-31
 

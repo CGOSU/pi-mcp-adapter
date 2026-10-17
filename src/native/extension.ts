@@ -141,7 +141,7 @@ function installAdapter(pi: ExtensionAPI, options: McpAdapterOptions): NativeAda
   if (previous) return previous;
 
   const configAssembly = createNativeConfigAssembly(options);
-  const assemblyResult = installNativeMcpOwnerAssembly(configAssembly.assembly);
+  const assemblyResult = installNativeMcpOwnerAssembly(configAssembly.assembly, pi.events);
   let currentState: NativeAdapterState | undefined;
   const bridge = new NativeMcpManagementBridge(
     pi,

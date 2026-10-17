@@ -8,6 +8,12 @@
 
 ## 已确认决策
 
+### 2026-10-17：通过 Pi 扩展事件总线把 adapter assembly 交给 bundled native owner
+
+- 决定：adapter 安装 `McpOwnerAssembly` 时显式传入当前 `pi.events`；Pi 内置 MCP factory 在 session 开始时通过同一 event bus 请求、接收并释放该 assembly。Adapter management bridge 若初始 discovery 早于 owner available，会在 available 事件后重试，并以 session generation 和 pending-request identity 防止迟到结果覆盖当前状态。
+- 原因：Jiti 加载的 adapter 与 Pi bundled CLI 中的内置 MCP owner 不保证使用同一 module instance；仅写入 public installer 所在模块的 module-local singleton，会导致 built-in owner 仍加载默认配置。fresh packed CLI 运行验证确认 event-bus handoff 后，native owner 能连接 adapter assembly 中的 local fixture。
+- 约束：Pi 原生 MCP 仍为唯一连接、认证和执行 owner；事件 handoff 是内部 assembly seam，不扩展 `pi.mcp-management` v1 public capability，也不引入 fallback/client。必须在 peer omitted、无 ancestor Pi `node_modules` 的 fresh packed CLI 中验证，不能用源码/Vitest alias 代替。
+
 ### 2026-10-16：发布产物构建必须先成功后替换，失败不得破坏已提交 dist
 
 - 决定：`npm run build:public` 在仓库内 `.tmp-public-build-*` 暂存目录完成 JS、声明与运行资源构建，全部成功后才原子替换 `dist/`；发布失败时还原旧目录，暂存目录始终清理。

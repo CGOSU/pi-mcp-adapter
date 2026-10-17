@@ -80,7 +80,10 @@ type PublicApiExports = Pick<
   | "installMcpOwnerAssembly"
 >;
 
-type AssemblyInstaller = (assembly: McpOwnerAssembly) => McpOwnerAssemblyResult;
+type AssemblyInstaller = (
+  assembly: McpOwnerAssembly,
+  events?: ExtensionAPI["events"],
+) => McpOwnerAssemblyResult;
 
 export type NativeManagementFailureCode =
   | "missing-public-api"
@@ -277,10 +280,11 @@ export function getNativeManagementRuntime(): NativeManagementResult<NativeManag
 
 export function installNativeMcpOwnerAssembly(
   assembly: McpOwnerAssembly,
+  events?: ExtensionAPI["events"],
 ): NativeManagementResult<() => void> {
   const runtime = getNativeManagementRuntime();
   if (!runtime.ok) return runtime;
-  const result = runtime.value.installAssembly(assembly);
+  const result = runtime.value.installAssembly(assembly, events);
   if (!result.ok) {
     return failure("invalid-public-api", result.error.message);
   }
@@ -319,7 +323,8 @@ export class NativeMcpManagementBridge {
         this.onUnavailable({ code: "session-ended", message: "Pi native MCP management is no longer available in this session." });
         return;
       }
-      void this.discover(generation);
+      if (this.handle) return;
+      this.restartDiscovery(generation);
     });
     void this.discover(generation);
   }
@@ -354,6 +359,16 @@ export class NativeMcpManagementBridge {
     this.handle = undefined;
   }
 
+  private restartDiscovery(generation: number): void {
+    if (this.pending) {
+      const cancel = this.cancelPending;
+      this.pending = undefined;
+      this.cancelPending = undefined;
+      cancel?.();
+    }
+    void this.discover(generation);
+  }
+
   private discover(generation: number): Promise<NativeManagementResult<McpManagementHandle>> {
     if (this.pending) return this.pending;
     const runtime = getNativeManagementRuntime();
@@ -364,7 +379,7 @@ export class NativeMcpManagementBridge {
     const result = this.requestHandle(runtime.value, generation);
     this.pending = result;
     void result.then((discovery) => {
-      if (this.generation !== generation) return;
+      if (this.generation !== generation || this.pending !== result) return;
       this.pending = undefined;
       this.cancelPending = undefined;
       if (!discovery.ok) {

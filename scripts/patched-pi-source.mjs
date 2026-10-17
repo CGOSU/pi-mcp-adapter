@@ -15,7 +15,7 @@ const supportedTargets = new Map([
     manifestFile: "pi-1.3.0-native-mcp-management.json",
     baseCommit: "71023aec1546d6d677a65669c5665c0927ce0dd0",
     patchPath: "pi-1.3.0-native-mcp-management.patch",
-    patchSha256: "953d4911373cddaa133989515786e247369edb43aad438dfca5170d0a00d3d78",
+    patchSha256: "67df3bb7e8d51dd9f15e66253869d20e5c4c0957f7a331f1a4ba82e2b54eaf33",
   }],
 ]);
 

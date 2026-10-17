@@ -96,6 +96,14 @@ OAuth sign-in 的 prompt 仅通过回调临时交互：展示 authorization URL�
 
 `setExecutionPolicy` 仍然只改变当前 session 的有效策略，不写配置；`setToolExposure` 仍写入 `toolExposure`，不会代替 `directTools` 的持久化选择。两者的既有语义不变。持久化能力分别位于 Pi 1.2.0/1.3.0 固定基线补丁中；准确 patch、manifest 与可复现 apply/consumer 验证见 [`docs/native-mcp-patch.md`](native-mcp-patch.md)。
 
+## Built-in owner assembly 与 bundled module 边界
+
+Adapter 的 public extension package 可能由 Jiti 加载，而 Pi 内置 MCP owner 位于 bundled CLI 的 ESM graph；两者不保证共享同一个 module instance。因此，不能依赖 `installMcpOwnerAssembly()` 内的 module-local singleton 自动被 built-in owner 读取，也不能因此创建第二套 MCP runtime。
+
+Adapter 将 `pi.events` 传给公开 assembly installer。若提供 event bus，installer 在该 bus 上注册 assembly-request listener 并发布当前 assembly；内置 MCP factory 在每个 session start 监听 install/release 事件，并先发 request，使 adapter 在 owner 监听前或监听后安装都能收敛到同一 owner。内部 handoff 事件为 `pi:mcp-management:owner-assembly:request`、`pi:mcp-management:owner-assembly:install` 和 `pi:mcp-management:owner-assembly:release`。内置 owner 在自己的 module instance 中校验并安装收到的 assembly；释放只作用于同一 source object。冲突 assembly 仍 fail-closed，手动创建的 `createMcpExtension()` instance 不使用该内置 owner seam。
+
+这三个 handoff 事件是 Pi 扩展内部 assembly seam，不属于公开 `pi.mcp-management` v1 discovery/capability 契约，不暴露 client 或执行入口。Adapter management bridge 若启动发现早于 owner 可用，会在 `available: true` 后重试，并以 session generation 与 pending-request identity 丢弃旧结果；公开能力清单和无 fallback 边界不变。
+
 ## 快照与 freshness
 
 快照只含管理 UI 所需的规范化数据，且每次返回新的递归不可变副本。server 至少提供：`name`、`enabled`、`scope`、有效 server exposure、`connectionStatus`、`catalog.freshness` 和 `catalog.tools`；tool 项只含原生工具名、可选说明与 effective exposure，不包含输入 schema 或执行器。`scope` 只允许 `global`、`project`、`extension`、`unknown`，不包含路径；已有 project override 的 entry 报告有效作用域 `project`。

@@ -10,9 +10,9 @@
   "patch": {
     "path": "pi-1.3.0-native-mcp-management.patch",
     "format": "git binary/full-index diff",
-    "sha256": "953d4911373cddaa133989515786e247369edb43aad438dfca5170d0a00d3d78",
-    "sizeBytes": 543194,
-    "fileCount": 48,
+    "sha256": "67df3bb7e8d51dd9f15e66253869d20e5c4c0957f7a331f1a4ba82e2b54eaf33",
+    "sizeBytes": 547689,
+    "fileCount": 49,
     "paths": [
       "packages/coding-agent/docs/extensions.md",
       "packages/coding-agent/docs/mcp.md",
@@ -38,6 +38,7 @@
       "packages/coding-agent/src/extensions/mcp/tools.ts",
       "packages/coding-agent/src/extensions/tool-search/tool.ts",
       "packages/coding-agent/src/index.ts",
+      "packages/coding-agent/src/modes/interactive/interactive-mode.ts",
       "packages/coding-agent/test/mcp-approval.test.ts",
       "packages/coding-agent/test/mcp-catalog-cache.test.ts",
       "packages/coding-agent/test/mcp-direct-tools-config.test.ts",
@@ -110,8 +111,8 @@
       "worktreeBeforeApply": "clean"
     },
     "applyCheck": "git apply --check passed on a clean isolated checkout at the fixed baseline.",
-    "apply": "git apply passed; the result matched all 48 manifest paths (22 modified, 26 added).",
-    "diffCheck": "git diff --check passed on the patched isolated checkout.",
+    "apply": "git apply passed; the result matched all 49 manifest paths (23 modified, 26 added).",
+    "diffCheck": "git diff --check passed on the patched isolated checkout after build-compatibility and event-bus assembly handoff changes.",
     "nativeTests": {
       "files": [
         "test/mcp-management.test.ts",
@@ -123,7 +124,11 @@
         "test/mcp-oauth-refresh.test.ts",
         "test/mcp-oauth-store.test.ts"
       ],
-      "result": "8 test files passed; 89 tests passed in the isolated Pi 1.3.0 checkout."
+      "result": "8 test files passed; 90 tests passed in the isolated Pi 1.3.0 checkout."
+    },
+    "cliBuild": {
+      "command": "npm run build",
+      "result": "Passed in isolated staging: full workspace typecheck/build and bundled CLI emitted (83 bundle files, 8.9 MiB)."
     }
   }
 }
