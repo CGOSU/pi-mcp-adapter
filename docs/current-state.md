@@ -35,6 +35,6 @@
 
 ## 尚待完成的交付
 
-- 本轮只创建 adapter 本地中文提交，不 push、发布或打 tag；远端 CI 未由本轮触发。具体提交和验证记录见 [`docs/session-log.md`](session-log.md)。
+- Adapter 中文提交 `增加 Pi 1.3.0 固定基线支持` 已按用户明确要求推送至 `origin/main`，本地 `main` 与远端同步；未发布 npm、部署或打 tag。远端 CI 是否完成尚未核实；具体记录见 [`docs/session-log.md`](session-log.md)。
 - 重新生成发布文件时，必须向 `npm run test:public-types -- --pi-source <已应用对应补丁的固定 Pi 源码目录>` 显式提供 Pi 1.2.0 或 1.3.0 checkout。Stock Pi 缺少原生管理 API 类型，不能用于 adapter 构建；构建脚本会保留旧 `dist/`，但不把缺 API 的失败伪装为成功。详见 [`docs/native-mcp-patch.md`](native-mcp-patch.md) 和 [`docs/pitfalls.md`](pitfalls.md)。
 - `AGENTS.md` 和 `docs/clean-code.md` 未在本轮修改。
