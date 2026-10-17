@@ -16,6 +16,7 @@
 - Artifact/managed install 验证：已验证 Pi 1.3.0 tarball SHA-256 `b929058ead39f7766452aa32457f0b369b31da630165cab585614f7164c32e26` 在隔离模拟 managed root 中离线安装、核验 18 项 management capabilities 并成功原子切换。随后按用户授权将该 artifact 持久化到本机 Pi managed cache，装好 launcher wrapper 并激活独立 alias；检查原 launcher backup 与 stock release 均在。通过隔离 HOME 的本机 launcher `--version`（输出 `1.3.0`）及 alias public API import。
 - 真实 CLI runtime 验证：用本机 managed patched alias 的实际 bundled CLI、隔离配置目录、packed adapter 与 local stdio fixture 运行 RPC smoke；owner connected，live catalog 有 3 tools，`/mcp-adapter` prompt handled，`notify`/`setStatus` 可见，model inference events 为 0，CLI exit 0 且 fixture 退出。未读取用户配置/keyring、未连接生产 MCP/LLM。
 - 未执行真实 `pi update --all`，避免核心升级/network side effect；因此 updater 实际网络/发布行为未实测，post-update 退出状态由 fake child integration tests 验证。正在运行的旧 Pi process 不会因 `current-version` 切换而热替换，需完全退出并重启。未发布 npm、未 push、未部署或打 tag。
+- Git 交付：按仓库本地身份 `CGOSU`/`dev@cgosu.com` 创建中文本地提交 `7ec2f8586e899fb8224a772f82a97794b14d68bd`（`接入托管 Pi 非阻断 MCP 补丁更新`，14 个明确归属文件）。提交后 `main` 比 `origin/main` 超前 1 个提交；未 push。
 
 ### 2026-10-17：完成 Pi 1.3.0 fresh packed CLI 原生 MCP 验证
 
