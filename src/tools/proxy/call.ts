@@ -157,9 +157,7 @@ export async function executeCall(
     const match = getSingleToolMatch(state.toolMetadata.get(serverName), toolName);
     if (match === "ambiguous") return ambiguousToolResult("call", toolName);
     toolMeta = match;
-    if (isServerDisabled(state.config.mcpServers[serverName])) {
-      return disabledCallResult(serverName, toolMeta);
-    }
+    if (isServerDisabled(state.config.mcpServers[serverName])) return disabledResult("call", serverName, toolMeta);
   } else {
     const exactMatches = getEnabledToolMatches(state, toolName, true);
     if (exactMatches.length > 1) return ambiguousToolResult("call", toolName);
@@ -192,7 +190,7 @@ export async function executeCall(
         break;
       }
     }
-    if (!toolMeta && disabledMatch) return disabledCallResult(disabledMatch.serverName, disabledMatch.toolMeta);
+    if (!toolMeta && disabledMatch) return disabledResult("call", disabledMatch.serverName, disabledMatch.toolMeta);
   }
 
   if (serverName && !toolMeta) {
@@ -443,9 +441,7 @@ export async function executeCall(
     }
   }
 
-  if (isServerDisabled(state.config.mcpServers[serverName])) {
-    return disabledCallResult(serverName, toolMeta);
-  }
+  if (isServerDisabled(state.config.mcpServers[serverName])) return disabledResult("call", serverName, toolMeta);
 
   const normalizedArgs = toolMeta.resourceUri ? args ?? {} : normalizeToolArguments(args);
   const approval = await ensureToolCallApproved(

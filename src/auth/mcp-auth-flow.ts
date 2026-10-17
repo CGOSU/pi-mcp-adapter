@@ -12,6 +12,7 @@ import {
   type AuthOptions,
 } from "@modelcontextprotocol/client"
 import open from "open"
+import { logger } from "../logger.ts"
 import { McpOAuthProvider, type McpOAuthConfig } from "./mcp-oauth-provider.ts"
 import {
   ensureCallbackServer,
@@ -803,7 +804,7 @@ export async function authenticate(
       if (options.onAuthorizationUrl) {
         await abortable(Promise.resolve(options.onAuthorizationUrl(authorizationUrl)), signal)
       } else {
-        console.log(`MCP Auth: Open this URL to authenticate ${serverName}:\n${authorizationUrl}`)
+        logger.debug(`MCP Auth: Open this URL to authenticate ${serverName}:\n${authorizationUrl}`)
       }
       try {
         await abortable(open(authorizationUrl), signal)
@@ -882,7 +883,7 @@ export async function getValidToken(
   }
 
   if (expired === true && entry.tokens.refreshToken) {
-    console.log(`MCP Auth: Token expired for ${serverName}, attempting refresh`)
+    logger.debug(`MCP Auth: Token expired for ${serverName}, attempting refresh`)
 
     try {
       const authProvider = new McpOAuthProvider(serverName, serverUrl, {}, {
@@ -893,7 +894,7 @@ export async function getValidToken(
         const clientInfo = await authProvider.clientInformation()
         throwIfAborted(signal)
         if (!clientInfo) {
-          console.log(`MCP Auth: No client info for refresh for ${serverName}`)
+          logger.debug(`MCP Auth: No client info for refresh for ${serverName}`)
           return null
         }
 
@@ -961,7 +962,7 @@ export async function removeAuth(serverName: string, options: AuthenticateOption
   clearAllCredentials(serverName, authStorageOptions)
   await clearOAuthState(serverName, authStorageOptions)
   throwIfAborted(signal)
-  console.log(`MCP Auth: Removed credentials for ${serverName}`)
+  logger.debug(`MCP Auth: Removed credentials for ${serverName}`)
 }
 
 /**

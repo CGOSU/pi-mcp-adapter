@@ -53,11 +53,16 @@ export function ambiguousToolResult(mode: "call" | "describe", toolName: string)
   };
 }
 
-export function disabledResult(mode: string, serverName: string): ProxyToolResult {
+export function disabledResult(mode: string, serverName: string, tool?: ToolMetadata): ProxyToolResult {
   const message = `Server "${serverName}" is disabled. Run /mcp enable ${serverName} and /reload to enable it.`;
+  const identity = tool?.resourceUri
+    ? { resourceUri: tool.resourceUri }
+    : tool
+      ? { tool: tool.originalName }
+      : {};
   return {
     content: [{ type: "text" as const, text: message }],
-    details: { mode, error: "server_disabled", server: serverName, message },
+    details: { mode, error: "server_disabled", server: serverName, ...identity, message },
   };
 }
 
