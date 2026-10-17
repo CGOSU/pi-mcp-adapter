@@ -8,6 +8,12 @@
 
 ## 已确认决策
 
+### 2026-10-17：Pi managed 更新后单独 reconciliate 已登记 MCP 补丁，绝不阻断核心更新
+
+- 决定：仅在 Pi managed `releases-v1` launcher 的核心更新命令成功退出后运行本地 patch reconciler；只允许精确登记并核验 hash 的持久 artifact。未知版本、artifact 缺失/校验失败、安装/验证失败、锁冲突都只报告 adapter 暂不可用，不暂停、回滚或 pin Pi 核心更新，并保留 Pi updater 原始退出码。当前 managed registry 只启用固定 Pi 1.3.0 artifact。
+- 原因：用户明确要求 `pi update --all` 的核心升级照常完成，而当前 Pi 自身 updater 没有本地 MCP patch hook；独立外层 launcher 可以在核心 updater 结束后进行补丁安装，不改写 Pi 核心代码或发布来源。
+- 约束：不修改活动 release；使用独立 staging、offline/npm scripts disabled、API/bundle/CLI 验证后才原子切换 `current-version`；补丁 release 使用非 SemVer alias 以免被 Pi managed updater 的 SemVer release pruning 清除，保留原 stock release 和本地回滚路径。hook 仅识别确切 artifact 版本；不得远程下载未核验补丁、回退到第二套 MCP runtime 或影响非核心 update。实际安装与验证状态见 [`current-state.md`](current-state.md)，可复现流程见 [`native-mcp-patch.md`](native-mcp-patch.md)。
+
 ### 2026-10-17：通过 Pi 扩展事件总线把 adapter assembly 交给 bundled native owner
 
 - 决定：adapter 安装 `McpOwnerAssembly` 时显式传入当前 `pi.events`；Pi 内置 MCP factory 在 session 开始时通过同一 event bus 请求、接收并释放该 assembly。Adapter management bridge 若初始 discovery 早于 owner available，会在 available 事件后重试，并以 session generation 和 pending-request identity 防止迟到结果覆盖当前状态。

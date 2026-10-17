@@ -62,10 +62,22 @@ npm run test:patched-pi-runners
 
 它检查固定版本选择、Pi 1.2.0 既有 hash 保持、参数边界，以及 Pi 1.3.0 manifest/hash/path/protocol/capability 校验。
 
+## 托管 Pi 的非阻断更新 hook
+
+`npm run install:managed-pi-update-hook -- --artifact <verified-pi.tgz>` 为 Pi 的 `releases-v1` managed install 安装本地 launcher wrapper。只有从 `~/.pi/agent/bin/pi`（或等效 managed agent 路径）启动的 Pi 命令会经过该 wrapper；非 managed 安装不受影响。安装器先校验仓库中的 patch SHA-256、artifact registry 和传入 tarball SHA-256，随后把 artifact 持久化到 managed install 的 `native-mcp-update/artifacts/`，备份原 launcher，并安装 post-update hook。当前 registry 只登记 Pi 1.3.0；其 patched Pi tarball SHA-256 为 `b929058ead39f7766452aa32457f0b369b31da630165cab585614f7164c32e26`。Artifact tarball 不随 adapter package 发布，且安装器不从远端下载或依赖 `/tmp`。
+
+成功的 `pi update --all` 完成后，wrapper 才运行 reconciliation。它只选择 package version 与 registry 精确相等的 artifact；安装使用独立 staging、npm offline/cache、禁用 lifecycle scripts，之后核验包版本、public MCP management protocol/capabilities、bundled owner events 和 `pi --version`，最后将新 release 移入 managed `releases/` 并原子切换 `current-version`。补丁 release 使用稳定的非 SemVer alias，使 Pi 自身的旧 release pruning 不会把它当作可清理的版本目录；原 stock release 保留以便回滚。
+
+Hook failure、未知版本、缺少/哈希错误 artifact、离线依赖不足、并发更新锁冲突或 bundle/API 验证失败只输出 warning；wrapper 保留 Pi 核心更新原始退出状态，既不暂停、回滚也不 pin 核心版本。`--models` 和 `--extensions` 更新不应用核心补丁。对于未登记版本，adapter 仍按 fail-closed 契约报告宿主缺少受支持的 MCP API，不会回退到第二套 runtime。
+
+恢复命令为 `npm run install:managed-pi-update-hook -- --remove`。只有当前指针仍是 hook 激活的 release 且 prior release 存在时，remove 才将指针恢复至 prior release；随后恢复原 launcher。补丁 release 和 artifact 缓存保留，不会删除文件。安装/恢复后需完全重启 Pi，现有进程不会替换已加载的宿主模块。
+
+实际验证包括：9 项 managed hook/launcher Node tests，涵盖 Pi updater 锁冲突与安装 staging 期间核心 release 指针并发变化；真实 1.3.0 tarball 在隔离模拟 managed root 中的离线 install/reconcile/API smoke；本机 managed Pi 新 release 的 `--version` 与 public API 检查；使用已安装 managed release 的 bundled CLI、packed adapter、隔离配置和 local stdio fixture 执行 RPC smoke。没有运行真实 `pi update --all`，因此 updater 网络/发布链路不在本轮实测范围；wrapper 的成功/失败退出状态由 fake child 测试覆盖。
+
 ## 已执行验证与边界
 
 - Pi 1.2.0：在独立固定 checkout `06a466935536f8c9bcacb2d5efc0fc021be1bdff` 上确认 apply 前干净，`git apply --check` 与 apply 成功，48 路径匹配 manifest。既有 patch SHA-256 `d499d6f...c46c654`、manifest SHA-256 `d7507252...e664c6` 未改变。本轮 `test:public-types`（typecheck、5 项 exports/package 检查、packed consumer）和真实 same-session runner 各通过。
 - Pi 1.3.0：在新建 detached checkout `71023aec1546d6d677a65669c5665c0927ce0dd0` 上确认 apply 前干净，`git apply --check` 与 apply 成功，49 路径（23 修改、26 新增）匹配 manifest；`git diff --check` 通过。Patch SHA-256 为 `67df3bb7...54eaf33`，manifest SHA-256 为 `5768a010...39bd7e`。固定补丁对应的完整 `npm run build` 通过，生成 83 个 bundled CLI 文件（8.9 MiB）；四个 owner/management 定向测试文件 71 项通过。Adapter `test:public-types` 中 typecheck、5 项 exports/package 检查及 packed consumer 通过，版本化 runner 6 项通过；adapter 原生 bridge 定向测试 3 文件/9 项通过。
 - Adapter 版本化 runner 测试为 6 项通过。`npm pack --dry-run --ignore-scripts --json` 检查到 31 个发布文件，含 `dist`、README 所链接的协议文档及 Pi 1.2.0/1.3.0 patch/manifest，不含 `src/**`、`test/**` 或 source map；未发布 npm 包。
 - Pi 1.3.0 fresh packed CLI runtime smoke：Pi tarball SHA-256 `b929058ead39f7766452aa32457f0b369b31da630165cab585614f7164c32e26`，adapter tarball SHA-256 `d4b6ee49f8f5d21b527779321b15e25aeeec22943a2327a9643198ef52f06428`。二者安装在相互隔离的临时目录；adapter 的 Pi peer 被省略，且没有 ancestor `node_modules`。用实际 `dist/bundle/cli.js`、packed adapter 和本地 stdio fixture 执行 RPC：观测到完整 public management API/18 项 capabilities、owner assembly 中 `assembly_fixture` 连接成功并取得 3 项 live tools、`/mcp-adapter` prompt 被处理、`notify`/`setStatus` 发出；无模型推理事件，EOF 后 CLI 退出码 0，fixture 子进程退出。fixture 只记录 `initialize` 与 `tools/list`，未调用 tool，也未访问真实 MCP、LLM、用户配置或凭据。完整 transcript、probe 和 fixture 日志保存在隔离目录 `/tmp/pi-mcp-evidence-1.3.nbLEJX/runtime/packed-final/`。
-- Adapter tarball 通过 `npm run test:public-types -- --pi-source <fixed patched checkout>` 产生并验证的 `dist`，随后以 `npm pack --ignore-scripts` 打包；裸 `npm pack` 会重新执行 `prepack` 并使用 adapter 本地 stock Pi 1.2.0 开发类型，导致缺少 patched management exports 的声明构建失败。`npm run check` 和 Pi 全量测试未运行；不得将定向测试/构建扩展解释为全量 check 通过。未修改、提交或推送 Pi 上游，也未改动用户运行中的 Pi。
+- Adapter tarball 通过 `npm run test:public-types -- --pi-source <fixed patched checkout>` 产生并验证的 `dist`，随后以 `npm pack --ignore-scripts` 打包；裸 `npm pack` 会重新执行 `prepack` 并使用 adapter 本地 stock Pi 1.2.0 开发类型，导致缺少 patched management exports 的声明构建失败。`npm run check` 和 Pi 全量测试未运行；不得将定向测试/构建扩展解释为全量 check 通过。未修改、提交或推送 Pi 上游。managed launcher hook 的本机安装、release pointer 切换与验证见上一节；没有运行真实 `pi update --all`。

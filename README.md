@@ -45,6 +45,24 @@ pi install git:github.com/CGOSU/pi-mcp-adapter.git
 
 两版补丁都不改变 Pi npm 依赖。Pi 内置 MCP 管理方仍是唯一连接、OAuth 和工具执行运行时；本适配器只提供选择加入的组装接入和界面。
 
+### 托管 Pi 更新后的非阻断补丁
+
+托管安装可选择安装一个本地 post-update hook。它只接入通过 `~/.pi/agent/bin/pi` 启动的 managed Pi；在 Pi 自身更新成功后，按固定 package version 查找本机已登记且 SHA-256 匹配的 Pi artifact，在独立 staging 中离线安装、验证 MCP management API，再以独立 release 和 `current-version` 指针切换。安装时须提供事先验证过的 Pi tarball；artifact 不从临时目录或未登记远端下载。在 adapter 仓库或已安装 package 的根目录执行：
+
+```sh
+npm run install:managed-pi-update-hook -- --artifact /path/to/verified-pi-coding-agent.tgz
+```
+
+安装器会备份原始 launcher，当前登记的 artifact 只覆盖 Pi 1.3.0。未来执行托管 `pi update --all` 时，官方 Pi 核心更新先照常完成；未知版本、artifact 缺失或校验/安装/验证失败只警告 adapter 可能不可用，不暂停、不回滚、不 pin 核心版本，且保留 Pi 原更新退出状态。Pi 核心仍是唯一 MCP owner；stock 或不完整版本上的 adapter 继续明确失败，不启用第二套 runtime。`pi update --models` 与 `pi update --extensions` 不应用核心补丁。
+
+删除 hook 会恢复原始 launcher；若当前指针仍指向 hook 激活的版本，也恢复先前 release。独立补丁 release 与本地 artifact 缓存保留以便审计/回滚：
+
+```sh
+npm run install:managed-pi-update-hook -- --remove
+```
+
+安装或移除后需完全退出并重新启动 Pi，当前运行进程不会因 `current-version` 指针切换而换载已加载的宿主代码。完整安装、故障语义与当前登记范围见 [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md)。
+
 ### 打过补丁的宿主上的入口
 
 | 界面             | 负责方     | 用途                                                                                |

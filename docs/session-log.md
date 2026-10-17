@@ -8,6 +8,15 @@
 
 ## 会话
 
+### 2026-10-17：接入托管 Pi 非阻断更新 hook 并激活 1.3.0 patched release
+
+- 用户目标：继续实现 `pi update --all` 后接入已验证 MCP patch，但无论版本未知还是 patch/cache/install/API 验证失败，都必须让 Pi 核心更新照常完成。实现只作用于 `releases-v1` managed launcher；Pi 原生 MCP 仍是唯一 owner，不引入 fallback，也不下载未经登记的远端补丁。
+- 完成：新增 `scripts/managed-pi-update-hook.mjs`、`scripts/install-managed-pi-update-hook.mjs`、`scripts/managed-pi-update-launcher.sh` 与固定 artifact registry；wrapper 在原 Pi update 子进程成功后触发 reconciliation，保留原退出状态。使用独立 staging、offline npm/cache、禁用 lifecycle scripts，验证包版本、公开管理 API、bundle owner events 和 `pi --version` 后才以非 SemVer alias `native-mcp-1.3.0-67df3bb7e8` 安装并切换指针。故障只警告，不暂停/回滚/pin 核心 release；launcher 原件与 stock 1.3.0 release 保留。安装/移除与故障语义写入 README 和 [`docs/native-mcp-patch.md`](native-mcp-patch.md)，pitfall 写入 [`docs/pitfalls.md`](pitfalls.md)，决策写入 [`docs/decisions.md`](decisions.md)。CI 增加 managed update hook tests。
+- 自动化验证：`npm run test:managed-pi-update-hook` 9 项通过，覆盖 self-update 命令选择、未知版本、Pi updater 锁冲突、staging 期间 current release 并发变化、固定版本激活/stock release 保留、hash/install failure 不改 core pointer、非核心更新 no-op、launcher 安装恢复与 wrapper 经 symlink 启动时的退出码保持。`node --check`（hook/installer/test）、`sh -n`（wrapper）通过。`npm pack --ignore-scripts --dry-run --json` 检查 35 文件，含四个 managed hook/manifest assets，不含 `test/**`/`node_modules/**`。
+- Artifact/managed install 验证：已验证 Pi 1.3.0 tarball SHA-256 `b929058ead39f7766452aa32457f0b369b31da630165cab585614f7164c32e26` 在隔离模拟 managed root 中离线安装、核验 18 项 management capabilities 并成功原子切换。随后按用户授权将该 artifact 持久化到本机 Pi managed cache，装好 launcher wrapper 并激活独立 alias；检查原 launcher backup 与 stock release 均在。通过隔离 HOME 的本机 launcher `--version`（输出 `1.3.0`）及 alias public API import。
+- 真实 CLI runtime 验证：用本机 managed patched alias 的实际 bundled CLI、隔离配置目录、packed adapter 与 local stdio fixture 运行 RPC smoke；owner connected，live catalog 有 3 tools，`/mcp-adapter` prompt handled，`notify`/`setStatus` 可见，model inference events 为 0，CLI exit 0 且 fixture 退出。未读取用户配置/keyring、未连接生产 MCP/LLM。
+- 未执行真实 `pi update --all`，避免核心升级/network side effect；因此 updater 实际网络/发布行为未实测，post-update 退出状态由 fake child integration tests 验证。正在运行的旧 Pi process 不会因 `current-version` 切换而热替换，需完全退出并重启。未发布 npm、未 push、未部署或打 tag。
+
 ### 2026-10-17：完成 Pi 1.3.0 fresh packed CLI 原生 MCP 验证
 
 - 背景与修复：此前 packaged CLI probe 无法在 bundled Pi built-in owner 的 snapshot 中看到 adapter programmatic server。核实 Jiti-loaded adapter 与 CLI bundle 中的 owner 不共享 module-local singleton；adapter 将当前 `pi.events` 传入 assembly installer，由内置 owner 通过内部 request/install/release event handoff 在自己的 module instance 安装同一 assembly。Management bridge 在 owner 迟到 available 时重试 discovery，并用 session generation/pending request identity 丢弃旧结果。该 seam 不扩展 public `pi.mcp-management` v1，也不引入 adapter runtime/fallback。同步更新 Pi 1.3 patch/manifest 与 source runner hash；最终 patch 为 49 paths，SHA-256 `67df3bb7e8d51dd9f15e66253869d20e5c4c0957f7a331f1a4ba82e2b54eaf33`，manifest SHA-256 `5768a010e8473a0d6d9dde557e733f5a513e42933bf15b8c61a3a4dd8339bd7e`。清洁 fixed baseline apply 与 verifier 均通过；临时诊断日志已从 staging source 移除，最终 bundle 不含该诊断代码。

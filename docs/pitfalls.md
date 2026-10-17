@@ -57,6 +57,12 @@
   验证：第一次 RPC test 在 ancestor `/tmp/.../runtime/node_modules` 存在 Pi package 时拿到空 owner snapshot；删除该目录并让 Pi 内置 owner通过事件总线请求/接收 assembly 后，fresh packed CLI 返回 programmatic fixture 的 connected/live catalog，且 EOF 后 fixture 退出。
 
 - 日期：2026-10-17；
+  现象：给 Pi managed install 增加独立 patched release 后，若 release 目录名仍是纯 SemVer，Pi 自己的更新清理可能把它视为旧版本并删除；另一个独立问题是 npm v12 把 user/global config 都指定成同一个 `/dev/null` 会报重复加载配置，导致离线安装失败；
+  原因：Pi managed release pruning 只把 SemVer 目录纳入版本保留/清理；npm config loader 会拒绝同一 config 文件被 user/global scope 同时加载；
+  处理：补丁 release 使用稳定非 SemVer alias（原 stock release 保留），只在新 release 完整安装与 API/bundle/CLI 验证后切换 `current-version`；离线 npm install 在独立 staging 创建两个不同的空 config 文件，禁用 lifecycle scripts 并强制 offline/cache；
+  验证：真实 Pi 1.3.0 tarball 在隔离 managed-root 模拟中成功离线安装、验证并原子切换；本机 launcher/current pointer 验证与实际 patched release RPC smoke 通过；真实 `pi update --all` 未运行，详见 [`docs/native-mcp-patch.md`](native-mcp-patch.md) 和 [`docs/session-log.md`](session-log.md)。
+
+- 日期：2026-10-17；
   现象：在 adapter 根目录直接 `npm pack` 会重新执行 `prepack`，并因管理 API 类型不存在而在 `build:public` 失败，即使 `test:public-types -- --pi-source <patched checkout>` 刚刚验证过 patched build；
   原因：当前根 `node_modules` 的 development Pi 仍是 stock 1.2.0，缺少 patch 才增加的 public MCP management types；裸 `npm pack` 的生命周期脚本不会自动复用 `test:public-types` 的隔离 patched-Pi build；
   处理：先对明确的固定 patched Pi checkout 运行 `npm run test:public-types -- --pi-source <patched-Pi-checkout>`，随后从该成功 build 的 `dist/` 使用 `npm pack --ignore-scripts`；不得跳过 fresh public-types/artifact verification 或对未验证 `dist` 直接打包；

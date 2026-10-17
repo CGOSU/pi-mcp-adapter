@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `server.set-direct-tools` management capability and `McpManagementHandle.setDirectTools`, which persists the server-level `directTools` selection through the native owner's provenance, writable-source, and project-trust rules. `setExecutionPolicy` remains session-only and `setToolExposure` still writes `toolExposure`; neither impersonates the persisted selection.
 - `npm run test:public-types` to rebuild and verify the public artifacts against a patched Pi checkout, and `npm run test:patched-native-session` to run the real patched native extension and this adapter in one harness session with local fixtures and a faux provider.
 - Added a separately versioned Pi 1.3.0 fixed-baseline patch while preserving the Pi 1.2.0 patch and validation path; the two fixed commits are the only verified support targets.
+- Added an opt-in managed Pi post-update hook. `pi update --all` continues the official core update first; afterward, the hook installs only an exact-version locally verified Pi artifact. Unknown versions or patch-install failures do not block or roll back the core update, and native MCP remains fail-closed when the adapter API is unavailable.
 - [`docs/native-mcp-protocol.md`](docs/native-mcp-protocol.md), [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md), and machine-readable patch manifests under `patches/`.
 
 ### Removed

@@ -48,6 +48,8 @@ jobs:
           git diff --exit-code -- dist
       - name: Test patched Pi and adapter in one session
         run: npm run test:patched-native-session -- --pi-source "$GITHUB_WORKSPACE/pi-upstream"
+      - name: Test managed Pi update hook
+        run: npm run test:managed-pi-update-hook
       - name: Build interactive visualizer example
         run: |
           npm install --prefix examples/interactive-visualizer --no-package-lock --no-audit --no-fund
