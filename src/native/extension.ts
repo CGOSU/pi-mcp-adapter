@@ -142,6 +142,7 @@ function installAdapter(pi: ExtensionAPI, options: McpAdapterOptions): NativeAda
 
   const configAssembly = createNativeConfigAssembly(options);
   const assemblyResult = installNativeMcpOwnerAssembly(configAssembly.assembly, pi.events);
+  let releaseAssembly = assemblyResult.ok ? assemblyResult.value : undefined;
   let currentState: NativeAdapterState | undefined;
   const bridge = new NativeMcpManagementBridge(
     pi,
@@ -209,6 +210,9 @@ function installAdapter(pi: ExtensionAPI, options: McpAdapterOptions): NativeAda
       panelView.markUnavailable("The native MCP session has ended; panel changes are no longer saved.");
     }
     state.bridge.stopSession();
+    releaseAssembly?.();
+    releaseAssembly = undefined;
+    adapters.delete(pi);
     state.handle = undefined;
     state.snapshot = undefined;
     publishNativeStatusShutdown(pi);

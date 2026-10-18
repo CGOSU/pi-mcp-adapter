@@ -226,3 +226,35 @@ describe("native extension entry", () => {
       .toThrow("pi-mcp-adapter is not installed for this Pi instance");
   });
 });
+
+describe("native owner assembly lifetime", () => {
+  it.each(["reload", "quit", "new", "resume", "fork"])("releases the owner assembly on %s before installing a replacement", (reason) => {
+    let installed: unknown;
+    const release = vi.fn(() => { installed = undefined; });
+    nativeApi.installAssembly.mockImplementation((assembly: unknown) => {
+      if (installed) return { ok: false, error: { code: "already-installed", message: "A different MCP owner assembly is already installed; remove it before installing a replacement." } };
+      installed = assembly;
+      return { ok: true, value: release };
+    });
+    const first = makePi();
+    const factory = createMcpAdapter();
+    factory(first.pi);
+    first.lifecycle.get("session_shutdown")!({ type: "session_shutdown", reason }, undefined);
+    expect(release).toHaveBeenCalledTimes(1);
+    const replacement = makePi();
+    factory(replacement.pi);
+    expect(() => registerMcpServer({ pi: replacement.pi, name: "replacement", definition: { command: "fixture-server" } })).not.toThrow();
+  });
+
+  it("allows reinstalling on the same Pi instance after shutdown", () => {
+    nativeApi.installAssembly.mockClear();
+    nativeApi.installAssembly.mockImplementation(() => ({ ok: true, value: vi.fn() }));
+    const { pi, lifecycle } = makePi();
+    const factory = createMcpAdapter();
+    factory(pi);
+    lifecycle.get("session_shutdown")!({ type: "session_shutdown", reason: "reload" }, undefined);
+    factory(pi);
+    expect(nativeApi.installAssembly).toHaveBeenCalledTimes(2);
+  });
+});
+
