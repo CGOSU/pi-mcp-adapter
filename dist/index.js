@@ -3866,6 +3866,7 @@ function installAdapter(pi, options) {
   if (previous) return previous;
   const configAssembly = createNativeConfigAssembly(options);
   const assemblyResult = installNativeMcpOwnerAssembly(configAssembly.assembly, pi.events);
+  let releaseAssembly = assemblyResult.ok ? assemblyResult.value : void 0;
   let currentState;
   const bridge = new NativeMcpManagementBridge(
     pi,
@@ -3932,6 +3933,9 @@ function installAdapter(pi, options) {
       panelView.markUnavailable("The native MCP session has ended; panel changes are no longer saved.");
     }
     state.bridge.stopSession();
+    releaseAssembly?.();
+    releaseAssembly = void 0;
+    adapters.delete(pi);
     state.handle = void 0;
     state.snapshot = void 0;
     publishNativeStatusShutdown(pi);

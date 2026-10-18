@@ -42,10 +42,14 @@ jobs:
             test/mcp-extension.test.ts \
             test/mcp-direct-tools-config.test.ts \
             test/mcp-owner-assembly.test.ts
-      - name: Verify adapter public build against patched Pi
+      - name: Build and test adapter public artifacts against patched Pi
+        run: npm run test:public-types -- --pi-source "$GITHUB_WORKSPACE/pi-upstream"
+      - name: Verify committed dist matches source
         run: |
-          npm run test:public-types -- --pi-source "$GITHUB_WORKSPACE/pi-upstream"
-          git diff --exit-code -- dist
+          if ! git diff --exit-code -- dist; then
+            echo '::error::Committed dist/ is stale. Run test:public-types with a fixed patched Pi checkout and commit the regenerated artifacts.'
+            exit 1
+          fi
       - name: Test patched Pi and adapter in one session
         run: npm run test:patched-native-session -- --pi-source "$GITHUB_WORKSPACE/pi-upstream"
       - name: Test managed Pi update hook

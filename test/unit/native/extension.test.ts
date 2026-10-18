@@ -257,4 +257,15 @@ describe("native owner assembly lifetime", () => {
     expect(nativeApi.installAssembly).toHaveBeenCalledTimes(2);
   });
 });
+describe("shipped native owner assembly lifetime", () => {
+  it("releases the bundled owner assembly on reload", async () => {
+    const { createMcpAdapter: createBundledAdapter } = await import("../../../dist/index.js");
+    const release = vi.fn();
+    nativeApi.installAssembly.mockImplementation(() => ({ ok: true, value: release }));
+    const { pi, lifecycle } = makePi();
+    createBundledAdapter()(pi);
+    lifecycle.get("session_shutdown")!({ type: "session_shutdown", reason: "reload" }, undefined);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+});
 
