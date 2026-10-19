@@ -143,11 +143,13 @@ test("keeps an unsupported core update and reports that its MCP patch is unavail
     assert.equal(result.ok, false);
     assert.equal(result.code, "unsupported-pi-version");
     assert.match(messages.join("\n"), /Keeping the core release/);
+    messages.length = 0;
     const hookExitCode = await runUpdateHook(
       ["--after-update", "--managed-root", managedRoot, "--hook-root", hookRoot, "--", "update", "--all"],
       { info: (message) => messages.push(message), warn: (message) => messages.push(message) },
     );
     assert.equal(hookExitCode, 0);
+    assert.match(messages.join("\n"), /Keeping the core release/);
     assert.equal((await readFile(join(managedRoot, "current-version"), "utf8")).trim(), "1.3.1");
   } finally {
     await rm(root, { recursive: true, force: true });

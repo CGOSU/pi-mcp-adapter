@@ -12,7 +12,7 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
-import { basename, join, relative, sep } from "node:path";
+import { basename, join, relative, sep, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const codingAgentPackageName = "@earendil-works/pi-coding-agent";

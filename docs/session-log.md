@@ -8,6 +8,15 @@
 
 ## 会话
 
+### 2026-10-19：修复 managed 更新钩子的 resolve 缺失导入
+
+- 现象与根因：`pi update --all` 已完成包和核心版本检查后，MCP post-update hook 输出 `resolve is not defined`。`parseHookArguments` 使用 `resolve` 但未从 `node:path` 导入；`main` 按非阻断契约捕获错误并返回 0，因此只检查退出码的既有测试漏报，前一次 reconcile 的警告也掩盖了 CLI 路径失败。
+- 修复：源码与本机已部署的 `managed-pi-update-hook.mjs` 补齐 `resolve` 导入；既有 unsupported-version 回归在调用 CLI main 前清空警告，并断言 main 自身产生预期警告。不改 managed release、current-version、核心更新退出码或 pi-init。
+- 验证：新增断言修改前重现同一错误；修复后 `npm run test:managed-pi-update-hook` 9 项通过。源码与本机脚本 `node --check` 通过；本机脚本使用隔离临时目录、缺失 managed root 的只读参数路径探针通过，不再出现 resolve 引用错误。
+- 提交检查：最初全仓 typecheck 因开发依赖是缺少 native MCP 类型的 stock Pi 失败；校验已登记 Pi 1.3.0 patched tarball 的 SHA-256 后，仅对本仓库 node_modules 离线、no-save、无 scripts 地安装该依赖，未修改 package.json/lock 或 managed release。随后 `npm run typecheck` 和上述 9 项测试均通过，没有跳过提交检查。
+- 未执行：未重新运行真实 `pi update --all`，未触发实际补丁安装/切换、未运行全量测试或构建，未发布 npm 包。后续重新安装 hook 前应使用包含该修复的来源。
+
+
 ### 2026-10-17：接入托管 Pi 非阻断更新 hook 并激活 1.3.0 patched release
 
 - 用户目标：继续实现 `pi update --all` 后接入已验证 MCP patch，但无论版本未知还是 patch/cache/install/API 验证失败，都必须让 Pi 核心更新照常完成。实现只作用于 `releases-v1` managed launcher；Pi 原生 MCP 仍是唯一 owner，不引入 fallback，也不下载未经登记的远端补丁。

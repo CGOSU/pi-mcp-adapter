@@ -13,7 +13,7 @@
 - 保留的旧适配器运行时源码仍位于 `src/**`，并由对应测试覆盖，但不会从 `dist/index.js` 加载，也不包含在发布包中。
 - `scriptMode`、`disableProxyTool`、`autoAuth`、`trace`、`oauthDir` 和服务器级 `debug`/`trace` 在原生管理方下不生效；配置仍予保留，不会静默删除。完整用户可见边界见 [`README.md`](../README.md) 中的 “必需的 Pi 宿主版本”和“原生管理方下的行为变化” 两节。
 - Pi 原生 MCP 补丁分别固定在 Pi 1.2.0 commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff` 与 Pi 1.3.0 commit `71023aec1546d6d677a65669c5665c0927ce0dd0`；只有这两个补丁后的固定基线完成本仓库验证。两个 patch、manifest、hash 与复现范围以 [`docs/native-mcp-patch.md`](native-mcp-patch.md) 为准。Pi 上游未提交、未推送、未发布或打标签。
-- 本机 managed Pi 已安装非阻断 post-update hook，并将已验证 Pi 1.3.0 patched release 作为当前 managed release；stock `1.3.0` release 和 launcher 原版备份均保留。hook 当前只登记 Pi 1.3.0 artifact；未知版本/补丁失败只警告，不影响核心更新退出状态。运行中的旧 Pi 进程仍须完全退出并重启才能加载新 release。
+- 本机 managed Pi 已安装非阻断 post-update hook，并将已验证 Pi 1.3.0 patched release 作为当前 managed release；stock `1.3.0` release 和 launcher 原版备份均保留。hook 当前只登记 Pi 1.3.0 artifact；未知版本/补丁失败只警告，不影响核心更新退出状态。源码与已部署 hook 的 CLI 参数解析已补齐 `resolve` 导入，定向 9 项回归和隔离参数探针通过，详见 [会话记录](session-log.md)。运行中的旧 Pi 进程仍须完全退出并重启才能加载新 release。
 
 ## 源码、启动与发布布局
 
