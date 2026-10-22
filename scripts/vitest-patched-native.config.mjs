@@ -1,6 +1,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { satisfies } from "semver";
 import { defineConfig } from "vitest/config";
 
 const adapterRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -17,7 +18,9 @@ const piAiPackageRoot = join(piRoot, "packages", "ai", "dist");
 const hostPiAiVersion = JSON.parse(readFileSync(join(piRoot, "packages", "ai", "package.json"), "utf8")).version;
 const hostExpectedPiAiVersion = JSON.parse(readFileSync(join(codingAgentRoot, "package.json"), "utf8"))
   .dependencies?.["@earendil-works/pi-ai"];
-if (hostPiAiVersion !== hostExpectedPiAiVersion) {
+// The dependency declaration may be exact (Pi 1.4.0: "1.4.0") or a range (Pi 1.2.0: "^1.2.0").
+// Validate the built workspace version against the declared range instead of comparing raw strings.
+if (typeof hostExpectedPiAiVersion !== "string" || !satisfies(hostPiAiVersion, hostExpectedPiAiVersion)) {
   throw new Error(
     `The host workspace must build its own pi-ai ${hostExpectedPiAiVersion}; found ${hostPiAiVersion}.`,
   );
