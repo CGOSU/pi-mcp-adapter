@@ -607,3 +607,164 @@ test("installer accepts the registered Pi 1.4.0 tarball and rejects an unregiste
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("prefers the adapter package registry so a normal extension update reaches the hook", async () => {
+  const root = await makeTemporaryRoot();
+  try {
+    const adapterRoot = join(root, "adapter");
+    const registryDir = join(adapterRoot, "scripts");
+    await mkdir(registryDir, { recursive: true });
+    const version = "1.5.0";
+    const alias = "native-mcp-1.5.0-4444444444";
+    const artifactBytes = Buffer.from("verified 1.5.0 adapter-shipped package bytes");
+    const adapterArtifact = {
+      packageVersion: version,
+      releaseAlias: alias,
+      baseCommit: "5".repeat(40),
+      patchPath: `pi-${version}-native-mcp-management.patch`,
+      patchSha256: "6".repeat(64),
+      artifactFile: `pi-coding-agent-${version}.tgz`,
+      artifactSha256: createHash("sha256").update(artifactBytes).digest("hex"),
+      protocolId,
+      protocolVersion: 1,
+      capabilities,
+      ownerEvents,
+    };
+    await writeFile(
+      join(registryDir, "managed-pi-update-artifacts.json"),
+      JSON.stringify({ schemaVersion: 1, packageName, artifacts: [adapterArtifact] }),
+    );
+
+    const { managedRoot } = await makeManagedInstall(root, version);
+    // The frozen hook cache only knows the older artifact and must not win.
+    const hookRoot = join(root, "install", "native-mcp-update");
+    await mkdir(join(hookRoot, "artifacts"), { recursive: true });
+    await writeFile(
+      join(hookRoot, "artifacts.json"),
+      JSON.stringify({ schemaVersion: 1, packageName, artifacts: [{ ...adapterArtifact, packageVersion: "1.3.0", releaseAlias }] }),
+    );
+    // Artifact lives beside the adapter package, not in the hook cache.
+    await writeFile(join(adapterRoot, adapterArtifact.artifactFile), artifactBytes);
+
+    const result = await reconcileManagedPiPatch({
+      managedRoot,
+      hookRoot,
+      adapterRoot,
+      artifactSourceRoot: adapterRoot,
+      updateArgs: ["update", "--all"],
+      logger: quietLogger,
+      acquireLock: async () => ({ ok: true, releaseLock: async () => {} }),
+      installPackage: fakeInstallPackage(adapterArtifact),
+    });
+
+    assert.deepEqual(result, {
+      ok: true,
+      action: "patched",
+      previousVersion: version,
+      currentVersion: alias,
+      packageVersion: version,
+    });
+    assert.equal((await readFile(join(managedRoot, "current-version"), "utf8")).trim(), alias);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("falls back to the frozen hook registry when no adapter package is reachable", async () => {
+  const root = await makeTemporaryRoot();
+  try {
+    const { managedRoot } = await makeManagedInstall(root);
+    const { hookRoot, artifact } = await makeRegistry(root);
+    const result = await reconcileManagedPiPatch({
+      managedRoot,
+      hookRoot,
+      adapterRoot: join(root, "missing-adapter"),
+      updateArgs: ["update", "--all"],
+      logger: quietLogger,
+      acquireLock: async () => ({ ok: true, releaseLock: async () => {} }),
+      installPackage: fakeInstallPackage(artifact),
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.action, "patched");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("rejects a tampered adapter-shipped artifact and keeps the core release", async () => {
+  const root = await makeTemporaryRoot();
+  try {
+    const adapterRoot = join(root, "adapter");
+    const registryDir = join(adapterRoot, "scripts");
+    await mkdir(registryDir, { recursive: true });
+    const version = "1.5.0";
+    const artifactBytes = Buffer.from("the real adapter-shipped bytes");
+    const artifact = {
+      packageVersion: version,
+      releaseAlias: "native-mcp-1.5.0-5555555555",
+      baseCommit: "7".repeat(40),
+      patchPath: `pi-${version}-native-mcp-management.patch`,
+      patchSha256: "8".repeat(64),
+      artifactFile: `pi-coding-agent-${version}.tgz`,
+      artifactSha256: createHash("sha256").update(artifactBytes).digest("hex"),
+      protocolId,
+      protocolVersion: 1,
+      capabilities,
+      ownerEvents,
+    };
+    await writeFile(
+      join(registryDir, "managed-pi-update-artifacts.json"),
+      JSON.stringify({ schemaVersion: 1, packageName, artifacts: [artifact] }),
+    );
+    await writeFile(join(adapterRoot, artifact.artifactFile), "tampered bytes");
+
+    const { managedRoot } = await makeManagedInstall(root, version);
+    const hookRoot = join(root, "install", "native-mcp-update");
+    await mkdir(hookRoot, { recursive: true });
+
+    const result = await reconcileManagedPiPatch({
+      managedRoot,
+      hookRoot,
+      adapterRoot,
+      artifactSourceRoot: adapterRoot,
+      updateArgs: ["update", "--all"],
+      logger: quietLogger,
+      acquireLock: async () => ({ ok: true, releaseLock: async () => {} }),
+      installPackage: async () => { throw new Error("tampered artifact must never install"); },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "patch-artifact-hash-mismatch");
+    assert.equal((await readFile(join(managedRoot, "current-version"), "utf8")).trim(), version);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("ignores an invalid adapter registry instead of trusting it", async () => {
+  const root = await makeTemporaryRoot();
+  try {
+    const adapterRoot = join(root, "adapter");
+    const registryDir = join(adapterRoot, "scripts");
+    await mkdir(registryDir, { recursive: true });
+    await writeFile(
+      join(registryDir, "managed-pi-update-artifacts.json"),
+      JSON.stringify({ schemaVersion: 1, packageName, artifacts: [{ packageVersion: "1.5.0" }] }),
+    );
+    const { managedRoot } = await makeManagedInstall(root);
+    const { hookRoot } = await makeRegistry(root);
+    const result = await reconcileManagedPiPatch({
+      managedRoot,
+      hookRoot,
+      adapterRoot,
+      updateArgs: ["update", "--all"],
+      logger: quietLogger,
+      acquireLock: async () => ({ ok: true, releaseLock: async () => {} }),
+      installPackage: async () => { throw new Error("an invalid adapter registry must not install"); },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "invalid-artifact-manifest");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

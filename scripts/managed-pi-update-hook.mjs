@@ -12,11 +12,15 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
+import { realpathSync } from "node:fs";
 import { basename, join, relative, sep, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const codingAgentPackageName = "@earendil-works/pi-coding-agent";
+const adapterPackageName = "pi-mcp-adapter";
 const managedInstallMarker = "managed-install.json";
+const adapterRegistryRelativePath = ["scripts", "managed-pi-update-artifacts.json"];
+const adapterArtifactsRelativeDir = ["scripts", "managed-pi-update-artifacts"];
 const managedReleaseNamePattern = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/u;
 const semverReleasePattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
 const defaultLogger = {
@@ -206,14 +210,64 @@ function execute(command, args, options = {}) {
   return result;
 }
 
-async function readArtifactRegistry(hookRoot) {
+async function readArtifactRegistry(hookRoot, adapterRoot) {
+  // Plan A: prefer the registry shipped by the installed adapter package so a normal extension update
+  // makes newly supported Pi versions available to the hook. Fall back to the frozen install copy when
+  // the adapter package cannot be located, keeping the previous explicit-trust behavior working.
+  const adapterRegistryPath = adapterRoot === undefined
+    ? undefined
+    : join(adapterRoot, ...adapterRegistryRelativePath);
+  if (adapterRegistryPath !== undefined) {
+    let adapterValue;
+    try {
+      adapterValue = JSON.parse(await readFile(adapterRegistryPath, "utf8"));
+    } catch {
+      adapterValue = undefined;
+    }
+    if (adapterValue !== undefined) {
+      const validation = validateArtifactManifest(adapterValue);
+      if (!validation.ok) return validation;
+      return success("validated", { manifest: validation.manifest, source: "adapter-package", registryPath: adapterRegistryPath });
+    }
+  }
+
   let value;
   try {
     value = JSON.parse(await readFile(join(hookRoot, "artifacts.json"), "utf8"));
   } catch {
     return failure("missing-artifact-manifest", "The persistent Pi patch artifact manifest is unavailable.");
   }
-  return validateArtifactManifest(value);
+  const validation = validateArtifactManifest(value);
+  if (!validation.ok) return validation;
+  return success("validated", { manifest: validation.manifest, source: "hook-cache", registryPath: join(hookRoot, "artifacts.json") });
+}
+
+// Artifacts are never published inside the adapter package, so a newly registered version is satisfied
+// from a caller-supplied artifact directory before falling back to the hook's own persistent cache.
+async function resolveArtifactPath(artifact, hookRoot, artifactSourceRoot) {
+  const candidates = [];
+  if (artifactSourceRoot !== undefined) candidates.push(join(artifactSourceRoot, artifact.artifactFile));
+  candidates.push(join(hookRoot, "artifacts", artifact.artifactFile));
+  let sawPresentButInvalid = false;
+  for (const candidate of candidates) {
+    const bytes = await readFile(candidate).catch(() => undefined);
+    if (bytes === undefined) continue;
+    if (createHash("sha256").update(bytes).digest("hex") !== artifact.artifactSha256) {
+      sawPresentButInvalid = true;
+      continue;
+    }
+    return success("artifact-resolved", { artifactPath: candidate });
+  }
+  if (sawPresentButInvalid) {
+    return failure(
+      "patch-artifact-hash-mismatch",
+      `The registered patched Pi ${artifact.packageVersion} artifact does not match its recorded SHA-256.`,
+    );
+  }
+  return failure(
+    "patch-artifact-missing",
+    `The registered patched Pi ${artifact.packageVersion} artifact is unavailable.`,
+  );
 }
 
 async function acquireManagedUpdateLock(managedRoot, releaseDir) {
@@ -356,7 +410,7 @@ export async function reconcileManagedPiPatch(options) {
 
   const install = await readManagedInstall(options.managedRoot);
   if (!install.ok) return install;
-  const registryResult = await readArtifactRegistry(options.hookRoot);
+  const registryResult = await readArtifactRegistry(options.hookRoot, options.adapterRoot);
   if (!registryResult.ok) return registryResult;
 
   let releaseDir = install.releaseDir;
@@ -394,15 +448,9 @@ export async function reconcileManagedPiPatch(options) {
       return failure("current-release-changed", "The active Pi package changed while resolving its patch artifact.");
     }
 
-    const artifactPath = join(options.hookRoot, "artifacts", artifact.artifactFile);
-    const artifactBuffer = await readFile(artifactPath).catch(() => undefined);
-    if (!artifactBuffer) {
-      return failure("patch-artifact-missing", "The registered patched Pi artifact is missing from the persistent cache.");
-    }
-    const artifactHash = createHash("sha256").update(artifactBuffer).digest("hex");
-    if (artifactHash !== artifact.artifactSha256) {
-      return failure("patch-artifact-hash-mismatch", "The cached patched Pi artifact hash does not match its registration.");
-    }
+    const resolvedArtifact = await resolveArtifactPath(artifact, options.hookRoot, options.artifactSourceRoot);
+    if (!resolvedArtifact.ok) return resolvedArtifact;
+    const artifactPath = resolvedArtifact.artifactPath;
 
     const stagingRoot = join(install.managedRoot, "staging");
     await mkdir(stagingRoot, { recursive: true, mode: 0o700 });
@@ -461,10 +509,16 @@ function parseHookArguments(args) {
     const argument = args[index];
     if (argument === "--after-update") options.afterUpdate = true;
     else if (argument === "--apply-current") options.force = true;
-    else if (argument === "--managed-root" || argument === "--hook-root") {
+    else if (argument === "--managed-root" || argument === "--hook-root" || argument === "--adapter-root" || argument === "--artifact-source") {
       const value = args[++index];
       if (!value || value.startsWith("--")) throw new Error(`Missing value for ${argument}.`);
-      options[argument === "--managed-root" ? "managedRoot" : "hookRoot"] = resolve(value);
+      const key = {
+        "--managed-root": "managedRoot",
+        "--hook-root": "hookRoot",
+        "--adapter-root": "adapterRoot",
+        "--artifact-source": "artifactSourceRoot",
+      }[argument];
+      options[key] = resolve(value);
     } else if (argument === "--") {
       separatorSeen = true;
       options.updateArgs = args.slice(index + 1);
@@ -497,6 +551,8 @@ export async function main(args = process.argv.slice(2), logger = defaultLogger)
   const result = await reconcileManagedPiPatch({
     managedRoot: options.managedRoot,
     hookRoot: options.hookRoot,
+    ...(options.adapterRoot === undefined ? {} : { adapterRoot: options.adapterRoot }),
+    ...(options.artifactSourceRoot === undefined ? {} : { artifactSourceRoot: options.artifactSourceRoot }),
     updateArgs: options.updateArgs,
     force: options.force,
     logger,
@@ -507,6 +563,19 @@ export async function main(args = process.argv.slice(2), logger = defaultLogger)
   return 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Compare real paths: a launcher may invoke this file through a symlinked path (for example
+// /tmp -> /private/tmp on macOS), which never equals import.meta.url. A direct string compare would
+// skip main() entirely and still exit 0, silently disabling the post-update hook.
+function isDirectExecution() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isDirectExecution()) {
   process.exitCode = await main();
 }

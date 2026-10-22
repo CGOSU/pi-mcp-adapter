@@ -271,6 +271,9 @@ export async function installManagedUpdateHook({
   const activation = await reconcile({
     managedRoot: install.managedRoot,
     hookRoot: assets.hookRoot,
+    // The adapter package that ships the verified registry and reconciler is the same tree this
+    // installer runs from, so the managed hook can follow normal extension updates.
+    adapterRoot: sourceRoot,
     force: true,
     logger,
   });
