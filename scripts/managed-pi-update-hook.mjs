@@ -261,12 +261,23 @@ async function resolveArtifactPath(artifact, hookRoot, artifactSourceRoot) {
   if (sawPresentButInvalid) {
     return failure(
       "patch-artifact-hash-mismatch",
-      `The registered patched Pi ${artifact.packageVersion} artifact does not match its recorded SHA-256.`,
+      `The registered patched Pi ${artifact.packageVersion} artifact does not match its recorded SHA-256. `
+        + `Remove or replace ${join(hookRoot, "artifacts", artifact.artifactFile)} and reinstall it with:\n`
+        + `  npm run install:managed-pi-update-hook -- --artifact <pi-coding-agent-${artifact.packageVersion}.tgz>`,
     );
   }
+
+  // The version is supported by this adapter build, but its tarball is not published with the package.
+  // Fail closed and hand the operator the exact recovery command instead of a generic warning.
   return failure(
     "patch-artifact-missing",
-    `The registered patched Pi ${artifact.packageVersion} artifact is unavailable.`,
+    `Pi ${artifact.packageVersion} is a supported native MCP target, but its patched artifact is not installed locally. `
+      + `The core release was kept and native MCP stays unavailable until it is.\n`
+      + `Expected file  : ${join(hookRoot, "artifacts", artifact.artifactFile)}\n`
+      + `Expected SHA-256: ${artifact.artifactSha256}\n`
+      + `Build it from the registered patch (source patch: ${artifact.patchPath},\n`
+      + `patch SHA-256: ${artifact.patchSha256}), then run:\n`
+      + `  npm run install:managed-pi-update-hook -- --artifact <pi-coding-agent-${artifact.packageVersion}.tgz>`,
   );
 }
 
@@ -558,7 +569,13 @@ export async function main(args = process.argv.slice(2), logger = defaultLogger)
     logger,
   });
   if (!result.ok && result.code !== "unsupported-pi-version") {
-    logger.warn(`${result.message} The completed Pi core update was kept.`);
+    // Recovery instructions for a missing or tampered artifact are already multi-line and actionable;
+    // appending the generic suffix would bury the command the operator needs to run.
+    if (result.code === "patch-artifact-missing" || result.code === "patch-artifact-hash-mismatch") {
+      logger.warn(result.message);
+    } else {
+      logger.warn(`${result.message} The completed Pi core update was kept.`);
+    }
   }
   return 0;
 }

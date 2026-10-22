@@ -768,3 +768,55 @@ test("ignores an invalid adapter registry instead of trusting it", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("reports an actionable recovery command when a registered version has no local artifact", async () => {
+  const root = await makeTemporaryRoot();
+  try {
+    const adapterRoot = join(root, "adapter");
+    const registryDir = join(adapterRoot, "scripts");
+    await mkdir(registryDir, { recursive: true });
+    const version = "1.6.0";
+    const artifact = {
+      packageVersion: version,
+      releaseAlias: "native-mcp-1.6.0-6666666666",
+      baseCommit: "9".repeat(40),
+      patchPath: `pi-${version}-native-mcp-management.patch`,
+      patchSha256: "a".repeat(64),
+      artifactFile: `pi-coding-agent-${version}.tgz`,
+      artifactSha256: "b".repeat(64),
+      protocolId,
+      protocolVersion: 1,
+      capabilities,
+      ownerEvents,
+    };
+    await writeFile(
+      join(registryDir, "managed-pi-update-artifacts.json"),
+      JSON.stringify({ schemaVersion: 1, packageName, artifacts: [artifact] }),
+    );
+    const { managedRoot } = await makeManagedInstall(root, version);
+    const hookRoot = join(root, "install", "native-mcp-update");
+    await mkdir(join(hookRoot, "artifacts"), { recursive: true });
+
+    const messages = [];
+    const result = await reconcileManagedPiPatch({
+      managedRoot,
+      hookRoot,
+      adapterRoot,
+      updateArgs: ["update", "--all"],
+      logger: { info() {}, warn: (message) => messages.push(message) },
+      acquireLock: async () => ({ ok: true, releaseLock: async () => {} }),
+      installPackage: async () => { throw new Error("a missing artifact must never install"); },
+    });
+    const output = result.message;
+
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "patch-artifact-missing");
+    assert.match(output, /is a supported native MCP target/u);
+    assert.match(output, /Expected file\s+: .*pi-coding-agent-1\.6\.0\.tgz/u);
+    assert.match(output, /Expected SHA-256: b{64}/u);
+    assert.match(output, /install:managed-pi-update-hook -- --artifact/u);
+    assert.equal((await readFile(join(managedRoot, "current-version"), "utf8")).trim(), version);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

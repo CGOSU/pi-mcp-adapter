@@ -73,9 +73,13 @@ Both runners resolve host dependencies from the selected Pi checkout, so the pac
 
 Hook failure、未知版本、缺少/哈希错误 artifact、离线依赖不足、并发更新锁冲突或 bundle/API 验证失败只输出 warning；wrapper 保留 Pi 核心更新原始退出状态，既不暂停、回滚也不 pin 核心版本。`--models` 和 `--extensions` 更新不应用核心补丁。对于未登记版本，adapter 仍按 fail-closed 契约报告宿主缺少受支持的 MCP API，不会回退到第二套 runtime。
 
+Hook 运行时优先读取适配器包内的 `scripts/managed-pi-update-artifacts.json`，仅在无法定位适配器包时回退到 `native-mcp-update/artifacts.json` 冻结副本。因此 `pi update --extensions` 拉到含新版本的 adapter 后，新增支持的 Pi 版本立即对 hook 生效。适配器包存在但登记表非法时直接失败，不静默回退。launcher 同样优先执行适配器包内的 reconciler，使脚本修复随扩展更新生效。
+
+Artifact tarball 不随 adapter package 发布（每版约 7.4 MB，且 Pi 的 git 包会拉取全部 tracked 文件）。版本已登记但本地缺 tarball 时，hook 会输出预期的文件路径、SHA-256、对应的 source patch 与 hash，以及可直接执行的 `install:managed-pi-update-hook --artifact` 命令；artifact 存在但 hash 不符时输出可区分的篡改提示。两种情形都保留核心 release 并保持 fail-closed。
+
 恢复命令为 `npm run install:managed-pi-update-hook -- --remove`。只有当前指针仍是 hook 激活的 release 且 prior release 存在时，remove 才将指针恢复至 prior release；随后恢复原 launcher。补丁 release 和 artifact 缓存保留，不会删除文件。安装/恢复后需完全重启 Pi，现有进程不会替换已加载的宿主模块。
 
-实际验证包括：12 项 managed hook/launcher Node tests，涵盖 Pi updater 锁冲突、安装 staging 期间核心 release 指针并发变化、Pi 1.4.0 按自身 hash/patch 精确选中，以及未登记版本不激活且不复用其他版本 artifact；真实 1.3.0 与 1.4.0 tarball 在隔离模拟 managed root 中的离线 install/reconcile/API smoke；本机 managed Pi 新 release 的 `--version` 与 public API 检查；使用已安装 managed release 的 bundled CLI、packed adapter、隔离配置和 local stdio fixture 执行 RPC smoke。没有运行真实 `pi update --all`，因此 updater 网络/发布链路不在本轮实测范围；wrapper 的成功/失败退出状态由 fake child 测试覆盖。
+实际验证包括：17 项 managed hook/launcher Node tests，涵盖 Pi updater 锁冲突、安装 staging 期间核心 release 指针并发变化、Pi 1.4.0 按自身 hash/patch 精确选中，以及未登记版本不激活且不复用其他版本 artifact；真实 1.3.0 与 1.4.0 tarball 在隔离模拟 managed root 中的离线 install/reconcile/API smoke；本机 managed Pi 新 release 的 `--version` 与 public API 检查；使用已安装 managed release 的 bundled CLI、packed adapter、隔离配置和 local stdio fixture 执行 RPC smoke。没有运行真实 `pi update --all`，因此 updater 网络/发布链路不在本轮实测范围；wrapper 的成功/失败退出状态由 fake child 测试覆盖。
 
 ## 已执行验证与边界
 
