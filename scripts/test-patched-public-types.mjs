@@ -8,6 +8,14 @@ import { parsePiSourceArgument, verifyPatchedPiSource } from "./patched-pi-sourc
 const adapterRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const distRoot = join(adapterRoot, "dist");
 const workspacePackages = ["chord", "tui", "telemetry", "codemode", "mcp", "ai", "agent", "coding-agent"];
+// Packages whose build also copies runtime assets beside the emitted declarations, and whose asset
+// steps are not exposed as standalone scripts. `ai` ships its model catalog data (the packed host
+// fails to load `.manifest.json` without it) and `coding-agent` ships themes, images, and templates.
+// These run their own build script, which is idempotent over the emission above.
+const workspaceAssetScripts = [
+  ["ai", "build:offline"],
+  ["coding-agent", "build:unbundled"],
+];
 const adapterBuildFiles = [
   "CHANGELOG.md",
   "LICENSE",
@@ -246,6 +254,12 @@ async function main() {
     for (const workspacePackage of workspacePackages) {
       const workspaceRoot = join(sourceRoot, "packages", workspacePackage);
       run(process.execPath, [compiler, "-p", "tsconfig.build.json", "--noCheck"], workspaceRoot);
+    }
+    // `tsc --noCheck` emits declarations only. Some workspace packages copy runtime assets in their
+    // own build scripts, and the packed host fails to load its model data without them. Run those
+    // asset steps explicitly instead of reimplementing them here.
+    for (const [workspacePackage, script] of workspaceAssetScripts) {
+      run(npmCommand(), ["run", script], join(sourceRoot, "packages", workspacePackage));
     }
 
     const piTarball = packPackage(packageRoot, piPackDirectory, "pi-coding-agent");
