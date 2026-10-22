@@ -8,14 +8,6 @@ import { parsePiSourceArgument, verifyPatchedPiSource } from "./patched-pi-sourc
 const adapterRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const distRoot = join(adapterRoot, "dist");
 const workspacePackages = ["chord", "tui", "telemetry", "codemode", "mcp", "ai", "agent", "coding-agent"];
-// Packages whose build also copies runtime assets beside the emitted declarations, and whose asset
-// steps are not exposed as standalone scripts. `ai` ships its model catalog data (the packed host
-// fails to load `.manifest.json` without it) and `coding-agent` ships themes, images, and templates.
-// These run their own build script, which is idempotent over the emission above.
-const workspaceAssetScripts = [
-  ["ai", "build:offline"],
-  ["coding-agent", "build:unbundled"],
-];
 const adapterBuildFiles = [
   "CHANGELOG.md",
   "LICENSE",
@@ -72,6 +64,32 @@ async function extractPackage(tarball, destination) {
   await mkdir(destination, { recursive: true });
   run("tar", ["-xzf", tarball, "-C", destination], dirname(tarball));
   return join(destination, "package");
+}
+
+async function copyModelCatalogData(sourceRoot) {
+  const target = join(sourceRoot, "packages", "ai", "dist", "providers", "data");
+  const source = join(adapterRoot, "node_modules", "@earendil-works", "pi-ai", "dist", "providers", "data");
+  const manifest = join(target, ".manifest.json");
+  try {
+    await lstat(manifest);
+    return;
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  let entries;
+  try {
+    entries = await readdir(source, { withFileTypes: true });
+  } catch {
+    throw new Error(
+      `The adapter's published pi-ai package is missing model catalog data at ${source}. `
+        + "Install adapter dependencies before running this check.",
+    );
+  }
+  await mkdir(target, { recursive: true });
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    await cp(join(source, entry.name), join(target, entry.name));
+  }
 }
 
 async function copyAdapterBuildInputs(stageRoot) {
@@ -255,12 +273,14 @@ async function main() {
       const workspaceRoot = join(sourceRoot, "packages", workspacePackage);
       run(process.execPath, [compiler, "-p", "tsconfig.build.json", "--noCheck"], workspaceRoot);
     }
-    // `tsc --noCheck` emits declarations only. Some workspace packages copy runtime assets in their
-    // own build scripts, and the packed host fails to load its model data without them. Run those
-    // asset steps explicitly instead of reimplementing them here.
-    for (const [workspacePackage, script] of workspaceAssetScripts) {
-      run(npmCommand(), ["run", script], join(sourceRoot, "packages", workspacePackage));
-    }
+    // `tsc --noCheck` emits declarations only, but two packages ship runtime assets that their
+    // builds copy rather than compile. Pi excludes the `ai` model catalog from git
+    // (`packages/ai/src/providers/data/` is gitignored), so a fresh checkout never contains it and
+    // the packed host cannot resolve `.manifest.json` without it. Copy the catalog from the
+    // adapter's own published `pi-ai` dependency, and run the coding-agent asset step, which only
+    // touches files present in every checkout.
+    await copyModelCatalogData(sourceRoot);
+    run(npmCommand(), ["run", "copy-assets"], join(sourceRoot, "packages", "coding-agent"));
 
     const piTarball = packPackage(packageRoot, piPackDirectory, "pi-coding-agent");
     const packedPiRoot = await extractPackage(piTarball, piExtractRoot);
