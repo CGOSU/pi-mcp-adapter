@@ -40,5 +40,12 @@
 
 - 先前 Pi 1.3.0 fixed-patch 交付已按用户明确要求推送至 `origin/main`；本轮 CLI 验证、managed update hook 实现与文档已完成，按项目规则创建中文本地提交，未 push。用户授权的本机 managed install 已切换到独立 patched release，launcher 原版与 stock release 均保留；当前运行中的 Pi process 尚未重启。未执行真实 `pi update --all`、npm 发布、部署或打 tag。远端 CI 是否完成尚未核实；详细 Git 与 runtime 范围见 [`docs/session-log.md`](session-log.md)。
 - 重新生成发布文件时，必须向 `npm run test:public-types -- --pi-source <已应用对应补丁的固定 Pi 源码目录>` 显式提供 Pi 1.2.0、1.3.0 或 1.4.0 checkout。Stock Pi 缺少原生管理 API 类型，不能用于 adapter 构建；构建脚本会保留旧 `dist/`，但不把缺 API 的失败伪装为成功。详见 [`docs/native-mcp-patch.md`](native-mcp-patch.md) 和 [`docs/pitfalls.md`](pitfalls.md)。
-- Pi 1.4.0 patched tarball 与 adapter tarball 目前只存在于隔离临时目录；真实 managed install 仍指向 Pi 1.3.0 patched release，未运行真实 `pi update --all`。后续安装命令：`npm run install:managed-pi-update-hook -- --artifact <pi-1.4.0 tarball>`。
+- Pi 1.4.0 patched tarball 与 adapter tarball 目前只存在于隔离临时目录；真实 managed install 仍指向 Pi 1.3.0 patched release，未运行真实 `pi update --all`。仓库侧的 1.4.0 支持不会自动让本机正在运行的 stock Pi 1.4.0 获得管理 API；需要主动安装 patched artifact 并重启。最少步骤：
+
+  ```sh
+  npm run install:managed-pi-update-hook -- --artifact <pi-1.4.0 patched tarball>
+  # 然后完全退出并重新启动 Pi
+  ```
+
+  未提供已登记 tarball、未登记该 hash、或安装/API/版本校验失败时，installer 会 fail-closed 且不改动 `current-version`；此时 adapter 继续对缺失管理 API 的宿主结构化失败，不启用 fallback。
 - `AGENTS.md` 和 `docs/clean-code.md` 未在本轮修改。

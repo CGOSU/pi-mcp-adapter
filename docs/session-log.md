@@ -22,6 +22,14 @@
 - 诊断文案：`management-bridge` 与 `config-mapping` 中写死「1.2.0」的降级建议改为版本中立的「安装提供完整能力的 patched Pi release」，缺 API/能力仍结构化失败。
 - 未执行：真实 `pi update --all`、npm 发布、部署或打 tag；未 push；真实 managed install 未从 1.3.0 patched release 切到 1.4.0。后续命令：`npm run install:managed-pi-update-hook -- --artifact <pi-1.4.0 tarball>`。
 
+### 2026-10-22：Pi 1.4.0 用户文档收尾
+
+- 完成：`README.md` 的必需宿主版本表新增 Pi 1.4.0 固定 commit `4a080252f06caf63a525d7873c5d94d3c23887e0`，manifest 清单补 `patches/pi-1.4.0-native-mcp-management.json`；删除「错误提示中的版本建议仍可能写作 Pi 1.2.0」这段已失效说明（对应诊断文案已改为版本中立）；托管更新段落由「只覆盖 Pi 1.3.0」改为「覆盖 Pi 1.3.0 与 1.4.0」；两处协议范围说明补 1.4.0。
+- `CHANGELOG.md`：Unreleased 由「two fixed patched Pi baselines」改为「three」，并明确 stock Pi 1.4.0 在应用对应补丁前仍缺管理 API；Added 段补 1.4.0 固定补丁、runner 宿主依赖 fail-closed 校验、installer 按 tarball hash 定位记录三项。
+- `docs/current-state.md`：补最少安装/重启步骤与 fail-closed 边界，明确仓库侧 1.4.0 支持不会自动让本机正在运行的 stock Pi 1.4.0 获得管理 API。
+- 验证：`git diff --check` 通过；`npm pack --ignore-scripts --dry-run --json` 静态核对 37 个发布文件，含 1.2.0/1.3.0/1.4.0 三套 patch 与 manifest 及 `scripts/managed-pi-update-artifacts.json`，不含 `src/**`、`test/**`、`.map`。未因文档改动重跑功能验证。
+- 未执行：未运行真实 `pi update --all`，未修改用户 MCP 配置/keyring，未激活真实 host 到 1.4.0 patched release，未 push/发布/部署。
+
 ### 2026-10-19：修复 managed 更新钩子的 resolve 缺失导入
 
 - 现象与根因：`pi update --all` 已完成包和核心版本检查后，MCP post-update hook 输出 `resolve is not defined`。`parseHookArguments` 使用 `resolve` 但未从 `node:path` 导入；`main` 按非阻断契约捕获错误并返回 0，因此只检查退出码的既有测试漏报，前一次 reconcile 的警告也掩盖了 CLI 路径失败。

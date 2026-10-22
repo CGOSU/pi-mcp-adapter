@@ -33,17 +33,18 @@ pi install git:github.com/CGOSU/pi-mcp-adapter.git
 此版本只对下列**固定源码基线且应用了对应补丁**的 Pi 版本完成验证：
 
 - `@earendil-works/pi-coding-agent` `1.2.0`，源码 commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff`；
-- `@earendil-works/pi-coding-agent` `1.3.0`，源码 commit `71023aec1546d6d677a65669c5665c0927ce0dd0`。
+- `@earendil-works/pi-coding-agent` `1.3.0`，源码 commit `71023aec1546d6d677a65669c5665c0927ce0dd0`；
+- `@earendil-works/pi-coding-agent` `1.4.0`，源码 commit `4a080252f06caf63a525d7873c5d94d3c23887e0`。
 
-未打补丁的 Pi、其他 commit 或不完整补丁均不在已验证范围内。Pi 原生管理 API 缺失或能力不完整时，`/mcp-adapter` 会明确失败，不连接 MCP 服务器，也不回退到第二套运行时。当前错误提示中的版本建议仍可能写作 Pi 1.2.0；对 1.3.0 应按上表使用对应固定补丁。Adapter 的 peer range `^1.2.0` 只是包依赖范围，不代表该范围内任意 Pi build 都包含本适配器需要的补丁。
+未打补丁的 Pi、其他 commit 或不完整补丁均不在已验证范围内。Pi 原生管理 API 缺失或能力不完整时，`/mcp-adapter` 会明确失败，不连接 MCP 服务器，也不回退到第二套运行时。Adapter 的 peer range `^1.2.0` 只是包依赖范围，不代表该范围内任意 Pi build 都包含本适配器需要的补丁；例如本机当前运行的 stock Pi 1.4.0 仍缺少管理 API，不会因为 adapter 支持 1.4.0 而自动获得。
 
 前置条件和可复现的补丁流程见：
 
-- [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md)：两个固定基线、独立补丁、apply 步骤、测试范围和公共产物验证；
-- [`patches/pi-1.2.0-native-mcp-management.json`](patches/pi-1.2.0-native-mcp-management.json) 与 [`patches/pi-1.3.0-native-mcp-management.json`](patches/pi-1.3.0-native-mcp-management.json)：对应基线、补丁 SHA-256、能力和验证范围的机器可读清单；
+- [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md)：三个固定基线、独立补丁、apply 步骤、测试范围和公共产物验证；
+- [`patches/pi-1.2.0-native-mcp-management.json`](patches/pi-1.2.0-native-mcp-management.json)、[`patches/pi-1.3.0-native-mcp-management.json`](patches/pi-1.3.0-native-mcp-management.json) 与 [`patches/pi-1.4.0-native-mcp-management.json`](patches/pi-1.4.0-native-mcp-management.json)：对应基线、补丁 SHA-256、能力和验证范围的机器可读清单；
 - [`docs/native-mcp-protocol.md`](docs/native-mcp-protocol.md)：版本化的 `pi.mcp-management` v1 契约。
 
-两版补丁都不改变 Pi npm 依赖。Pi 内置 MCP 管理方仍是唯一连接、OAuth 和工具执行运行时；本适配器只提供选择加入的组装接入和界面。
+各版补丁都不改变 Pi npm 依赖。Pi 内置 MCP 管理方仍是唯一连接、OAuth 和工具执行运行时；本适配器只提供选择加入的组装接入和界面。
 
 ### 托管 Pi 更新后的非阻断补丁
 
@@ -53,7 +54,7 @@ pi install git:github.com/CGOSU/pi-mcp-adapter.git
 npm run install:managed-pi-update-hook -- --artifact /path/to/verified-pi-coding-agent.tgz
 ```
 
-安装器会备份原始 launcher，当前登记的 artifact 只覆盖 Pi 1.3.0。未来执行托管 `pi update --all` 时，官方 Pi 核心更新先照常完成；未知版本、artifact 缺失或校验/安装/验证失败只警告 adapter 可能不可用，不暂停、不回滚、不 pin 核心版本，且保留 Pi 原更新退出状态。Pi 核心仍是唯一 MCP owner；stock 或不完整版本上的 adapter 继续明确失败，不启用第二套 runtime。`pi update --models` 与 `pi update --extensions` 不应用核心补丁。
+安装器会备份原始 launcher，当前登记的 artifact 覆盖 Pi 1.3.0 与 1.4.0。未来执行托管 `pi update --all` 时，官方 Pi 核心更新先照常完成；未知版本、artifact 缺失或校验/安装/验证失败只警告 adapter 可能不可用，不暂停、不回滚、不 pin 核心版本，且保留 Pi 原更新退出状态。Pi 核心仍是唯一 MCP owner；stock 或不完整版本上的 adapter 继续明确失败，不启用第二套 runtime。`pi update --models` 与 `pi update --extensions` 不应用核心补丁。
 
 删除 hook 会恢复原始 launcher；若当前指针仍指向 hook 激活的版本，也恢复先前 release。独立补丁 release 与本地 artifact 缓存保留以便审计/回滚：
 
@@ -82,7 +83,7 @@ npm run install:managed-pi-update-hook -- --remove
 - **不由原生管理方启用：** `settings.scriptMode`、`disableProxyTool`、`autoAuth`、`trace`、`oauthDir`，以及服务器级 `debug`/`trace`。这些配置保持原样，并明确作为“保留但不生效”处理，不会静默丢弃。`scriptMode` 和 `disableProxyTool` 保持关闭，避免原生管理方再增加 MCP 脚本或代理执行面；`oauthDir` 不启用，避免触发明文凭据迁移。旧脚本与 MCP UI 路径使用的 `mcp-script-worker.mjs` 和 `app-bridge.bundle.js` 不再随包发布。
 - **信任：** 项目级来源（共享 `.mcp.json`、项目 `.agents`/`.pi`）受 Pi 的真实项目可信度检查控制。项目不受信任时，服务器不会进入活动快照、不会连接，`setDirectTools` 也会拒绝写入。不能用调用方自行声明的 trusted 标记或把来源改写成全局配置来绕过此检查。
 - **凭据：** 适配器服务器的凭据继续保存在操作系统密钥环中，并通过原生 OAuth 管理方使用；此路径不会写入原生默认的 `mcp-auth.json`，也不会把已存令牌迁移到明文文件。
-- **协议范围：** 已验证的 Pi 1.2.0/1.3.0 固定基线仍使用原生 MCP `initialize` 时代线协议。若配置 `protocolVersion: "2026-07-28"` 或 `"auto"`，连接前会返回结构化的不支持结果，且不改写配置。
+- **协议范围：** 已验证的 Pi 1.2.0/1.3.0/1.4.0 固定基线仍使用原生 MCP `initialize` 时代线协议。若配置 `protocolVersion: "2026-07-28"` 或 `"auto"`，连接前会返回结构化的不支持结果，且不改写配置。
 
 ### 发布包布局
 
@@ -354,7 +355,7 @@ pi.events.on(MCP_STATUS_EVENT, (snapshot) => {
 
 #### 当前协议支持范围
 
-当前发布入口使用已验证固定版本的 Pi 原生 MCP client（Pi 1.2.0/1.3.0），只支持 `initialize` 时代线协议。未设置 `protocolVersion` 时按 Pi 原生默认行为处理。若明确设置 `"2026-07-28"`，或设置 `"auto"` 而需要协商现代协议，适配器会在连接或执行前返回结构化“不支持”结果；不会静默回退到旧协议，也不会改写配置。
+当前发布入口使用已验证固定版本的 Pi 原生 MCP client（Pi 1.2.0/1.3.0/1.4.0），只支持 `initialize` 时代线协议。未设置 `protocolVersion` 时按 Pi 原生默认行为处理。若明确设置 `"2026-07-28"`，或设置 `"auto"` 而需要协商现代协议，适配器会在连接或执行前返回结构化“不支持”结果；不会静默回退到旧协议，也不会改写配置。
 
 以下内容仅描述仓库保留的旧适配器运行时，不适用于当前 Pi 原生扩展入口：旧版本可选择 `"auto"` 探测 MCP 2026-07-28，再根据服务器证据回退到经典握手；也可显式固定为 `"2026-07-28"`，此时不回退到 legacy 或 SSE。
 
