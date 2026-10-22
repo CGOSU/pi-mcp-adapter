@@ -8,6 +8,20 @@
 
 ## 会话
 
+### 2026-10-22：接入 Pi 1.4.0 原生 MCP 兼容
+
+- 目标：只新增 Pi 1.4.0 兼容，保留既有 1.2.0/1.3.0 资产与 native-only 契约；不降级、不引入第二套 runtime 或 fallback。
+- 固定基线：上游 tag `v1.4.0` → commit `4a080252f06caf63a525d7873c5d94d3c23887e0`。候选补丁 `patches/pi-1.4.0-native-mcp-management.patch` 在本任务前已存在（未跟踪），按既有候选处理、未冒称本轮生成；在 `/private/tmp/pi-1.4.0-fixed-patch.8aSzZL/pi` 干净 checkout 上 `git apply --check`/`git apply`/`git diff --check` 与反向 apply 校验全部通过，23 修改 + 26 新增共 49 路径与 manifest 一致；`npm ci` 安装 332 包；4 个 owner/management 测试文件 59 项通过。固定在 Pi 1.2.0 的脏 checkout `../pi-upstream-native` 未被触碰。
+- Manifest 与 runner：新增 `patches/pi-1.4.0-native-mcp-management.json`（含 target/hash/49 路径/18 caps/directTools/实际安装与测试结果/handoff 段）；`scripts/patched-pi-source.mjs` 追加 1.4.0 固定目标；`test/node/package/patched-pi-runners.test.mjs` 新增 1.4 manifest 校验与 1.3↔1.4 双向 baseCommit 拒绝，7 项通过。
+- 真实产物：完整 `npm run build` 通过（84 个 bundle 文件，9.0 MiB），`npm pack --ignore-scripts` 产出 tarball SHA-256 `9a3f27b857e29c6197de266fc1282176a6ec139ec71e5f4ffac78f6de50531ed`（7 778 845 bytes、1322 文件）；解包实测 `dist/index.js` 导出 management protocol/18 caps/`installMcpOwnerAssembly`，bundle 含三条 owner events，`pi --version` 为 `1.4.0`。
+- Adapter 真实验证：`npm run test:public-types -- --pi-source <patched 1.4.0 checkout>` 与 `npm run test:patched-native-session -- --pi-source <同一 checkout>` 均实际通过并同步发布 `dist`；`typecheck`、`test/unit/native` 8 文件 30 项通过。
+- 修复的两处 runner 缺陷：packed host 与 vitest alias 原先都把 adapter pin 的 `pi-ai` 1.2.0 注入 1.4.0 宿主，导致 `formatUserAgent` 缺失和 tool result 丢失。改为从所选 Pi checkout 解析宿主依赖，并断言宿主 `pi-ai` 版本与其 `coding-agent` 依赖声明一致。详见 [`docs/pitfalls.md`](pitfalls.md)。
+- Managed hook：installer 不再写死 Pi 1.3.0，改为用传入 tarball 的 SHA-256 在 registry 中唯一定位记录；`scripts/managed-pi-update-artifacts.json` 登记 1.4.0（alias `native-mcp-1.4.0-9a3f27b857`）。`npm run test:managed-pi-update-hook` 由 9 项扩到 12 项并全通过，新增「按 1.4.0 自身 hash/patch 精确选中」「未登记的 1.4.1 不激活且不复用他版 artifact」「installer 接受已登记 1.4.0 并拒绝未登记 tarball」。
+- 隔离 managed root 实测：用真实 1.4.0 tarball 完成离线 install → API/version 核验 → 原子切换到 `native-mcp-1.4.0-9a3f27b857`；stock `1.4.0` release 保留。真实 `~/.pi/agent` 的 `current-version` 未改动。
+- Fresh packed CLI RPC smoke：真实 1.4.0 tarball 与 packed adapter 装在相互隔离目录（adapter peer omitted、无 ancestor Pi `node_modules`），用实际 `dist/bundle/cli.js`、隔离 HOME/`PI_CODING_AGENT_DIR` 和本地 stdio fixture 运行：owner assembly 中 `assembly_fixture` connected 并取得 3 项 live tools，`/mcp-adapter` prompt 被处理，`notify`/`setStatus` 发出，模型推理事件 0，EOF 后 CLI 退出码 0。未连接真实 MCP/LLM/keyring。
+- 诊断文案：`management-bridge` 与 `config-mapping` 中写死「1.2.0」的降级建议改为版本中立的「安装提供完整能力的 patched Pi release」，缺 API/能力仍结构化失败。
+- 未执行：真实 `pi update --all`、npm 发布、部署或打 tag；未 push；真实 managed install 未从 1.3.0 patched release 切到 1.4.0。后续命令：`npm run install:managed-pi-update-hook -- --artifact <pi-1.4.0 tarball>`。
+
 ### 2026-10-19：修复 managed 更新钩子的 resolve 缺失导入
 
 - 现象与根因：`pi update --all` 已完成包和核心版本检查后，MCP post-update hook 输出 `resolve is not defined`。`parseHookArguments` 使用 `resolve` 但未从 `node:path` 导入；`main` 按非阻断契约捕获错误并返回 0，因此只检查退出码的既有测试漏报，前一次 reconcile 的警告也掩盖了 CLI 路径失败。

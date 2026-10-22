@@ -73,3 +73,15 @@
   原因：当前根 `node_modules` 的 development Pi 仍是 stock 1.2.0，缺少 patch 才增加的 public MCP management types；裸 `npm pack` 的生命周期脚本不会自动复用 `test:public-types` 的隔离 patched-Pi build；
   处理：先对明确的固定 patched Pi checkout 运行 `npm run test:public-types -- --pi-source <patched-Pi-checkout>`，随后从该成功 build 的 `dist/` 使用 `npm pack --ignore-scripts`；不得跳过 fresh public-types/artifact verification 或对未验证 `dist` 直接打包；
   验证：本轮裸 `npm pack` 的 `prepack` 因 stock 1.2.0 缺少 MCP management exports 失败；其后 `test:public-types` 的 typecheck、5 项 exports/package tests 和 packed consumer 通过，`npm pack --ignore-scripts` 生成 adapter tarball，SHA-256 `d4b6ee49f8f5d21b527779321b15e25aeeec22943a2327a9643198ef52f06428`。
+
+- 日期：2026-10-22；
+  现象：为 Pi 1.4.0 运行 adapter 的 `test:public-types` 时，packed host 抛出 `SyntaxError: The requested module '@earendil-works/pi-ai' does not provide an export named 'formatUserAgent'`；`test:patched-native-session` 则表现为会话里拿不到 MCP tool result；
+  原因：两个 runner 都把 adapter `node_modules` 链接进 packed host / 用 vitest alias 指向 adapter 自己 pin 的 `pi-ai` 1.2.0。Pi 1.4.0 的 `utils/pi-user-agent` 需要 `pi-ai` 1.4.0 的 `formatUserAgent`，其 agent loop 也要求宿主与 adapter 共用同一份 message 类型；混用两套 `pi-ai` 会让 tool result 无法回填；
+  处理：packed host 的依赖必须从所选 Pi checkout 解析（`createNodeModulesLinks(join(sourceRoot, "node_modules"), ...)`），vitest alias 必须指向 `join(piRoot, "packages", "ai", "dist")`，并断言宿主 workspace 的 `pi-ai` 版本与其 `coding-agent` 依赖声明一致后才继续；
+  验证：修正前 1.4.0 的 `test:public-types` 与 `test:patched-native-session` 均失败；修正后两者对同一 patched 1.4.0 checkout 均通过，且 1.2.0/1.3.0 的既有 runner 测试未受影响。
+
+- 日期：2026-10-22；
+  现象：在 macOS 上对 `/tmp/...` 路径的 Pi 1.4.0 checkout 执行 `npm run build` 时，`packages/durable` 报 `Models` / `TranscriptContext` 在 `/tmp/...` 与 `/private/tmp/...` 两种路径身份下不兼容；
+  原因：`/tmp` 是指向 `/private/tmp` 的符号链接，tsconfig 的 project reference 与 `paths` 同时解析出两种 absolute 路径，TS 因 brand 类型不同而判定为两个不同的 declaration identity；这与补丁内容无关；
+  处理：构建和验证 1.4.0 patched checkout 时使用 canonical realpath（`/private/tmp/...`）。同一 checkout 从 canonical 路径构建即可通过；
+  验证：同一 checkout 从 `/tmp/...` 构建在 `packages/durable` 以 exit 2 失败；改用 `/private/tmp/...` 后完整 `npm run build` 通过并产出 84 个 bundle 文件。

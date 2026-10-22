@@ -1923,7 +1923,7 @@ function blockingIssues(name, entry) {
     issues.push({
       code: "unsupported-protocol-version",
       field: "protocolVersion",
-      message: `MCP server "${name}" requests remote protocol ${entry.protocolVersion}, which the native Pi 1.2.0 client does not support.`
+      message: `MCP server "${name}" requests remote protocol ${entry.protocolVersion}, which the native Pi MCP client does not support.`
     });
   }
   const redirectUri = typeof entry.oauth === "object" && entry.oauth !== null ? entry.oauth.redirectUri : void 0;
@@ -3560,7 +3560,7 @@ function parseDiscoveryResponse(value, requestId) {
     const missing = REQUIRED_CAPABILITIES.filter((capability) => !capabilities.includes(capability));
     return failure(
       "missing-capabilities",
-      `Pi native MCP management is missing required capabilities: ${missing.join(", ")}. Install the patched Pi 1.2.0 API.`
+      `Pi native MCP management is missing required capabilities: ${missing.join(", ")}. Install a patched Pi release that provides every required capability.`
     );
   }
   if (!isRecord4(value.result) || typeof value.result.ok !== "boolean") {
@@ -3599,7 +3599,7 @@ function getNativeManagementRuntime() {
   if (protocolId === void 0 || protocolVersion === void 0 || discoveryEvent === void 0 || availableEvent === void 0 || responseEventPrefix === void 0 || supportedCapabilities === void 0 || installAssembly === void 0) {
     return failure(
       "missing-public-api",
-      "This Pi host does not expose the patched native MCP management API. Install the patched Pi 1.2.0 package; adapter runtime fallback is disabled."
+      "This Pi host does not expose the patched native MCP management API. Install a patched Pi release for a supported Pi version; adapter runtime fallback is disabled."
     );
   }
   if (protocolId !== PROTOCOL_ID || protocolVersion !== PROTOCOL_VERSION || discoveryEvent !== DISCOVERY_EVENT || availableEvent !== AVAILABLE_EVENT || responseEventPrefix !== RESPONSE_EVENT_PREFIX || !isStringArray2(supportedCapabilities) || typeof installAssembly !== "function") {

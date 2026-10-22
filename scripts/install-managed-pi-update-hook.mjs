@@ -119,12 +119,13 @@ async function writeAtomic(path, bytes, mode) {
 async function installHookAssets({ managedRoot, artifactPath, manifest }) {
   const hookRoot = join(managedRoot, hookDirectoryName);
   const artifactDirectory = join(hookRoot, "artifacts");
-  const artifact = manifest.artifacts.find((entry) => entry.packageVersion === "1.3.0");
-  if (!artifact) return failure("missing-supported-artifact", "No verified Pi 1.3.0 artifact is registered.");
 
   const sourceArtifact = await readFile(artifactPath).catch(() => undefined);
-  if (!sourceArtifact || sha256(sourceArtifact) !== artifact.artifactSha256) {
-    return failure("artifact-hash-mismatch", "The supplied Pi tarball does not match its verified SHA-256 registration.");
+  if (!sourceArtifact) return failure("artifact-required", "The supplied Pi tarball is missing or unreadable.");
+  const sourceArtifactHash = sha256(sourceArtifact);
+  const artifact = manifest.artifacts.find((entry) => entry.artifactSha256 === sourceArtifactHash);
+  if (!artifact) {
+    return failure("artifact-hash-mismatch", "The supplied Pi tarball does not match any verified SHA-256 registration.");
   }
 
   const existingHookRoot = await stat(hookRoot).then(() => true).catch(() => false);
@@ -251,7 +252,7 @@ export async function installManagedUpdateHook({
   sourceRoot = repositoryRoot,
   artifactManifest,
 } = {}) {
-  if (!artifactPath) return failure("artifact-required", "Provide the previously verified Pi 1.3.0 tarball path.");
+  if (!artifactPath) return failure("artifact-required", "Provide the previously verified Pi tarball path.");
   agentDir = resolve(agentDir);
   const install = await readManagedInstall(agentDir);
   if (!install.ok) return install;

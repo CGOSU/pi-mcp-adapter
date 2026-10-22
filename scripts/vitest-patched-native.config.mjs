@@ -1,4 +1,4 @@
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
@@ -9,7 +9,19 @@ if (!sourceValue) throw new Error("PI_CODING_AGENT_SOURCE must be set by the exp
 
 const piRoot = realpathSync(resolve(sourceValue));
 const codingAgentRoot = join(piRoot, "packages", "coding-agent");
-const piAiPackageRoot = join(adapterRoot, "node_modules", "@earendil-works", "pi-ai", "dist");
+
+// The host and the adapter must share the host's own pi-ai. Aliasing the adapter's pinned pi-ai here
+// would mix two pi-ai versions in one session: Pi 1.4.0 imports APIs its own pi-ai provides (such as
+// `formatUserAgent`) and its agent loop expects matching message shapes.
+const piAiPackageRoot = join(piRoot, "packages", "ai", "dist");
+const hostPiAiVersion = JSON.parse(readFileSync(join(piRoot, "packages", "ai", "package.json"), "utf8")).version;
+const hostExpectedPiAiVersion = JSON.parse(readFileSync(join(codingAgentRoot, "package.json"), "utf8"))
+  .dependencies?.["@earendil-works/pi-ai"];
+if (hostPiAiVersion !== hostExpectedPiAiVersion) {
+  throw new Error(
+    `The host workspace must build its own pi-ai ${hostExpectedPiAiVersion}; found ${hostPiAiVersion}.`,
+  );
+}
 
 export default defineConfig({
   resolve: {

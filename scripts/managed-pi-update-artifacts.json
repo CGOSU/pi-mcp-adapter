@@ -37,6 +37,42 @@
         "pi:mcp-management:owner-assembly:install",
         "pi:mcp-management:owner-assembly:release"
       ]
+    },
+    {
+      "packageVersion": "1.4.0",
+      "releaseAlias": "native-mcp-1.4.0-9a3f27b857",
+      "baseCommit": "4a080252f06caf63a525d7873c5d94d3c23887e0",
+      "patchPath": "pi-1.4.0-native-mcp-management.patch",
+      "patchSha256": "e832267afd3c1a92f0971158524e6d70dfd80f622811f8e274dc0652a5817698",
+      "artifactFile": "pi-coding-agent-1.4.0.tgz",
+      "artifactSha256": "9a3f27b857e29c6197de266fc1282176a6ec139ec71e5f4ffac78f6de50531ed",
+      "protocolId": "pi.mcp-management",
+      "protocolVersion": 1,
+      "capabilities": [
+        "server.snapshot",
+        "server.subscribe",
+        "server.enable",
+        "server.disable",
+        "server.reconnect",
+        "server.set-exposure",
+        "tool.set-exposure",
+        "catalog.refresh",
+        "catalog.resources",
+        "catalog.prompts",
+        "resource.read",
+        "resource.read-app",
+        "prompt.get",
+        "app.call-tool",
+        "oauth.sign-in",
+        "oauth.sign-out",
+        "server.set-direct-tools",
+        "execution.set-policy"
+      ],
+      "ownerEvents": [
+        "pi:mcp-management:owner-assembly:request",
+        "pi:mcp-management:owner-assembly:install",
+        "pi:mcp-management:owner-assembly:release"
+      ]
     }
   ]
 }

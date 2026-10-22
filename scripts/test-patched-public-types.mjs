@@ -258,16 +258,16 @@ async function main() {
       stagedNodeModules,
       new Map([["@earendil-works/pi-coding-agent", packedPiRoot]]),
     );
+    // The packed host must resolve its own fixed Pi workspace dependencies. Linking the adapter's
+    // node_modules here would substitute the adapter's pinned Pi packages, which do not match the
+    // host version under test (for example pi-ai 1.2.0 exports no `formatUserAgent` for Pi 1.4.0).
     const piNodeModules = join(packedPiRoot, "node_modules");
     await createNodeModulesLinks(
-      join(adapterRoot, "node_modules"),
+      join(sourceRoot, "node_modules"),
       piNodeModules,
-      new Map([
-        ["@earendil-works/pi-coding-agent", packedPiRoot],
-        ["@earendil-works/pi-mcp", join(sourceRoot, "packages", "mcp")],
-      ]),
+      new Map([["@earendil-works/pi-coding-agent", packedPiRoot]]),
     );
-    await addMissingNodeModules(join(sourceRoot, "node_modules"), piNodeModules);
+    await addMissingNodeModules(join(adapterRoot, "node_modules"), piNodeModules);
 
     console.log(`Building and checking adapter public artifacts against patched Pi ${sourceVersion} at ${sourceHead}.`);
     run(npmCommand(), ["run", "typecheck"], stagedAdapterRoot);

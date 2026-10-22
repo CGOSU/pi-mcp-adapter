@@ -122,3 +122,9 @@
 - 决定：将 `package.json` 的 Pi 扩展入口改为 `extensions/index.js`，由该入口转发到已构建的 `dist/index.js`，并将 wrapper 纳入发布文件。
 - 原因：Pi 对位于包根 `dist/` 下的 `index.js` 会在紧凑扩展标签中追加 `:dist`；`extensions/index.js` 是 Pi 约定的入口布局，可保留 `CGOSU/pi-mcp-adapter` 的显示名称。
 - 约束：不改变 npm 公共 exports、CLI 入口或 `dist` 的构建与懒加载边界；wrapper 必须在 Git 安装和 npm tarball 中同时可用。
+
+### 2026-10-22：Pi 1.4.0 沿用固定版本 native-only 契约，runner 必须使用宿主自身 pi-ai
+
+- 决定：Pi 1.4.0 只追加一个固定目标（commit + patch SHA-256 + manifest），复用既有 schemaVersion 1 manifest 布局和 18 项 capabilities；不引入 1.4 专属机制、降级路径或第二套 runtime。验证脚本（`test:public-types`、`test:patched-native-session`）必须从所选 Pi checkout 解析宿主依赖，包括 `pi-ai`。
+- 原因：1.4.0 候选补丁可直接应用到干净基线，无需专属源码改动；而 Pi 1.4.0 的 `utils/pi-user-agent` 依赖 `pi-ai` 1.4.0 的 `formatUserAgent`，其 agent loop 也要求宿主与 adapter 共享同一份 message 类型。用 adapter pin 的 1.2.0 填充宿主会同时破坏 public-types 与同会话回归。
+- 约束：宿主 `pi-ai` 版本必须与其 `coding-agent` 依赖声明一致，否则 runner fail-closed；manifest 的 `handoff` 段只承载下游复用信息，不改变被 runner 断言的既有字段。managed installer 按 tarball 的 SHA-256 在 registry 中唯一定位记录，不再写死版本号。

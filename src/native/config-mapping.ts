@@ -195,7 +195,7 @@ function blockingIssues(name: string, entry: ServerEntry): NativeConfigServerIss
     issues.push({
       code: "unsupported-protocol-version",
       field: "protocolVersion",
-      message: `MCP server "${name}" requests remote protocol ${entry.protocolVersion}, which the native Pi 1.2.0 client does not support.`,
+      message: `MCP server "${name}" requests remote protocol ${entry.protocolVersion}, which the native Pi MCP client does not support.`,
     });
   }
   const redirectUri = typeof entry.oauth === "object" && entry.oauth !== null ? entry.oauth.redirectUri : undefined;

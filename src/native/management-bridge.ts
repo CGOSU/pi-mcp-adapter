@@ -191,7 +191,7 @@ function parseDiscoveryResponse(
     const missing = REQUIRED_CAPABILITIES.filter((capability) => !capabilities.includes(capability));
     return failure(
       "missing-capabilities",
-      `Pi native MCP management is missing required capabilities: ${missing.join(", ")}. Install the patched Pi 1.2.0 API.`,
+      `Pi native MCP management is missing required capabilities: ${missing.join(", ")}. Install a patched Pi release that provides every required capability.`,
     );
   }
   if (!isRecord(value.result) || typeof value.result.ok !== "boolean") {
@@ -241,7 +241,7 @@ export function getNativeManagementRuntime(): NativeManagementResult<NativeManag
   ) {
     return failure(
       "missing-public-api",
-      "This Pi host does not expose the patched native MCP management API. Install the patched Pi 1.2.0 package; adapter runtime fallback is disabled.",
+      "This Pi host does not expose the patched native MCP management API. Install a patched Pi release for a supported Pi version; adapter runtime fallback is disabled.",
     );
   }
   if (

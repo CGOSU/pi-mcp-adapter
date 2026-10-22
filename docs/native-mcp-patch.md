@@ -1,6 +1,6 @@
 # 固定 Pi 基线的原生 MCP 补丁
 
-本文是 Pi 原生 MCP adapter 补丁的复现和验证说明。仅覆盖下列两个固定源码 commit；版本号匹配但 commit 不同、stock Pi 或不完整补丁均不视为已验证宿主。Pi 原生 MCP 仍是唯一连接、认证和工具执行 owner；adapter 提供配置/provenance、keyring 接线和管理增强，不创建第二套 runtime，也没有 capability fallback。
+本文是 Pi 原生 MCP adapter 补丁的复现和验证说明。仅覆盖下列三个固定源码 commit；版本号匹配但 commit 不同、stock Pi 或不完整补丁均不视为已验证宿主。Pi 原生 MCP 仍是唯一连接、认证和工具执行 owner；adapter 提供配置/provenance、keyring 接线和管理增强，不创建第二套 runtime，也没有 capability fallback。
 
 ## 固定交付
 
@@ -8,8 +8,9 @@
 | --- | --- | --- | --- | ---: | --- | --- |
 | `@earendil-works/pi-coding-agent` 1.2.0 | `06a466935536f8c9bcacb2d5efc0fc021be1bdff` | [`pi-1.2.0-native-mcp-management.patch`](../patches/pi-1.2.0-native-mcp-management.patch) | `d499d6fba6728dbaced2876149b362780ce4b8ef2129ec3283587a456c46c654` | 48 | [`pi-1.2.0-native-mcp-management.json`](../patches/pi-1.2.0-native-mcp-management.json) | `d7507252bc0c98df8f04d33fb0bf10092a128e19ec40e2b5d31dd8f552e664c6` |
 | `@earendil-works/pi-coding-agent` 1.3.0 | `71023aec1546d6d677a65669c5665c0927ce0dd0` | [`pi-1.3.0-native-mcp-management.patch`](../patches/pi-1.3.0-native-mcp-management.patch) | `67df3bb7e8d51dd9f15e66253869d20e5c4c0957f7a331f1a4ba82e2b54eaf33` | 49 | [`pi-1.3.0-native-mcp-management.json`](../patches/pi-1.3.0-native-mcp-management.json) | `5768a010e8473a0d6d9dde557e733f5a513e42933bf15b8c61a3a4dd8339bd7e` |
+| `@earendil-works/pi-coding-agent` 1.4.0 | `4a080252f06caf63a525d7873c5d94d3c23887e0` | [`pi-1.4.0-native-mcp-management.patch`](../patches/pi-1.4.0-native-mcp-management.patch) | `e832267afd3c1a92f0971158524e6d70dfd80f622811f8e274dc0652a5817698` | 49 | [`pi-1.4.0-native-mcp-management.json`](../patches/pi-1.4.0-native-mcp-management.json) | `b9559fb79f1f2da74c6ea27e53db495e51a9904c12d204732b3e5f7308c13f3e` |
 
-两份补丁分别基于各自干净固定 commit 生成，不可互换或重复应用。1.2.0 的既有补丁和 manifest 保持不变。两个 manifest 分别记录 package version、基线、hash、路径、协议能力和验证范围；adapter package 的 peer range `^1.2.0` 不是对该区间所有 Pi build 的兼容承诺。
+三份补丁分别基于各自干净固定 commit 生成，不可互换或重复应用。1.2.0 的既有补丁和 manifest 保持不变。每个 manifest 分别记录 package version、基线、hash、路径、协议能力和验证范围；adapter package 的 peer range `^1.2.0` 不是对该区间所有 Pi build 的兼容承诺。
 
 ## 在独立干净 checkout 中应用
 
@@ -60,11 +61,13 @@ Same-session runner 在单个 Pi harness session 加载 patched native MCP exten
 npm run test:patched-pi-runners
 ```
 
-它检查固定版本选择、Pi 1.2.0 既有 hash 保持、参数边界，以及 Pi 1.3.0 manifest/hash/path/protocol/capability 校验。
+It checks fixed version selection, the existing Pi 1.2.0 hash, argument boundaries, and the Pi 1.3.0 and 1.4.0 manifest/hash/path/protocol/capability checks, including bidirectional cross-version baseline rejection.
+
+Both runners resolve host dependencies from the selected Pi checkout, so the packed host uses its own `pi-ai` and workspace packages instead of the adapter's pinned dev versions. Linking the adapter's `node_modules` into the packed host breaks Pi 1.4.0, whose `pi-user-agent` module imports `formatUserAgent` from `pi-ai` 1.4.0.
 
 ## 托管 Pi 的非阻断更新 hook
 
-`npm run install:managed-pi-update-hook -- --artifact <verified-pi.tgz>` 为 Pi 的 `releases-v1` managed install 安装本地 launcher wrapper。只有从 `~/.pi/agent/bin/pi`（或等效 managed agent 路径）启动的 Pi 命令会经过该 wrapper；非 managed 安装不受影响。安装器先校验仓库中的 patch SHA-256、artifact registry 和传入 tarball SHA-256，随后把 artifact 持久化到 managed install 的 `native-mcp-update/artifacts/`，备份原 launcher，并安装 post-update hook。当前 registry 只登记 Pi 1.3.0；其 patched Pi tarball SHA-256 为 `b929058ead39f7766452aa32457f0b369b31da630165cab585614f7164c32e26`。Artifact tarball 不随 adapter package 发布，且安装器不从远端下载或依赖 `/tmp`。
+`npm run install:managed-pi-update-hook -- --artifact <verified-pi.tgz>` 为 Pi 的 `releases-v1` managed install 安装本地 launcher wrapper。只有从 `~/.pi/agent/bin/pi`（或等效 managed agent 路径）启动的 Pi 命令会经过该 wrapper；非 managed 安装不受影响。安装器先校验仓库中的 patch SHA-256、artifact registry，并用传入 tarball 的 SHA-256 在 registry 中唯一定位记录（不按写死的版本号），随后把 artifact 持久化到 managed install 的 `native-mcp-update/artifacts/`，备份原 launcher，并安装 post-update hook。当前 registry 登记 Pi 1.3.0 与 1.4.0；1.4.0 patched tarball SHA-256 为 `9a3f27b857e29c6197de266fc1282176a6ec139ec71e5f4ffac78f6de50531ed`，1.3.0 仍为 `b929058ead39f7766452aa32457f0b369b31da630165cab585614f7164c32e26`。Artifact tarball 不随 adapter package 发布，且安装器不从远端下载或依赖 `/tmp`。
 
 成功的 `pi update --all` 完成后，wrapper 才运行 reconciliation。它只选择 package version 与 registry 精确相等的 artifact；安装使用独立 staging、npm offline/cache、禁用 lifecycle scripts，之后核验包版本、public MCP management protocol/capabilities、bundled owner events 和 `pi --version`，最后将新 release 移入 managed `releases/` 并原子切换 `current-version`。补丁 release 使用稳定的非 SemVer alias，使 Pi 自身的旧 release pruning 不会把它当作可清理的版本目录；原 stock release 保留以便回滚。
 
@@ -72,7 +75,7 @@ Hook failure、未知版本、缺少/哈希错误 artifact、离线依赖不足�
 
 恢复命令为 `npm run install:managed-pi-update-hook -- --remove`。只有当前指针仍是 hook 激活的 release 且 prior release 存在时，remove 才将指针恢复至 prior release；随后恢复原 launcher。补丁 release 和 artifact 缓存保留，不会删除文件。安装/恢复后需完全重启 Pi，现有进程不会替换已加载的宿主模块。
 
-实际验证包括：9 项 managed hook/launcher Node tests，涵盖 Pi updater 锁冲突与安装 staging 期间核心 release 指针并发变化；真实 1.3.0 tarball 在隔离模拟 managed root 中的离线 install/reconcile/API smoke；本机 managed Pi 新 release 的 `--version` 与 public API 检查；使用已安装 managed release 的 bundled CLI、packed adapter、隔离配置和 local stdio fixture 执行 RPC smoke。没有运行真实 `pi update --all`，因此 updater 网络/发布链路不在本轮实测范围；wrapper 的成功/失败退出状态由 fake child 测试覆盖。
+实际验证包括：12 项 managed hook/launcher Node tests，涵盖 Pi updater 锁冲突、安装 staging 期间核心 release 指针并发变化、Pi 1.4.0 按自身 hash/patch 精确选中，以及未登记版本不激活且不复用其他版本 artifact；真实 1.3.0 与 1.4.0 tarball 在隔离模拟 managed root 中的离线 install/reconcile/API smoke；本机 managed Pi 新 release 的 `--version` 与 public API 检查；使用已安装 managed release 的 bundled CLI、packed adapter、隔离配置和 local stdio fixture 执行 RPC smoke。没有运行真实 `pi update --all`，因此 updater 网络/发布链路不在本轮实测范围；wrapper 的成功/失败退出状态由 fake child 测试覆盖。
 
 ## 已执行验证与边界
 
@@ -81,3 +84,6 @@ Hook failure、未知版本、缺少/哈希错误 artifact、离线依赖不足�
 - Adapter 版本化 runner 测试为 6 项通过。`npm pack --dry-run --ignore-scripts --json` 检查到 31 个发布文件，含 `dist`、README 所链接的协议文档及 Pi 1.2.0/1.3.0 patch/manifest，不含 `src/**`、`test/**` 或 source map；未发布 npm 包。
 - Pi 1.3.0 fresh packed CLI runtime smoke：Pi tarball SHA-256 `b929058ead39f7766452aa32457f0b369b31da630165cab585614f7164c32e26`，adapter tarball SHA-256 `d4b6ee49f8f5d21b527779321b15e25aeeec22943a2327a9643198ef52f06428`。二者安装在相互隔离的临时目录；adapter 的 Pi peer 被省略，且没有 ancestor `node_modules`。用实际 `dist/bundle/cli.js`、packed adapter 和本地 stdio fixture 执行 RPC：观测到完整 public management API/18 项 capabilities、owner assembly 中 `assembly_fixture` 连接成功并取得 3 项 live tools、`/mcp-adapter` prompt 被处理、`notify`/`setStatus` 发出；无模型推理事件，EOF 后 CLI 退出码 0，fixture 子进程退出。fixture 只记录 `initialize` 与 `tools/list`，未调用 tool，也未访问真实 MCP、LLM、用户配置或凭据。完整 transcript、probe 和 fixture 日志保存在隔离目录 `/tmp/pi-mcp-evidence-1.3.nbLEJX/runtime/packed-final/`。
 - Adapter tarball 通过 `npm run test:public-types -- --pi-source <fixed patched checkout>` 产生并验证的 `dist`，随后以 `npm pack --ignore-scripts` 打包；裸 `npm pack` 会重新执行 `prepack` 并使用 adapter 本地 stock Pi 1.2.0 开发类型，导致缺少 patched management exports 的声明构建失败。`npm run check` 和 Pi 全量测试未运行；不得将定向测试/构建扩展解释为全量 check 通过。未修改、提交或推送 Pi 上游。managed launcher hook 的本机安装、release pointer 切换与验证见上一节；没有运行真实 `pi update --all`。
+- Pi 1.4.0：在干净 detached checkout `4a080252f06caf63a525d7873c5d94d3c23887e0` 上 `git apply --check`、apply、`git diff --check` 均通过，49 路径（23 修改、26 新增）与 manifest 一致，反向 apply 校验确认补丁完整应用；`npm ci` 安装 332 个包；四个 owner/management 定向测试文件 59 项通过。完整 `npm run build` 通过（84 个 bundle 文件，9.0 MiB）并产出 tarball SHA-256 `9a3f27b857e29c6197de266fc1282176a6ec139ec71e5f4ffac78f6de50531ed`（7 778 845 bytes，1322 个文件）；解包后实测 `dist/index.js` 导出 management protocol/18 项 capabilities/`installMcpOwnerAssembly`，bundle 含三条 owner events，`pi --version` 为 `1.4.0`。
+- Pi 1.4.0 上的 adapter 验证：`test:public-types` 与 `test:patched-native-session` 均实际通过（同一 checkout）；`test:patched-pi-runners` 7 项、`test:managed-pi-update-hook` 12 项、`test/unit/native` 8 文件 30 项、`typecheck` 均通过。隔离 managed root 中用真实 1.4.0 tarball 完成离线 install → API/version 核验 → 原子切换到 `native-mcp-1.4.0-9a3f27b857`，stock `1.4.0` release 与真实 `current-version` 未被改动。Fresh packed CLI runtime smoke（真实 tarball + packed adapter + 隔离配置 + local stdio fixture）：owner assembly 连接成功并取得 3 项 live tools，`/mcp-adapter` prompt 被处理，`notify`/`setStatus` 发出，无模型推理事件，EOF 后退出码 0；未连接真实 MCP/LLM/keyring，未运行真实 `pi update --all`。
+- 一处构建环境注记：在 macOS 上必须从 canonical `/private/tmp/...` 路径构建 Pi 1.4.0；经 `/tmp/...` 符号路径构建会因 tsconfig 路径身份不一致产生 `pi-ai` type 冲突。这是构建环境问题，不反映补丁或产物缺陷。
