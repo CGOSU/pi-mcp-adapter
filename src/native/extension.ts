@@ -16,9 +16,12 @@ import { mapLoadedConfigSourcesToNative } from "./config-mapping.ts";
 import { createNativeConfigAssembly, type NativeConfigAssemblyState } from "./config-assembly.ts";
 import {
   installNativeMcpOwnerAssembly,
+  getNativeManagementRuntime,
   NativeMcpManagementBridge,
   type NativeManagementFailure,
 } from "./management-bridge.ts";
+
+import { hasStandardAdapter, installStandardAdapter, registerStandardMcpServer, supportsStandardMcp } from "./standard-extension.ts";
 
 const PROGRAMMATIC_SOURCE = "pi-mcp-adapter:programmatic-config";
 const DISPOSE_TIMEOUT_MS = 5_000;
@@ -274,6 +277,11 @@ export function createMcpAdapter(options: McpAdapterOptions = {}): (pi: Extensio
     ...(options.configPath === undefined ? {} : { configPath: options.configPath }),
   };
   return (pi: ExtensionAPI) => {
+    const runtime = getNativeManagementRuntime();
+    if (!runtime.ok && runtime.error.code === "missing-public-api" && supportsStandardMcp(pi)) {
+      installStandardAdapter(pi, factoryOptions);
+      return;
+    }
     installAdapter(pi, factoryOptions);
   };
 }
@@ -312,6 +320,7 @@ export function registerMcpServer(options: {
   definition: ServerEntry;
 }): McpServerRegistration {
   const { pi, name, definition } = options;
+  if (hasStandardAdapter(pi)) return registerStandardMcpServer(pi, name, definition);
   const state = adapters.get(pi);
   if (!state) throw new Error("pi-mcp-adapter is not installed for this Pi instance");
   if (state.assemblyInstallError) throw new Error(state.assemblyInstallError.message);

@@ -8,7 +8,7 @@ import {
   resourceNameToToolName,
   sanitizeTerminalText,
   stripOscSequences
-} from "./chunk-YANXOPYG.js";
+} from "./chunk-YSPBPYPN.js";
 
 // src/ui/mcp-panel.ts
 import { matchesKey as matchesKey2, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";

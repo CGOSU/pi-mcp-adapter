@@ -49,7 +49,7 @@ function programmaticSource(config: McpConfig): LoadedConfigSource[] {
   }];
 }
 
-function nativeConfigSources(options: McpAdapterOptions, cwd: string): LoadedConfigSource[] {
+export function loadNativeConfigSources(options: McpAdapterOptions, cwd: string): LoadedConfigSource[] {
   if (options.config !== undefined) return programmaticSource(options.config);
 
   const baseSources = loadConfigSources(options.configPath ?? getConfigPathFromArgv(), cwd);
@@ -161,7 +161,7 @@ export function createNativeConfigAssembly(options: McpAdapterOptions): NativeCo
       activeCwd = context.cwd;
       let mapped: ReturnType<typeof mapLoadedConfigSourcesToNative>;
       try {
-        mapped = mapLoadedConfigSourcesToNative(nativeConfigSources(options, context.cwd));
+        mapped = mapLoadedConfigSourcesToNative(loadNativeConfigSources(options, context.cwd));
       } catch {
         provenanceByServer.clear();
         managedServerNames.clear();

@@ -239,9 +239,12 @@ export function getNativeManagementRuntime(): NativeManagementResult<NativeManag
     supportedCapabilities === undefined ||
     installAssembly === undefined
   ) {
+    if ([protocolId, protocolVersion, discoveryEvent, availableEvent, responseEventPrefix, supportedCapabilities, installAssembly].some((value) => value !== undefined)) {
+      return failure("invalid-public-api", "The Pi host exposes an incomplete native MCP management API.");
+    }
     return failure(
       "missing-public-api",
-      "This Pi host does not expose the patched native MCP management API. Install a patched Pi release for a supported Pi version; adapter runtime fallback is disabled.",
+      "This Pi host has no enhanced MCP management API. Use a Pi release with the standard registerMcpServer/unregisterMcpServer/getMcpServers extension APIs, or a supported patched Pi release for enhanced management. Adapter-owned connection runtime fallback is disabled.",
     );
   }
   if (

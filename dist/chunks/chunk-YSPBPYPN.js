@@ -581,6 +581,7 @@ export {
   MCP_TOOL_APPROVAL_REQUEST_EVENT,
   isToolAllowed,
   getConfigPathFromArgv,
+  getPiGlobalConfigPath,
   getProjectPiConfigPath,
   getConfigSources,
   isExclusiveConfigMode,

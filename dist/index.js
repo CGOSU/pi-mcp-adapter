@@ -9,6 +9,7 @@ import {
   getConfigDirName,
   getConfigPathFromArgv,
   getConfigSources,
+  getPiGlobalConfigPath,
   getProjectPiConfigPath,
   getToolNameCandidates,
   isExclusiveConfigMode,
@@ -20,7 +21,7 @@ import {
   parseDirectToolSelectors,
   resolveToolPrefix,
   resourceNameToToolName
-} from "./chunks/chunk-YANXOPYG.js";
+} from "./chunks/chunk-YSPBPYPN.js";
 
 // src/tools/mcp-references.ts
 var BUILTIN_NAMES = /* @__PURE__ */ new Set(["read", "bash", "edit", "write", "grep", "find", "ls", "mcp"]);
@@ -532,20 +533,20 @@ ${url.href}`, "info");
     }
   };
 }
-function saveSummary(report) {
+function saveSummary(report2) {
   const lines = [];
-  if (report.saved.length > 0) lines.push(`Saved directTools for: ${report.saved.join(", ")}.`);
-  for (const failure2 of report.failed) {
+  if (report2.saved.length > 0) lines.push(`Saved directTools for: ${report2.saved.join(", ")}.`);
+  for (const failure2 of report2.failed) {
     lines.push(`Could not fully save/apply directTools for "${failure2.name}": ${failure2.message}`);
   }
-  for (const name of report.unknown) {
+  for (const name of report2.unknown) {
     lines.push(`The directTools operation for "${name}" has an unknown outcome; it was not retried.`);
   }
-  if (report.notAttempted.length > 0) {
-    lines.push(`Not attempted after the native session changed: ${report.notAttempted.join(", ")}.`);
+  if (report2.notAttempted.length > 0) {
+    lines.push(`Not attempted after the native session changed: ${report2.notAttempted.join(", ")}.`);
   }
   if (lines.length === 0) return void 0;
-  return { message: lines.join("\n"), level: report.failed.length || report.unknown.length || report.notAttempted.length ? "error" : "info" };
+  return { message: lines.join("\n"), level: report2.failed.length || report2.unknown.length || report2.notAttempted.length ? "error" : "info" };
 }
 function panelUnavailableResult(result) {
   return result.ok ? void 0 : result.error.message;
@@ -582,12 +583,12 @@ async function openNativeMcpPanel(options) {
     return;
   }
   if (!initialSnapshot.ok) return;
-  const { createMcpPanel } = await import("./chunks/mcp-panel-EHSHO42K.js");
+  const { createMcpPanel } = await import("./chunks/mcp-panel-THZ2DP2L.js");
   const configuration = options.configAssembly.getPanelConfiguration(options.getProjectTrust() === true);
   let overlayHandle;
   let activeView;
   let finished = false;
-  await new Promise((resolve3) => {
+  await new Promise((resolve4) => {
     context.ui.custom(
       (tui, _theme, keybindings, done) => {
         let currentSnapshot = options.getCurrentSnapshot() ?? initialSnapshot.value;
@@ -606,18 +607,18 @@ async function openNativeMcpPanel(options) {
             options.setPanelView(void 0);
             void (async () => {
               if (!result.cancelled && result.changes.size > 0 && options.getCurrentHandle() === handle) {
-                const report = await saveNativeDirectToolsChanges(handle, result.changes, () => options.getCurrentHandle() === handle);
-                const summary = saveSummary(report);
+                const report2 = await saveNativeDirectToolsChanges(handle, result.changes, () => options.getCurrentHandle() === handle);
+                const summary = saveSummary(report2);
                 if (summary) context.ui.notify(summary.message, summary.level);
               } else if (!result.cancelled && result.changes.size > 0) {
                 context.ui.notify("The native MCP session changed; directTools changes were not started.", "error");
               }
               done(void 0);
-              resolve3();
+              resolve4();
             })().catch(() => {
               context.ui.notify("The native directTools operation could not be confirmed. It was not retried.", "error");
               done(void 0);
-              resolve3();
+              resolve4();
             });
           },
           {
@@ -1454,43 +1455,43 @@ function loadAgentPluginMcpConfig(path, cwd) {
   }
   return translateAgentPluginMcpConfig(raw, manifest, pluginRoot);
 }
-function readPluginManifest(pluginRoot, report) {
+function readPluginManifest(pluginRoot, report2) {
   const manifestPath = resolve2(pluginRoot, "plugin.json");
   if (!existsSync2(manifestPath)) {
-    if (report) console.warn(`Agent Plugin at ${pluginRoot} is invalid: missing plugin.json`);
+    if (report2) console.warn(`Agent Plugin at ${pluginRoot} is invalid: missing plugin.json`);
     return null;
   }
   if (!statSync2(manifestPath).isFile()) {
-    if (report) console.warn(`Agent Plugin at ${pluginRoot} is invalid: plugin.json is not a regular file`);
+    if (report2) console.warn(`Agent Plugin at ${pluginRoot} is invalid: plugin.json is not a regular file`);
     return null;
   }
   let raw;
   try {
     raw = JSON.parse(readFileSync2(manifestPath, "utf8"));
   } catch (error) {
-    if (report) console.warn(`Agent Plugin at ${pluginRoot} is invalid: failed to parse plugin.json`, error);
+    if (report2) console.warn(`Agent Plugin at ${pluginRoot} is invalid: failed to parse plugin.json`, error);
     return null;
   }
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    if (report) console.warn(`Agent Plugin at ${pluginRoot} is invalid: plugin.json must be an object`);
+    if (report2) console.warn(`Agent Plugin at ${pluginRoot} is invalid: plugin.json must be an object`);
     return null;
   }
   const manifest = raw;
   for (const key of Object.keys(manifest)) {
-    if (!PLUGIN_MANIFEST_FIELDS.has(key) && report) {
+    if (!PLUGIN_MANIFEST_FIELDS.has(key) && report2) {
       console.warn(`Agent Plugin at ${pluginRoot} ignores unknown plugin.json field: ${key}`);
     }
   }
   if (manifest.$schema !== PLUGIN_SCHEMA) {
-    if (report) console.warn(`Agent Plugin at ${pluginRoot} is invalid: unsupported plugin.json $schema`);
+    if (report2) console.warn(`Agent Plugin at ${pluginRoot} is invalid: unsupported plugin.json $schema`);
     return null;
   }
   if (typeof manifest.name !== "string" || manifest.name.length < 1 || manifest.name.length > 64 || !PLUGIN_NAME_PATTERN.test(manifest.name)) {
-    if (report) console.warn(`Agent Plugin at ${pluginRoot} is invalid: plugin.json name is invalid`);
+    if (report2) console.warn(`Agent Plugin at ${pluginRoot} is invalid: plugin.json name is invalid`);
     return null;
   }
   if (manifest.extensions !== void 0 && (!manifest.extensions || typeof manifest.extensions !== "object" || Array.isArray(manifest.extensions))) {
-    if (report) console.warn(`Agent Plugin ${manifest.name} ignores non-object plugin.json extensions`);
+    if (report2) console.warn(`Agent Plugin ${manifest.name} ignores non-object plugin.json extensions`);
   }
   return { name: manifest.name };
 }
@@ -3307,7 +3308,7 @@ function programmaticSource(config) {
     ...validated.issues === void 0 ? {} : { validationIssues: validated.issues }
   }];
 }
-function nativeConfigSources(options, cwd) {
+function loadNativeConfigSources(options, cwd) {
   if (options.config !== void 0) return programmaticSource(options.config);
   const baseSources = loadConfigSources(options.configPath ?? getConfigPathFromArgv(), cwd);
   if (isExclusiveConfigMode()) return baseSources;
@@ -3380,7 +3381,7 @@ function createNativeConfigAssembly(options) {
       activeCwd = context.cwd;
       let mapped2;
       try {
-        mapped2 = mapLoadedConfigSourcesToNative(nativeConfigSources(options, context.cwd));
+        mapped2 = mapLoadedConfigSourcesToNative(loadNativeConfigSources(options, context.cwd));
       } catch {
         provenanceByServer.clear();
         managedServerNames.clear();
@@ -3597,9 +3598,12 @@ function getNativeManagementRuntime() {
   const supportedCapabilities = getPublicExport("MCP_MANAGEMENT_CAPABILITIES");
   const installAssembly = getPublicExport("installMcpOwnerAssembly");
   if (protocolId === void 0 || protocolVersion === void 0 || discoveryEvent === void 0 || availableEvent === void 0 || responseEventPrefix === void 0 || supportedCapabilities === void 0 || installAssembly === void 0) {
+    if ([protocolId, protocolVersion, discoveryEvent, availableEvent, responseEventPrefix, supportedCapabilities, installAssembly].some((value) => value !== void 0)) {
+      return failure("invalid-public-api", "The Pi host exposes an incomplete native MCP management API.");
+    }
     return failure(
       "missing-public-api",
-      "This Pi host does not expose the patched native MCP management API. Install a patched Pi release for a supported Pi version; adapter runtime fallback is disabled."
+      "This Pi host has no enhanced MCP management API. Use a Pi release with the standard registerMcpServer/unregisterMcpServer/getMcpServers extension APIs, or a supported patched Pi release for enhanced management. Adapter-owned connection runtime fallback is disabled."
     );
   }
   if (protocolId !== PROTOCOL_ID || protocolVersion !== PROTOCOL_VERSION || discoveryEvent !== DISCOVERY_EVENT || availableEvent !== AVAILABLE_EVENT || responseEventPrefix !== RESPONSE_EVENT_PREFIX || !isStringArray2(supportedCapabilities) || typeof installAssembly !== "function") {
@@ -3750,7 +3754,7 @@ var NativeMcpManagementBridge = class {
       requestId,
       requiredCapabilities: runtime.requiredCapabilities
     };
-    return new Promise((resolve3) => {
+    return new Promise((resolve4) => {
       let settled = false;
       const unsubscribe = this.pi.events.on(channel, (event) => {
         finish(parseDiscoveryResponse(event, requestId));
@@ -3768,7 +3772,7 @@ var NativeMcpManagementBridge = class {
         clearTimeout(timer);
         unsubscribe();
         if (this.cancelPending === cancel) this.cancelPending = void 0;
-        resolve3(this.generation === generation ? result : failure("session-ended", "The MCP management session changed."));
+        resolve4(this.generation === generation ? result : failure("session-ended", "The MCP management session changed."));
       };
       this.cancelPending = cancel;
       this.pi.events.emit(runtime.discoveryEvent, request);
@@ -3776,10 +3780,225 @@ var NativeMcpManagementBridge = class {
   }
 };
 
+// src/native/standard-extension.ts
+import { resolve as resolve3 } from "node:path";
+
+// src/native/standard-config.ts
+import { readFileSync as readFileSync6 } from "node:fs";
+function readStandardNativeConfiguration(paths) {
+  const names = /* @__PURE__ */ new Set();
+  let settings;
+  for (const path of paths) {
+    let raw;
+    try {
+      raw = readFileSync6(path, "utf8");
+    } catch (error) {
+      if (error.code === "ENOENT") continue;
+      return { ok: false, error: { code: "read-failed", message: "Native Pi MCP configuration could not be read safely." } };
+    }
+    let parsed;
+    try {
+      parsed = parseJsonConfig(raw);
+    } catch {
+      return { ok: false, error: { code: "invalid-json", message: "Native Pi MCP configuration is not valid JSON." } };
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { ok: false, error: { code: "invalid-config", message: "Native Pi MCP configuration must be an object." } };
+    }
+    const config = parsed;
+    if (config.settings !== void 0) {
+      const validated = validateMcpConfig({ mcpServers: {}, settings: config.settings });
+      if (!validated.ok) return { ok: false, error: { code: "invalid-settings", message: "Native Pi configuration contains invalid adapter settings; additional sources cannot be imported safely." } };
+      settings = { ...settings, ...validated.value.settings };
+    }
+    if (config.mcpServers === void 0) continue;
+    if (!config.mcpServers || typeof config.mcpServers !== "object" || Array.isArray(config.mcpServers)) {
+      return { ok: false, error: { code: "invalid-config", message: "Native Pi MCP server map must be an object." } };
+    }
+    for (const name of Object.keys(config.mcpServers)) names.add(name);
+  }
+  return { ok: true, value: { names, settings } };
+}
+var SUPPORTED_FIELDS = /* @__PURE__ */ new Set([
+  "command",
+  "args",
+  "env",
+  "cwd",
+  "url",
+  "headers",
+  "enabled",
+  "disabled",
+  "exposure",
+  "toolExposure",
+  "directTools",
+  "requestTimeoutMs"
+]);
+function mapStandardServer(name, entry, settings) {
+  const validated = validateServerEntry(name, entry, { requireTransport: true });
+  if (!validated.ok) return { ok: false, error: { code: "invalid-server", message: validated.error.message } };
+  const unsupported = [
+    ...Object.keys(entry).filter((key) => entry[key] !== void 0 && !SUPPORTED_FIELDS.has(key)),
+    ...Object.keys(settings ?? {}).filter((key) => settings?.[key] !== void 0 && key !== "directTools").map((key) => `settings.${key}`)
+  ];
+  if (unsupported.length) {
+    return { ok: false, error: { code: "unsupported-fields", message: `Standard Pi MCP mode: unsupported fields for "${name}": ${unsupported.join(", ")}. This server was not registered; use native Pi configuration or the enhanced management host without dropping required policies.` } };
+  }
+  const value = validated.value;
+  const direct = value.directTools ?? settings?.directTools;
+  const toolExposure = {
+    ...Array.isArray(direct) ? Object.fromEntries(direct.map((tool) => [tool, "direct"])) : {},
+    ...value.toolExposure
+  };
+  const common = {
+    enabled: value.disabled === true ? false : value.enabled ?? true,
+    exposure: value.exposure ?? (direct === true ? "direct" : "codemode"),
+    ...Object.keys(toolExposure).length ? { toolExposure } : {},
+    ...value.requestTimeoutMs && value.requestTimeoutMs > 0 ? { timeout: value.requestTimeoutMs / 1e3 } : {}
+  };
+  if (value.command) {
+    return { ok: true, value: {
+      ...common,
+      command: value.command,
+      ...value.args === void 0 ? {} : { args: value.args },
+      ...value.env === void 0 ? {} : { env: value.env },
+      ...value.cwd === void 0 ? {} : { cwd: value.cwd }
+    } };
+  }
+  if (value.url) {
+    return { ok: true, value: { ...common, url: value.url, ...value.headers === void 0 ? {} : { headers: value.headers } } };
+  }
+  return { ok: false, error: { code: "invalid-server", message: `Standard Pi MCP mode requires a stdio command or HTTP URL for "${name}".` } };
+}
+
+// src/native/standard-extension.ts
+var MODE_NOTICE = "Standard Pi MCP compatibility mode: Pi owns connections, tool names, output handling and OAuth. Use /mcp for live status and management. Adapter enhanced panel, credential backend and execution policies are unavailable; credentials are not migrated.";
+var adapters = /* @__PURE__ */ new WeakMap();
+function supportsStandardMcp(pi) {
+  return typeof pi.registerMcpServer === "function" && typeof pi.unregisterMcpServer === "function" && typeof pi.getMcpServers === "function";
+}
+function hasStandardAdapter(pi) {
+  return adapters.has(pi);
+}
+function report(state, message, error = false) {
+  if (state.context?.hasUI) state.context.ui.notify(message, error ? "error" : "info");
+  else if (error) console.error(`MCP adapter: ${message}`);
+  else console.info(`MCP adapter: ${message}`);
+}
+function register(pi, state, name, config, configured) {
+  if (!state.active) throw new Error("The standard MCP adapter session has ended.");
+  if (!state.nativeConfigurationAvailable) throw new Error("Native Pi MCP configuration could not be verified; registration is blocked.");
+  if (state.reserved.has(name) || state.owned.has(name) || pi.getMcpServers().some((server) => server.name === name)) {
+    throw new Error(`MCP server "${name}" is already registered or owned by native Pi configuration.`);
+  }
+  pi.registerMcpServer(name, config);
+  state.owned.set(name, { configured });
+}
+function release(pi, state, name) {
+  if (!state.owned.has(name)) return;
+  pi.unregisterMcpServer(name);
+  state.owned.delete(name);
+}
+function loadConfiguration(pi, state, options, context) {
+  const nativePaths = new Set([getPiGlobalConfigPath(), getProjectPiConfigPath(context.cwd)].map((path) => resolve3(path)));
+  const native = readStandardNativeConfiguration(new Set([...nativePaths].filter((path) => context.isProjectTrusted() || path !== resolve3(getProjectPiConfigPath(context.cwd)))));
+  state.nativeConfigurationAvailable = native.ok;
+  if (!native.ok) {
+    report(state, `${native.error.code}: ${native.error.message}`, true);
+    return;
+  }
+  state.reserved.clear();
+  for (const name of native.value.names) {
+    state.reserved.add(name);
+    if (state.owned.has(name)) {
+      release(pi, state, name);
+      report(state, `Adapter registration "${name}" was removed because native Pi configuration owns this name.`, true);
+    }
+  }
+  const nativeSettings = native.value.settings;
+  let config = { mcpServers: {}, ...options.config === void 0 && nativeSettings !== void 0 ? { settings: nativeSettings } : {} };
+  for (const source of loadNativeConfigSources(options, context.cwd)) {
+    if (source.source.scope === "project" && !context.isProjectTrusted()) continue;
+    if (nativePaths.has(resolve3(source.source.readPath))) {
+      if (source.config?.settings) config = mergeConfigs(config, { mcpServers: {}, settings: source.config.settings });
+      continue;
+    }
+    if (source.error || source.validationIssues?.length) {
+      report(state, `Adapter MCP source could not be imported safely (${source.error?.code ?? source.validationIssues?.[0]?.code}).`, true);
+      return;
+    }
+    if (source.config) config = mergeConfigs(config, source.config);
+  }
+  for (const [name, entry] of Object.entries(config.mcpServers)) {
+    if (state.reserved.has(name)) continue;
+    const mapped2 = mapStandardServer(name, entry, config.settings);
+    if (!mapped2.ok) {
+      report(state, mapped2.error.message, true);
+      continue;
+    }
+    try {
+      register(pi, state, name, mapped2.value, true);
+    } catch {
+      report(state, `MCP server "${name}" could not be registered: ${state.owned.has(name) || pi.getMcpServers().some((server) => server.name === name) ? "already registered" : "the Pi host rejected registration"}.`, true);
+    }
+  }
+}
+function installStandardAdapter(pi, options) {
+  if (adapters.has(pi)) return;
+  const state = { owned: /* @__PURE__ */ new Map(), reserved: /* @__PURE__ */ new Set(), context: void 0, active: true, nativeConfigurationAvailable: true };
+  const native = readStandardNativeConfiguration(/* @__PURE__ */ new Set([resolve3(getPiGlobalConfigPath())]));
+  if (!native.ok) throw new Error(`${native.error.code}: ${native.error.message}`);
+  for (const name of native.value.names) state.reserved.add(name);
+  adapters.set(pi, state);
+  pi.on("session_start", (_event, context) => {
+    state.context = context;
+    for (const [name, registration] of state.owned) {
+      if (registration.configured) release(pi, state, name);
+    }
+    report(state, MODE_NOTICE);
+    try {
+      loadConfiguration(pi, state, options, context);
+    } catch {
+      report(state, "Adapter MCP configuration could not be loaded safely; no additional sources will be imported.", true);
+    }
+  });
+  pi.on("session_shutdown", () => {
+    state.active = false;
+    for (const name of state.owned.keys()) {
+      try {
+        release(pi, state, name);
+      } catch {
+        report(state, `The Pi host rejected removal of MCP server "${name}" during shutdown.`, true);
+      }
+    }
+    state.context = void 0;
+  });
+  pi.registerCommand("mcp-adapter", {
+    description: "Show Pi MCP compatibility mode and registered server names",
+    handler: async (_args, context) => {
+      state.context = context;
+      report(state, `${MODE_NOTICE}
+Adapter registrations: ${[...state.owned.keys()].join(", ") || "none"}.`);
+    }
+  });
+}
+function registerStandardMcpServer(pi, name, definition) {
+  const state = adapters.get(pi);
+  if (!state) throw new Error("pi-mcp-adapter is not installed for this Pi instance");
+  const mapped2 = mapStandardServer(name, definition);
+  if (!mapped2.ok) throw new Error(`${mapped2.error.code}: ${mapped2.error.message}`);
+  register(pi, state, name, mapped2.value, false);
+  const registration = state.owned.get(name);
+  return {
+    dispose: async () => {
+      if (state.owned.get(name) === registration) release(pi, state, name);
+    }
+  };
+}
+
 // src/native/extension.ts
 var PROGRAMMATIC_SOURCE2 = "pi-mcp-adapter:programmatic-config";
 var DISPOSE_TIMEOUT_MS = 5e3;
-var adapters = /* @__PURE__ */ new WeakMap();
+var adapters2 = /* @__PURE__ */ new WeakMap();
 function mapRuntimeServer(name, definition) {
   const validated = validateServerEntry(name, definition, { requireTransport: true });
   if (!validated.ok) {
@@ -3862,7 +4081,7 @@ function applyRuntimePolicies(state, snapshot) {
   }
 }
 function installAdapter(pi, options) {
-  const previous = adapters.get(pi);
+  const previous = adapters2.get(pi);
   if (previous) return previous;
   const configAssembly = createNativeConfigAssembly(options);
   const assemblyResult = installNativeMcpOwnerAssembly(configAssembly.assembly, pi.events);
@@ -3910,7 +4129,7 @@ function installAdapter(pi, options) {
     ...assemblyResult.ok ? {} : { assemblyInstallError: assemblyResult.error }
   };
   currentState = state;
-  adapters.set(pi, state);
+  adapters2.set(pi, state);
   pi.on("session_start", (_event, context) => {
     const panelView = state.panelView;
     if (panelView && panelView.handle === state.handle) {
@@ -3935,7 +4154,7 @@ function installAdapter(pi, options) {
     state.bridge.stopSession();
     releaseAssembly?.();
     releaseAssembly = void 0;
-    adapters.delete(pi);
+    adapters2.delete(pi);
     state.handle = void 0;
     state.snapshot = void 0;
     publishNativeStatusShutdown(pi);
@@ -3992,13 +4211,18 @@ function createMcpAdapter(options = {}) {
     ...options.configPath === void 0 ? {} : { configPath: options.configPath }
   };
   return (pi) => {
+    const runtime = getNativeManagementRuntime();
+    if (!runtime.ok && runtime.error.code === "missing-public-api" && supportsStandardMcp(pi)) {
+      installStandardAdapter(pi, factoryOptions);
+      return;
+    }
     installAdapter(pi, factoryOptions);
   };
 }
 function waitForServerRemoval(handle, name) {
   const current = handle.snapshot();
   if (!current.ok || !current.value.servers.some((server) => server.name === name)) return Promise.resolve();
-  return new Promise((resolve3, reject) => {
+  return new Promise((resolve4, reject) => {
     let finished = false;
     let unsubscribe;
     const timer = setTimeout(() => finish(new Error(`Native MCP owner did not retract server "${name}" before timeout.`)), DISPOSE_TIMEOUT_MS);
@@ -4008,7 +4232,7 @@ function waitForServerRemoval(handle, name) {
       clearTimeout(timer);
       unsubscribe?.();
       if (error) reject(error);
-      else resolve3();
+      else resolve4();
     };
     const subscription = handle.subscribe((snapshot) => {
       if (!snapshot.servers.some((server) => server.name === name)) finish();
@@ -4023,7 +4247,8 @@ function waitForServerRemoval(handle, name) {
 }
 function registerMcpServer(options) {
   const { pi, name, definition } = options;
-  const state = adapters.get(pi);
+  if (hasStandardAdapter(pi)) return registerStandardMcpServer(pi, name, definition);
+  const state = adapters2.get(pi);
   if (!state) throw new Error("pi-mcp-adapter is not installed for this Pi instance");
   if (state.assemblyInstallError) throw new Error(state.assemblyInstallError.message);
   if (typeof name !== "string" || name.trim() === "") throw new Error("MCP server name must be a non-empty string");

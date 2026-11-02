@@ -8,6 +8,12 @@
 
 ## 已确认决策
 
+### 2026-10-22：标准 MCP 注册 API 作为无补丁宿主的有限兼容模式
+
+- 决定：宿主公开完整、兼容的 patched MCP management API 时使用增强模式；patched 导出全部不存在且标准 `registerMcpServer`、`unregisterMcpServer`、`getMcpServers` 可用时，转用 Pi 自身 MCP owner 注册可安全映射的配置。部分 patched API、协议不兼容和能力缺失 fail-closed，不通过 runtime fallback 掩盖。
+- 原因：常规 Pi 升级不应强制安装定制补丁才能继续使用基本 MCP 配置，同时不能为兼容性引入重复连接 owner。
+- 约束：标准模式明确没有 adapter 增强面板、keyring/OAuth 后端、执行过滤/审批及 adapter 状态快照；不支持字段和不可信项目配置不得静默降级或覆盖原生 server。Pi 仍是唯一连接 owner，不修改宿主、安装补丁或迁移凭据。边界和使用说明以 [`README.md`](../README.md#pi-宿主兼容模式) 为唯一用户契约来源。
+
 ### 2026-10-17：Pi managed 更新后单独 reconciliate 已登记 MCP 补丁，绝不阻断核心更新
 
 - 决定：仅在 Pi managed `releases-v1` launcher 的核心更新命令成功退出后运行本地 patch reconciler；只允许精确登记并核验 hash 的持久 artifact。未知版本、artifact 缺失/校验失败、安装/验证失败、锁冲突都只报告 adapter 暂不可用，不暂停、回滚或 pin Pi 核心更新，并保留 Pi updater 原始退出码。当前 managed registry 只启用固定 Pi 1.3.0 artifact。

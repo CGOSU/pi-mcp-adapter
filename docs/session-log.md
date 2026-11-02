@@ -8,6 +8,12 @@
 
 ## 会话
 
+### 2026-10-22：新增 stock Pi 标准 MCP 注册兼容模式
+
+- 完成：缺少 patched management API 时，按公开 MCP 注册 API 能力选择有限兼容模式；Pi 仍为唯一连接 owner。标准模式导入可安全映射配置、调用 Pi 注册/释放 API、按 session 清理；对原生文件配置名称进行冲突保护，不可信项目源不导入，认证/执行策略及无损映射不了的字段明确拒绝。patched 协议部分缺失仍 fail-closed。补充 `scripts/test-standard-host.mjs`，可对指定真实 Pi package root 做无服务器启动的扩展加载器 smoke。详见 [`README.md`](../README.md#pi-宿主兼容模式) 的能力边界及 [`decisions.md`](decisions.md) 的兼容策略决策。
+- 验证：`npx vitest run test/unit/native/standard-extension.test.ts test/unit/native/extension.test.ts test/unit/native/stock-host.test.ts test/unit/native/management-bridge.test.ts test/unit/native/config-assembly.test.ts`（5 files、37 tests passed）；`npm run typecheck`；`node scripts/test-standard-host.mjs /Users/cgosu/.pi/agent/install/releases/1.5.0/node_modules/@earendil-works/pi-coding-agent`；`npm run build:public`；`node --test test/node/package/build-artifacts.test.mjs test/node/package/public-exports.test.mjs`（4 passed）；`git diff --check`。未连接真实 MCP 服务、未运行全仓测试。
+- 未执行：未发布、部署或 push。工作区原有 `AGENTS.md` 改动不属于本任务，保留且不提交。需要后续评估公开注册 API 变更时再验证对应 Pi 版本；不保证任意未来版本兼容。
+
 ### 2026-10-22：接入 Pi 1.4.0 原生 MCP 兼容
 
 - 目标：只新增 Pi 1.4.0 兼容，保留既有 1.2.0/1.3.0 资产与 native-only 契约；不降级、不引入第二套 runtime 或 fallback。

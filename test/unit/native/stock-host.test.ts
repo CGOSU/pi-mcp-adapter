@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI, McpOwnerAssembly } from "@earendil-works/pi-coding-agent";
 
+const hostApi = vi.hoisted(() => ({ protocolId: undefined as string | undefined }));
 vi.mock("@earendil-works/pi-coding-agent", () => ({
-  MCP_MANAGEMENT_PROTOCOL_ID: undefined,
+  get MCP_MANAGEMENT_PROTOCOL_ID() { return hostApi.protocolId; },
   MCP_MANAGEMENT_PROTOCOL_VERSION: undefined,
   MCP_MANAGEMENT_DISCOVERY_EVENT: undefined,
   MCP_MANAGEMENT_AVAILABLE_EVENT: undefined,
@@ -14,6 +15,15 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 const { getNativeManagementRuntime, installNativeMcpOwnerAssembly, NativeMcpManagementBridge } = await import("../../../src/native/management-bridge.ts");
 
 describe("stock Pi host compatibility gate", () => {
+  it("rejects partially present patched APIs instead of selecting a weaker mode", () => {
+    hostApi.protocolId = "pi.mcp-management";
+    try {
+      expect(getNativeManagementRuntime()).toMatchObject({ ok: false, error: { code: "invalid-public-api" } });
+    } finally {
+      hostApi.protocolId = undefined;
+    }
+  });
+
   it("fails explicitly and never emits a discovery request without the patched public API", () => {
     const events = { on: vi.fn(), emit: vi.fn() };
     const pi = { events } as unknown as ExtensionAPI;

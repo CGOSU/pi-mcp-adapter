@@ -1,6 +1,8 @@
 # 固定 Pi 基线的原生 MCP 补丁
 
-本文是 Pi 原生 MCP adapter 补丁的复现和验证说明。仅覆盖下列三个固定源码 commit；版本号匹配但 commit 不同、stock Pi 或不完整补丁均不视为已验证宿主。Pi 原生 MCP 仍是唯一连接、认证和工具执行 owner；adapter 提供配置/provenance、keyring 接线和管理增强，不创建第二套 runtime，也没有 capability fallback。
+本文是 Pi 增强管理模式的补丁复现和验证说明。仅覆盖下列三个固定源码 commit；版本号匹配但 commit 不同或不完整补丁均不视为已验证增强宿主。adapter 也支持标准兼容模式：没有 patched management API 时，使用 Pi 公开 MCP 注册 API（若可用），不创建第二套 runtime；完整支持范围及差异见 [README](../README.md#pi-宿主兼容模式)。stock host 无需匹配下列固定 commit 才能使用标准模式。
+
+**选择规则：**完整、协议兼容的 patched management API → 增强管理模式；所有 patched management 导出均缺失且标准 `registerMcpServer`、`unregisterMcpServer`、`getMcpServers` 存在 → 标准兼容模式；API 部分存在或协议/能力不兼容 → 明确失败，不降级。只有两种 API 都不可用时，才报告需更换 Pi 宿主。标准模式下 adapter-specific 认证、keyring 和执行策略不被转换或忽略；不支持的配置 fail-closed。
 
 ## 固定交付
 

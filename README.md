@@ -28,15 +28,19 @@ pi install git:github.com/CGOSU/pi-mcp-adapter.git
 
 安装后重启 Pi。
 
-### 必需的 Pi 宿主版本
+### Pi 宿主兼容模式
 
-此版本只对下列**固定源码基线且应用了对应补丁**的 Pi 版本完成验证：
+标准兼容模式已使用真实 Pi 1.5.0 stock 扩展加载器验证配置注册、session 清理和程序化注册/释放，无需安装补丁。宿主若公开 `registerMcpServer`、`unregisterMcpServer`、`getMcpServers`，且没有 patched management API，adapter 会使用 Pi 自带的 MCP owner；无需为每次 Pi 升级单独修改 adapter。未来版本是否兼容仍取决于这些公开 API 和配置契约，不承诺任意版本。
+
+标准模式只支持安全映射到 Pi 注册配置的 stdio/HTTP server。它不提供 adapter 增强面板、状态快照、adapter keyring/OAuth 凭据后端、逐工具执行审批/过滤、生命周期与 socket/专用认证扩展；Pi 自己的 `/mcp`、工具曝光及 OAuth 处理仍可使用。不能安全映射的 server/settings 会明确拒绝导入；不会将凭据迁移到 Pi 配置或第二套 runtime。程序化注册仍由 Pi 持有并支持 dispose。
+
+若启用了补丁版 native management API，adapter 会使用完整增强管理模式。已验证补丁基线包括：
 
 - `@earendil-works/pi-coding-agent` `1.2.0`，源码 commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff`；
 - `@earendil-works/pi-coding-agent` `1.3.0`，源码 commit `71023aec1546d6d677a65669c5665c0927ce0dd0`；
 - `@earendil-works/pi-coding-agent` `1.4.0`，源码 commit `4a080252f06caf63a525d7873c5d94d3c23887e0`。
 
-未打补丁的 Pi、其他 commit 或不完整补丁均不在已验证范围内。Pi 原生管理 API 缺失或能力不完整时，`/mcp-adapter` 会明确失败，不连接 MCP 服务器，也不回退到第二套运行时。Adapter 的 peer range `^1.2.0` 只是包依赖范围，不代表该范围内任意 Pi build 都包含本适配器需要的补丁；例如本机当前运行的 stock Pi 1.4.0 仍缺少管理 API，不会因为 adapter 支持 1.4.0 而自动获得。
+没有 patched management API 的宿主会使用以上标准兼容模式；若标准注册 API 也缺失，或 patched API 仅部分存在/协议不匹配，则 adapter fail-closed 并给出可操作错误，不连接服务器、不启用自建 runtime。Adapter peer range `^1.2.0` 只是包依赖范围，不是对任意 Pi build 的兼容承诺。
 
 前置条件和可复现的补丁流程见：
 
@@ -44,7 +48,7 @@ pi install git:github.com/CGOSU/pi-mcp-adapter.git
 - [`patches/pi-1.2.0-native-mcp-management.json`](patches/pi-1.2.0-native-mcp-management.json)、[`patches/pi-1.3.0-native-mcp-management.json`](patches/pi-1.3.0-native-mcp-management.json) 与 [`patches/pi-1.4.0-native-mcp-management.json`](patches/pi-1.4.0-native-mcp-management.json)：对应基线、补丁 SHA-256、能力和验证范围的机器可读清单；
 - [`docs/native-mcp-protocol.md`](docs/native-mcp-protocol.md)：版本化的 `pi.mcp-management` v1 契约。
 
-各版补丁都不改变 Pi npm 依赖。Pi 内置 MCP 管理方仍是唯一连接、OAuth 和工具执行运行时；本适配器只提供选择加入的组装接入和界面。
+各版补丁都不改变 Pi npm 依赖。两种模式下 Pi 都是唯一 MCP 连接 owner；标准模式使用 Pi 公共注册 API，补丁模式额外提供增强管理能力。适配器不会创建第二套连接运行时。
 
 ### 托管 Pi 更新后的非阻断补丁
 
@@ -64,7 +68,7 @@ npm run install:managed-pi-update-hook -- --remove
 
 安装或移除后需完全退出并重新启动 Pi，当前运行进程不会因 `current-version` 指针切换而换载已加载的宿主代码。完整安装、故障语义与当前登记范围见 [`docs/native-mcp-patch.md`](docs/native-mcp-patch.md)。
 
-### 打过补丁的宿主上的入口
+### MCP 管理入口
 
 | 界面             | 负责方     | 用途                                                                                |
 | -------------- | ------- | --------------------------------------------------------------------------------- |
@@ -77,7 +81,7 @@ npm run install:managed-pi-update-hook -- --remove
 
 ### 原生管理方下的行为变化
 
-打过补丁的 Pi 是唯一 MCP 运行时。以下旧适配器功能不会在第二个客户端中重新实现：
+Pi 是两种模式下唯一 MCP 运行时。补丁增强模式保留以下功能；标准兼容模式的限制见上文，缺少的能力不会通过第二个客户端重新实现：
 
 - **保留：** 配置发现、优先级和来源追踪；直接工具选择与持久化；包含/排除过滤；`toolPrefix`；搜索关键词；生命周期和 `idleTimeout`；逐请求 `requestHeadersCommand`；stdio/HTTP/socket 传输；Bearer token、`literalEnv` 和 `pluginDataDir`；`approveTools`；`outputGuard`；sampling、自动批准和 elicitation；资源与 prompt；通过适配器系统密钥环进行 OAuth；只读的 `MCP_STATUS_EVENT` v1 快照；`createMcpAdapter`、`registerMcpServer` 和五个公共子路径。
 - **不由原生管理方启用：** `settings.scriptMode`、`disableProxyTool`、`autoAuth`、`trace`、`oauthDir`，以及服务器级 `debug`/`trace`。这些配置保持原样，并明确作为“保留但不生效”处理，不会静默丢弃。`scriptMode` 和 `disableProxyTool` 保持关闭，避免原生管理方再增加 MCP 脚本或代理执行面；`oauthDir` 不启用，避免触发明文凭据迁移。旧脚本与 MCP UI 路径使用的 `mcp-script-worker.mjs` 和 `app-bridge.bundle.js` 不再随包发布。
