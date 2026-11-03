@@ -8,6 +8,34 @@
 
 ## 会话
 
+### 2026-11-03：核对 Pi 大文件审核的拆分建议
+
+- 来源：Pi 项目会话 `01a19f8f-7a8d-72d2-a152-83da3b8cc2cc`，当时审阅 checkout 路径为 `.tmp-public-exports-ci-pi`。从该会话已完成的 `file_review` 记录提取到 23 条 `recommend-split`：21 条位于 Pi 仓库、2 条位于 adapter。当前 Pi 分支已部分实现 `packages/coding-agent/src/core/agent-session.ts` 中的工具/loadout投影与只读统计提取；扩展能力绑定仍留在主类。其余20条Pi建议及2条adapter建议未找到对应拆分提交。建议是历史结构评估，不等同于用户已授权执行。
+- Pi 仓库建议（20项尚未处理，外加上述1项部分处理）：`packages/ai/test/cache-retention.test.ts` 将Cerebras strict/tool-schema用例移到工具兼容性测试；`context-overflow.test.ts` 将本地LLM/Ollama生命周期测试独立；`models-runtime.test.ts` 按目录刷新、认证、流派发拆组；`openai-codex-stream.test.ts` 分SSE/WebSocket套件并抽纯fixture；`openai-completions-tool-choice.test.ts` 分请求兼容、流归约、usage/目录测试；`stream.test.ts` 拆Ollama与Bedrock专属测试；`packages/agent/test/agent-loop.test.ts` 先分离runToolCall，再按调度/回合钩子拆组；`agent.test.ts` 按状态、运行生命周期、队列继续分组；`packages/agent/src/agent-loop.ts` 提取单工具校验/钩子/执行/结果定稿协作模块，循环仍保有事件和批次顺序；`packages/chord/test/delta-benchmark/conversation-view-benchmark.worker.ts` 分离合成fixture/场景计划，计时与状态仍由runner持有；`packages/coding-agent/examples/extensions/tic-tac-toe.ts` 提取棋盘绘制和消息组件，游戏状态与agent执行留原扩展；`overlay-qa-tests.ts` 按场景族拆局部模块，各自拥有controller/panel/handle/清理；`packages/coding-agent/src/core/tools/edit-diff.ts` 分离diff展示格式化与读取预览薄层，matching/apply算法保持单一；`packages/durable/src/tools/edit-diff.ts` 同样分纯展示与编辑算法，但不跨包建共享层；`packages/tui/src/terminal-image.ts` 提取图片尺寸解析和像素/cell几何，协议与能力状态留单一来源；`latex.ts` 分离词汇表/Unicode表与纯layout组合，保留单一render入口和解析语义；`components/markdown.ts` 提取strikethrough/LaTeX tokenizer、流式fence及表格布局，同时保持缓存和inline样式单一来源；`packages/coding-agent/src/core/extensions/types.ts` 分离内部runtime承载类型与公开契约，旧入口兼容转出；`packages/evals/src/harness.ts` 提取文档评测变体/可见性策略，通用装配与身份检查留在harness；`packages/env/daemon/src/sys/windows.rs` 按文件系统/进程适配拆分，保留unsafe资源清理和错误映射边界。
+- Adapter建议（2项）：`src/auth/mcp-callback-server.ts` 仅提取HTML/CSS及结果页渲染，HTTP/state校验和停止/取消生命周期留服务主模块；`test/node/update/managed-pi-update-hook.test.mjs` 按reconciliation、installer、launcher三组测试拆文件，共用纯fixture并保留安全闭环。
+- 提交与范围：对应Pi实现此前已提交为 `e101071a`；本条只登记审核清单与当前部分完成状态，不实施上述剩余建议。`git diff --check` 通过，未push。
+
+### 2026-11-03：修复 Pi refactor 工作区全仓 check 阻断
+
+- 完成：在 `/Users/cgosu/code/JavaScript/pi-session-refactor` 的 `refactor/session-responsibilities` 分支修复全仓 lint/TypeScript 阻断。清理 MCP 未使用导入、表达式赋值 lint、MCP 测试 fixture 缺失导入/不匹配类型及过时调用签名；修正扩展认证配置的类型收窄。针对本地模型目录已更新而测试仍引用旧 ID 的情况，迁移既有测试到当前 catalog 中的模型，不修改生成目录或测试覆盖目标；为 catalog 中的 OpenCode Go Google API 模型补齐实际API注册，并新增不调用真实服务的路由回归测试。
+- 验证：Pi 根目录 `npm run check` 全部通过，包括Biome、依赖/导入/入口/安装锁检查、全仓 `tsc --noEmit` 与 browser smoke；`git diff --check` 通过。隔离HOME且未提供凭据运行的定向测试：AI 21个文件中204项通过、673项依赖真实provider/API的测试跳过；coding-agent 14个文件、135项通过。未运行全量测试/build或固定 artifact 验证。
+- 提交与范围：此次修复涉及MCP实现与fixture、AI provider/test及此前已在工作区的拆分改动；Pi工作区核查时共40个未提交文件路径。Adapter仅更新current-state和session-log；保留既有 `AGENTS.md` 修改。未提交、push、发布、部署或修改patch/manifest/hash/安装。
+- 遗留：全仓 check 阻断已消除；Pi 1.2.0 固定补丁 artifact 构建/发布链路仍未验证。此前阶段check失败记录是当时的真实结果，后续修复与通过记录以本条为准。
+
+### 2026-11-03：提取 InteractiveMode 共享 selector 生命周期协调
+
+- 完成：在 `/Users/cgosu/code/JavaScript/pi-session-refactor` 的 `refactor/session-responsibilities` 分支新增 `selector-host.ts`，由 `SelectorHost` 持有 selector 的当前token、完成回调及dispose回调；`InteractiveMode` 保留editor容器、焦点、render与编辑器恢复端口，认证/扩展dialog继续沿既有入口取消。新增回归覆盖正常完成和当前editor恢复、替换时释放与旧完成回调隔离、释放重入、factory异常保留旧selector及dispose异常传播/关闭不恢复。没有改动旧未提交改动以外的既有功能。
+- 验证：7个定向Vitest文件、82项通过；本批3个Pi文件Biome检查、`npm run check:ts-imports`、`npm run check:entry-graphs` 与 `git diff --check` 通过。全仓 `tsc --noEmit` 仍报告模型数据和MCP相关既有诊断；本次未作固定基线对照。隔离快照运行 `npm run check` 仍被原生MCP lint的6项错误及1项警告阻断；快照之外的Pi源码工作区未被该命令改写。未运行全量测试、build或artifact验证。
+- 提交与范围：本批新增2个Pi文件并修改 `interactive-mode.ts`；连同前批保留改动，Pi工作区共7个未提交源码/测试文件。未提交Pi源码或adapter文档；未push、发布、部署或改动patch/manifest/hash/安装。
+- 边界：Pi全仓check的基线阻断及固定artifact链路限制仍未解决；详细历史和基线见本文件下方前批记录及 [`docs/native-mcp-patch.md`](native-mcp-patch.md)。
+
+### 2026-11-03：提取 InteractiveMode 扩展装饰组件所有权
+
+- 完成：在 `/Users/cgosu/code/JavaScript/pi-session-refactor` 的 `refactor/session-responsibilities` 分支，新增 `packages/coding-agent/src/modes/interactive/extension-decorations.ts`。该模块单一持有扩展 widgets 的placement映射及自定义header/footer，负责替换、恢复、释放、widget渲染和当前header展开同步；`InteractiveMode` 仍持有内建header/footer、容器布局、footer数据源和顶层session reset/rebind/stop。迁移 `createExtensionUIContext`、`resetExtensionUI`、初始渲染、`setToolsExpanded` 与reload路径；更新一个既有测试fixture，新增 `test/extension-decorations.test.ts` 覆盖placement迁移、删除/reset、header展开、footer订阅释放、renderer/footer-data重绑及工厂/dispose错误传播。当前Pi checkout共5个本批源码/测试文件改动，未提交。
+- 验证：5个定向Vitest文件、81项通过；5个改动文件Biome检查、`npm run check:ts-imports`、`npm run check:entry-graphs` 和 `git diff --check` 通过。全仓`tsc --noEmit`仍有75项诊断；与固定基线757a679a在相同工具/模型数据快照对照，诊断完全相同，仅忽略搬移后InteractiveMode行列位置。全仓`npm run check`在MCP基线6项lint错误和1项警告处失败；检查器的`--write`只作用于隔离快照，未改Pi工作树中的其它基线文件。未跑全量测试/build或artifact验证。
+- 提交与范围：没有Pi源码提交；不触及第一批提交、adapter根`AGENTS.md`、旧Pi checkout或managed安装；未push、发布、部署或更新patch/manifest/hash。Adapter仅更新必要的current-state、decisions和本条记录，尚未提交这些文档。
+- 保留边界：认证、工具执行/权限管线、扩展对话框和共享selector协调未改；`AgentSession` 剩余绑定闭包继续由session主类持有，不用宿主透传/mixin强行抽取。固定Pi patch artifact构建/发布链路仍未验证。
+
 ### 2026-11-03：拆分 Pi 1.2.0 AgentSession 与 InteractiveMode
 
 - 完成：在 `/Users/cgosu/code/JavaScript/pi-session-refactor` 的 `refactor/session-responsibilities` 分支，基于固定基线 `f05f02bf05a350b3f5b5c3b9ece3b84dde2609dc`，拆分 `AgentSession` 的工具目录/装配、loadout 投影和统计聚合；拆分 `InteractiveMode` 的认证/完成处理、扩展对话框及命令补全装配。运行状态、会话/队列/生命周期和顶层 UI/渲染协调仍由原类持有。新增窄端口模块和针对取消、过期操作及组件清理的回归测试；保留公共契约与原生 MCP 基线。
