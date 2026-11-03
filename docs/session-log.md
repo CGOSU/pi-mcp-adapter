@@ -8,6 +8,38 @@
 
 ## 会话
 
+### 2026-11-03：按历史大文件建议完成本批拆分并延期 Windows 项
+
+- 范围：复核历史会话 `01a19f8f-7a8d-72d2-a152-83da3b8cc2cc` 中的23项 `recommend-split`。结果为 Pi 19项完成、AgentSession 1项部分完成、Windows 1项延期；adapter 2项完成。历史建议是结构评估，不等于原先已完成，也不将本批结果描述为23项全部完成。
+- Pi 逐项结果：
+  1. `packages/ai/test/cache-retention.test.ts` 的 Cerebras strict/tool-schema 用例移入工具兼容套件：完成，随请求兼容测试重组验证。
+  2. `packages/ai/test/context-overflow.test.ts` 拆本地 LLM/Ollama 生命周期：完成，新增 `context-overflow-local.test.ts` 与 helper；原入口保留通用场景。与 `stream.test.ts` 的本地 provider 拆分结果合并记录见第6项，未把跳过项算作真实 provider 通过。
+  3. `packages/ai/test/models-runtime.test.ts` 按目录刷新、认证、流派发拆分：完成；42项定向测试通过。
+  4. `packages/ai/test/openai-codex-stream.test.ts` 按 SSE/WebSocket 拆分：完成，新增 WebSocket 套件及纯 fixture；40项通过。
+  5. `packages/ai/test/openai-completions-tool-choice.test.ts` 拆请求/流/usage/目录兼容，并迁移 Cerebras 场景：完成；76项通过、4项按原条件跳过。
+  6. `packages/ai/test/stream.test.ts` 拆本地 provider 与 Bedrock 场景：完成，新增 `stream-local.test.ts`、`stream-bedrock.test.ts` 及纯 helper；原入口保留通用场景。第2、6项涉及的268项本地 provider 用例按无凭据/本地服务禁用条件跳过；AST/skip一致性核对及 `npm run check` 通过，不代表真实 API 验证。
+  7. `packages/agent/test/agent-loop.test.ts` 拆工具调用、调度与回合钩子：完成；与下一项共78项定向测试通过。
+  8. `packages/agent/test/agent.test.ts` 按状态、生命周期、队列继续拆分：完成；提取多个测试套件与纯 fixture，未改运行时。
+  9. `packages/agent/src/agent-loop.ts` 提取单工具执行协作：完成，新增 `tool-call-execution.ts`；循环仍持有调度、事件、批次顺序与取消协调。82项测试通过，含失败和取消边界。
+  10. `packages/chord/test/delta-benchmark/conversation-view-benchmark.worker.ts` 拆合成会话 fixture/计划：完成，新增 `conversation-view-benchmark-fixtures.ts`；差分覆盖7场景、计划/变更/容量/记录数据，未运行真实 benchmark。
+  11. `packages/coding-agent/examples/extensions/tic-tac-toe.ts` 提取棋盘、消息组件：完成；游戏状态、输入和 agent 执行仍留原扩展。
+  12. `packages/coding-agent/examples/extensions/overlay-qa-tests.ts` 按场景族拆分：完成；入口保留13命令注册顺序，各场景持有自身 controller/panel/handle/清理。两个示例相关34项测试通过，标准 loader/discovery 核对通过；未运行真实终端或子进程。
+  13. `packages/coding-agent/src/core/tools/edit-diff.ts` 分纯格式化/只读预览与匹配算法：完成，新增 `edit-matching.ts`、`edit-diff-format.ts`、`edit-diff-preview.ts`，旧入口兼容转出。
+  14. `packages/durable/src/tools/edit-diff.ts` 同样分离格式化与匹配：完成，新增本包独立模块，不跨包共享；旧入口兼容转出且未添加 durable 预览/I/O。两包合计74项定向测试通过；最终 `npm run check` 通过。因可达图新增两个本包模块，用户同意仅将 `scripts/check-entry-graphs.mjs` Durable `./tools` 上限17校准为19，计数及 forbid 规则未变。
+  15. `packages/tui/src/terminal-image.ts` 提取图片尺寸解析和像素/cell 几何：完成，新增 `image-dimensions.ts`、`image-geometry.ts`，原终端能力/协议/Kitty状态保留。7个目标测试文件通过，新增尺寸边界7项；差分覆盖4500几何组合、1300解析输入、27协议渲染组合；未做真实终端显示验证。
+  16. `packages/tui/src/latex.ts` 提取词汇/Unicode转换与纯布局：完成，新增 `latex-symbols.ts`、`latex-layout.ts`，parser/节点状态仍由原入口持有。LaTeX和Markdown相关测试通过；差分覆盖349命令、2760个inline/display组合，不扩大解析支持。
+  17. `packages/tui/src/components/markdown.ts` 提取 tokenizer、流式 fence、表格布局：完成，新增 `markdown-tokenizers.ts`、`markdown-streaming.ts`、`markdown-table.ts`；缓存、inline样式、顶层渲染仍由组件持有。Markdown/LaTeX/layout测试通过，102来源的2040组渲染/缓存/回调差分一致。
+  18. `packages/coding-agent/src/core/extensions/types.ts` 分公开契约与内部 runtime 类型：完成，新增 `public-types.ts`、`runtime-types.ts`；原入口兼容转出，186项原导出保持且新增边界仅 type-only。87项 runner/discovery 测试通过。
+  19. `packages/evals/src/harness.ts` 提取文档 variant/可见性策略：完成，新增 `documentation-policy.ts`、`harness-types.ts`；容器/身份检查、通用装配与生命周期仍留 harness。15项 harness 测试通过，166组策略差分一致；未运行真实评测。
+  20. `packages/env/daemon/src/sys/windows.rs` 文件系统/进程适配拆分：**延期、未实施**。用户明确要求以后再做；文件未修改。本机没有 Windows target/执行环境，无法验证 Windows-only FFI、句柄转移/释放、取消及错误路径，因此不以静态移动或 macOS 检查替代目标平台验收。
+  21. `packages/coding-agent/src/core/agent-session.ts` 扩展绑定剩余职责：**部分完成**。历史既有工具/loadout/统计模块继续复用；本批新增 `session-extension-async-actions.ts`，只提取 sendMessage/sendUserMessage 失败上报和 compact 回调适配，依赖四个窄操作端口。动态模型/auth、工具/权限、abort/shutdown、会话条目/事件、资源与生命周期绑定仍由 AgentSession 持有，未宣称整个绑定闭包已拆分。新增10项回归；与相邻 model-extension、compaction、user_bash fail-closed、extensions-runner 定向测试合计118项通过。
+- Adapter 两项：
+  22. `src/auth/mcp-callback-server.ts` 提取 callback result page HTML/CSS：完成，新增 `src/auth/mcp-callback-pages.ts`；HTTP/state 校验、pending状态及等待/取消/停止仍由 server 持有。OAuth 141项、manual callback 2项和 typecheck 通过。
+  23. `test/node/update/managed-pi-update-hook.test.mjs` 拆 reconciliation/installer/launcher：完成，新增三个 `.suite.mjs` 与共享 fixture，旧入口继续聚合；17项联合及独立测试通过，未改安装/部署实现。
+- 本批 Pi 每次代码变更执行了仓库要求的 `npm run check`；最新 AgentSession 变更后的最终检查通过，Biome 的格式化改动已核对，`git diff --check` 通过。各任务的更细差分、测试边界与历史证据见对应工作流记录；本段汇总不把历史结果冒充本条写文档时新执行的验证。
+- Windows 工具链遗留：查询固定 Rust 1.96.0 target 时 rustup 意外尝试同步/下载组件并超时。后续只读检查未发现 rustup/cargo/rustc 进程；对应 toolchain 目录不含 `bin/rustc`，属于部分安装状态。未继续安装、重试、清理或回滚；详情与后续防复发规则见 [`docs/pitfalls.md`](pitfalls.md)。
+- Git/遗留：Pi 分支 `refactor/session-responsibilities` 有71个未提交路径；adapter `main` 有本批未提交文件，另有用户既有 `AGENTS.md` 修改必须保留。无 commit/push。Adapter 本次未运行代码验证；不运行真实 provider/MCP、真实 Windows、benchmark、全量测试或 build。具体当前状态见 [`docs/current-state.md`](current-state.md)。
+
 ### 2026-11-03：核对 Pi 大文件审核的拆分建议
 
 - 来源：Pi 项目会话 `01a19f8f-7a8d-72d2-a152-83da3b8cc2cc`，当时审阅 checkout 路径为 `.tmp-public-exports-ci-pi`。从该会话已完成的 `file_review` 记录提取到 23 条 `recommend-split`：21 条位于 Pi 仓库、2 条位于 adapter。当前 Pi 分支已部分实现 `packages/coding-agent/src/core/agent-session.ts` 中的工具/loadout投影与只读统计提取；扩展能力绑定仍留在主类。其余20条Pi建议及2条adapter建议未找到对应拆分提交。建议是历史结构评估，不等同于用户已授权执行。

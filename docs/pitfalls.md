@@ -8,6 +8,13 @@
 
 ## 已知问题
 
+### 2026-11-03：查询未完整安装的固定 Rust toolchain 可能触发下载
+
+- 现象：在 Pi checkout 内执行 `rustup target list --installed --toolchain 1.96.0` 时，rustup 开始同步 `1.96.0-aarch64-apple-darwin` 并下载组件，命令超时；后续只读检查看到 toolchain 目录存在但没有 `bin/rustc`。
+- 原因：`rustup` 的目标查询并非在该状态下无副作用；固定 toolchain 尚未完整安装时，命令会尝试同步/安装，不只是返回本地 target 清单。
+- 处理：当前 Windows 拆分按用户决定延期；未继续安装、重试、清理缓存或声称已回滚。后续需在明确获准且有对应目标环境时再准备 Rust toolchain，先确认工具调用可能产生下载副作用，不要自动重放。
+- 验证：查询超时后检查未发现仍运行的 rustup/cargo/rustc 进程；直接检查 `1.96.0-aarch64-apple-darwin` 目录确认缺少 `bin/rustc`。Windows 编译和运行验证未执行，完整事实及限制见 [`docs/session-log.md`](session-log.md)。
+
 ### 2026-10-19：非阻断 hook 的退出码 0 不能证明 CLI 参数和 reconcile 路径成功
 
 - `main` 为保留 Pi 核心更新结果，会捕获参数错误并返回 0；此前 `resolve` 漏导入导致真实 CLI 路径失败，但既有测试只断言退出码，且复用了前一次 reconcile 留下的警告，因此仍然通过。
