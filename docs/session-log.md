@@ -8,6 +8,19 @@
 
 ## 会话
 
+### 2026-11-03：拆分 Pi 1.2.0 AgentSession 与 InteractiveMode
+
+- 完成：在 `/Users/cgosu/code/JavaScript/pi-session-refactor` 的 `refactor/session-responsibilities` 分支，基于固定基线 `f05f02bf05a350b3f5b5c3b9ece3b84dde2609dc`，拆分 `AgentSession` 的工具目录/装配、loadout 投影和统计聚合；拆分 `InteractiveMode` 的认证/完成处理、扩展对话框及命令补全装配。运行状态、会话/队列/生命周期和顶层 UI/渲染协调仍由原类持有。新增窄端口模块和针对取消、过期操作及组件清理的回归测试；保留公共契约与原生 MCP 基线。
+- 验证：Pi 源码仓库内 12 个定向 Vitest 文件、113 项测试通过；本次 15 个源码/测试文件的 Biome 检查及 `git diff --check` 通过。全仓 TypeScript 检查仍有 75 项诊断：与固定基线的并行对照结果相同、没有新增诊断；全仓 `npm run check` 仍被原生 MCP 基线中的 6 项 lint 错误和 1 项警告阻断。旧固定 HEAD runner 不适用于新的源码重构分支，未验证该固定补丁 artifact 的构建/发布链路；未运行全量测试/build、真实认证或模型服务。
+- 提交：新源码仓库提交 `757a679a02a05694e90db28945531b883c4070be`（`重构会话与交互模式职责`，`CGOSU <dev@cgosu.com>`）。adapter 文档仅更新本条记录、设计决策和当前状态；未改 `AGENTS.md`。未更改旧临时 Pi checkout 或 managed Pi，未 push、发布或部署。
+- 遗留：需要后续在该分支继续时，再按具体范围完成适用验证；固定 Pi artifact 发布验证仍使用文档登记的固定基线，不以该重构分支结果替代。
+
+### 2026-11-03：建立职责拆分用 Pi 原生 MCP 持久基线
+
+- 来源：`.tmp-public-exports-ci-pi` 的 coding-agent 版本为 `1.2.0`，HEAD 为 `06a466935536f8c9bcacb2d5efc0fc021be1bdff`（`Release v1.2.0`）。`verifyPatchedPiSource` 核对其 48 个变更路径与已登记 `patches/pi-1.2.0-native-mcp-management.patch` 完全一致，并通过反向 apply 检查；manifest SHA-256 为 `d499d6fba6728dbaced2876149b362780ce4b8ef2129ec3283587a456c46c654`。临时 checkout 原有未提交改动保留，未复制其工作目录或改写来源。
+- 完成：从临时 checkout 的固定 HEAD 创建独立 clone（`--no-hardlinks`），路径 `/Users/cgosu/code/JavaScript/pi-session-refactor`，分支 `refactor/session-responsibilities`；确认无对象 alternates。静态应用登记补丁后，runner 再次确认版本、固定 HEAD、manifest/hash、48 个路径与公共管理 API 契约；`git diff --cached --check` 通过。仅提交 48 个登记补丁路径，基线提交 `f05f02bf05a350b3f5b5c3b9ece3b84dde2609dc`（`建立 Pi 1.2.0 原生 MCP 基线`，`CGOSU <dev@cgosu.com>`）。新工作区提交后干净；来源临时 checkout 未修改。
+- 未执行：未运行测试、typecheck 或 build；未修改其它 Pi checkout、managed 安装、adapter 根 `AGENTS.md`，未 push。职责拆分尚未开始；后续只在上述专用分支继续，遵循 `docs/clean-code.md` 与 Pi 项目规则。该分支基线不同于固定 HEAD runner 直接验收目标，后续按源码级相关验证，不放宽 runner 固定断言。
+
 ### 2026-10-22：新增 stock Pi 标准 MCP 注册兼容模式
 
 - 完成：缺少 patched management API 时，按公开 MCP 注册 API 能力选择有限兼容模式；Pi 仍为唯一连接 owner。标准模式导入可安全映射配置、调用 Pi 注册/释放 API、按 session 清理；对原生文件配置名称进行冲突保护，不可信项目源不导入，认证/执行策略及无损映射不了的字段明确拒绝。patched 协议部分缺失仍 fail-closed。补充 `scripts/test-standard-host.mjs`，可对指定真实 Pi package root 做无服务器启动的扩展加载器 smoke。详见 [`README.md`](../README.md#pi-宿主兼容模式) 的能力边界及 [`decisions.md`](decisions.md) 的兼容策略决策。

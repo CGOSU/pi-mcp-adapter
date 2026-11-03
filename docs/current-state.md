@@ -13,6 +13,7 @@
 - 保留的旧适配器运行时源码仍位于 `src/**`，并由对应测试覆盖，但不会从 `dist/index.js` 加载，也不包含在发布包中。
 - 增强管理模式的原生配置限制，以及标准兼容模式对执行策略/凭据功能的限制，见 [`README.md`](../README.md#pi-宿主兼容模式) 和“原生管理方下的行为变化”。
 - Pi 原生 MCP 补丁分别固定在 Pi 1.2.0 commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff`、Pi 1.3.0 commit `71023aec1546d6d677a65669c5665c0927ce0dd0` 与 Pi 1.4.0 commit `4a080252f06caf63a525d7873c5d94d3c23887e0`；只有这三个补丁后的固定基线完成本仓库验证。三个 patch、manifest、hash 与复现范围以 [`docs/native-mcp-patch.md`](native-mcp-patch.md) 为准。Pi 上游未提交、未推送、未发布或打标签。
+- 职责拆分专用 Pi 源码工作区 `/Users/cgosu/code/JavaScript/pi-session-refactor` 位于分支 `refactor/session-responsibilities`，基线为 commit `f05f02bf05a350b3f5b5c3b9ece3b84dde2609dc`（固定 Pi 1.2.0 原生 MCP 补丁）。`AgentSession` 与 `InteractiveMode` 已完成第一批模块职责拆分并提交；Pi 1.2.0 固定补丁产物构建/发布链路未在此重构分支验证。当前支持版本和 artifact 验证范围仍以 [`docs/native-mcp-patch.md`](native-mcp-patch.md) 为准，拆分及验证明细见 [`docs/session-log.md`](session-log.md)。
 - 本机 managed Pi 已安装非阻断 post-update hook，并将已验证 Pi 1.3.0 patched release 作为当前 managed release；stock `1.3.0` release 和 launcher 原版备份均保留。hook 当前登记 Pi 1.3.0 与 1.4.0 artifact；未知版本/补丁失败只警告，不影响核心更新退出状态。源码与已部署 hook 的 CLI 参数解析已补齐 `resolve` 导入，定向回归和隔离参数探针通过，详见 [会话记录](session-log.md)。运行中的旧 Pi 进程仍须完全退出并重启才能加载新 release。
 
 ## 源码、启动与发布布局

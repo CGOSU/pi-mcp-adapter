@@ -8,6 +8,12 @@
 
 ## 已确认决策
 
+### 2026-11-03：Pi 1.2.0 源码职责拆分保持运行状态与 UI 协调所有权
+
+- 决定：在独立固定 Pi 1.2.0 MCP 基线分支上拆分 `AgentSession` 的工具目录/装配、loadout 投影与统计聚合，以及 `InteractiveMode` 的认证、扩展对话框、命令补全装配和认证完成处理；运行状态、事件/队列/会话重绑/关闭及顶层渲染/UI协调仍由原主类持有。
+- 原因：提取职责可降低两个过载模块的责任集中度，同时不复制会话执行管线、不转移生命周期单一所有权。
+- 约束：只在独立源码 checkout 迭代；保留公共导出及现有错误、取消与stale检查语义。固定 Pi 补丁 manifest/hash 和旧 runner 基线不得为适配重构分支而放宽；源码级定向验证不等同于补丁产物构建/发布验证。具体实现和检查记录见 [`session-log.md`](session-log.md)。
+
 ### 2026-10-22：标准 MCP 注册 API 作为无补丁宿主的有限兼容模式
 
 - 决定：宿主公开完整、兼容的 patched MCP management API 时使用增强模式；patched 导出全部不存在且标准 `registerMcpServer`、`unregisterMcpServer`、`getMcpServers` 可用时，转用 Pi 自身 MCP owner 注册可安全映射的配置。部分 patched API、协议不兼容和能力缺失 fail-closed，不通过 runtime fallback 掩盖。
