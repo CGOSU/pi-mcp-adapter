@@ -5,7 +5,7 @@ import type { McpServerRegistration } from "./extension.ts";
 import { getPiGlobalConfigPath, getProjectPiConfigPath } from "../config/paths.js";
 import { mergeConfigs } from "../config/merge.js";
 import { loadNativeConfigSources } from "./config-assembly.ts";
-import { mapStandardServer, readStandardNativeConfiguration } from "./standard-config.ts";
+import { getStandardPresentationSettings, mapStandardServer, readStandardNativeConfiguration } from "./standard-config.ts";
 
 const MODE_NOTICE = "Standard Pi MCP compatibility mode: Pi owns connections, tool names, output handling and OAuth. Use /mcp for live status and management. Adapter enhanced panel, credential backend and execution policies are unavailable; credentials are not migrated.";
 
@@ -27,9 +27,10 @@ export function hasStandardAdapter(pi: ExtensionAPI): boolean {
   return adapters.has(pi);
 }
 
-function report(state: StandardAdapterState, message: string, error = false): void {
-  if (state.context?.hasUI) state.context.ui.notify(message, error ? "error" : "info");
-  else if (error) console.error(`MCP adapter: ${message}`);
+function report(state: StandardAdapterState, message: string, level: "info" | "warning" | "error" = "info"): void {
+  if (state.context?.hasUI) state.context.ui.notify(message, level);
+  else if (level === "error") console.error(`MCP adapter: ${message}`);
+  else if (level === "warning") console.warn(`MCP adapter: ${message}`);
   else console.info(`MCP adapter: ${message}`);
 }
 
@@ -55,7 +56,7 @@ function loadConfiguration(pi: ExtensionAPI, state: StandardAdapterState, option
   const native = readStandardNativeConfiguration(new Set([...nativePaths].filter((path) => context.isProjectTrusted() || path !== resolve(getProjectPiConfigPath(context.cwd)))));
   state.nativeConfigurationAvailable = native.ok;
   if (!native.ok) {
-    report(state, `${native.error.code}: ${native.error.message}`, true);
+    report(state, `${native.error.code}: ${native.error.message}`, "error");
     return;
   }
   state.reserved.clear();
@@ -63,7 +64,7 @@ function loadConfiguration(pi: ExtensionAPI, state: StandardAdapterState, option
     state.reserved.add(name);
     if (state.owned.has(name)) {
       release(pi, state, name);
-      report(state, `Adapter registration "${name}" was removed because native Pi configuration owns this name.`, true);
+      report(state, `Adapter registration "${name}" was removed because native Pi configuration owns this name.`, "error");
     }
   }
   const nativeSettings = native.value.settings;
@@ -75,23 +76,27 @@ function loadConfiguration(pi: ExtensionAPI, state: StandardAdapterState, option
       continue;
     }
     if (source.error || source.validationIssues?.length) {
-      report(state, `Adapter MCP source could not be imported safely (${source.error?.code ?? source.validationIssues?.[0]?.code}).`, true);
+      report(state, `Adapter MCP source could not be imported safely (${source.error?.code ?? source.validationIssues?.[0]?.code}).`, "error");
       return;
     }
     if (source.config) config = mergeConfigs(config, source.config);
+  }
+  const presentationSettings = getStandardPresentationSettings(config.settings);
+  if (presentationSettings.length) {
+    report(state, `Standard Pi MCP mode: presentation settings are ignored because Pi controls the interface: ${presentationSettings.join(", ")}. Server configuration and execution policies are checked separately.`, "warning");
   }
   for (const [name, entry] of Object.entries(config.mcpServers)) {
     if (state.reserved.has(name)) continue;
     const mapped = mapStandardServer(name, entry, config.settings);
     if (!mapped.ok) {
-      report(state, mapped.error.message, true);
+      report(state, mapped.error.message, "error");
       continue;
     }
     try {
       register(pi, state, name, mapped.value, true);
     } catch {
       // Host errors may contain configuration values; do not copy them into notifications.
-      report(state, `MCP server "${name}" could not be registered: ${state.owned.has(name) || pi.getMcpServers().some((server) => server.name === name) ? "already registered" : "the Pi host rejected registration"}.`, true);
+      report(state, `MCP server "${name}" could not be registered: ${state.owned.has(name) || pi.getMcpServers().some((server) => server.name === name) ? "already registered" : "the Pi host rejected registration"}.`, "error");
     }
   }
 }
@@ -112,7 +117,7 @@ export function installStandardAdapter(pi: ExtensionAPI, options: McpAdapterOpti
     try {
       loadConfiguration(pi, state, options, context);
     } catch {
-      report(state, "Adapter MCP configuration could not be loaded safely; no additional sources will be imported.", true);
+      report(state, "Adapter MCP configuration could not be loaded safely; no additional sources will be imported.", "error");
     }
   });
   pi.on("session_shutdown", () => {
@@ -121,7 +126,7 @@ export function installStandardAdapter(pi: ExtensionAPI, options: McpAdapterOpti
       try {
         release(pi, state, name);
       } catch {
-        report(state, `The Pi host rejected removal of MCP server "${name}" during shutdown.`, true);
+        report(state, `The Pi host rejected removal of MCP server "${name}" during shutdown.`, "error");
       }
     }
     state.context = undefined;

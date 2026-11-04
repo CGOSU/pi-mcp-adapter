@@ -193,6 +193,12 @@ export interface HttpRequestHeadersCommand {
     timeoutMs?: number;
 }
 export interface ServerEntry {
+    /** Input transport alias, normalized to command/url and httpTransport during validation. */
+    type?: "stdio" | "http" | "streamable-http";
+    /** Input timeout in seconds, normalized to requestTimeoutMs during validation. */
+    timeout?: number;
+    /** Server summary exposed by the native Pi host. */
+    description?: string;
     /** Pi-native enablement field accepted when reading shared Pi MCP configuration. */
     enabled?: boolean;
     /** Pi-native tool exposure policy accepted when reading shared Pi MCP configuration. */

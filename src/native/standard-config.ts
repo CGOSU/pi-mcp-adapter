@@ -3,6 +3,7 @@ import { parseJsonConfig } from "../config/read.ts";
 import type { McpServerConfig } from "@earendil-works/pi-coding-agent";
 import type { McpSettings, ServerEntry } from "../contracts/core.js";
 import { validateMcpConfig, validateServerEntry } from "../config/validation.ts";
+import { MCP_SETTINGS_FIELD_MAPPING } from "./config-mapping.ts";
 
 export type StandardConfigResult =
   | { readonly ok: true; readonly value: McpServerConfig }
@@ -49,21 +50,35 @@ export function readStandardNativeConfiguration(paths: ReadonlySet<string>): Sta
 
 const SUPPORTED_FIELDS = new Set([
   "command", "args", "env", "cwd", "url", "headers", "enabled", "disabled",
-  "exposure", "toolExposure", "directTools", "requestTimeoutMs",
+  "exposure", "toolExposure", "directTools", "requestTimeoutMs", "description",
 ]);
+
+function isPresentationSetting(key: string): boolean {
+  return Object.hasOwn(MCP_SETTINGS_FIELD_MAPPING, key)
+    && MCP_SETTINGS_FIELD_MAPPING[key as keyof McpSettings].owner === "adapter-presentation";
+}
+
+export function getStandardPresentationSettings(settings?: McpSettings): string[] {
+  return Object.keys(settings ?? {})
+    .filter((key) => settings?.[key as keyof McpSettings] !== undefined && isPresentationSetting(key))
+    .map((key) => `settings.${key}`);
+}
 
 // Do not pass adapter-only authentication or policies to a host that may ignore them.
 export function mapStandardServer(name: string, entry: ServerEntry, settings?: McpSettings): StandardConfigResult {
   const validated = validateServerEntry(name, entry, { requireTransport: true });
   if (!validated.ok) return { ok: false, error: { code: "invalid-server", message: validated.error.message } };
+  const value = validated.value;
   const unsupported = [
-    ...Object.keys(entry).filter((key) => entry[key as keyof ServerEntry] !== undefined && !SUPPORTED_FIELDS.has(key)),
-    ...Object.keys(settings ?? {}).filter((key) => settings?.[key as keyof McpSettings] !== undefined && key !== "directTools").map((key) => `settings.${key}`),
+    ...Object.keys(value).filter((key) => value[key as keyof ServerEntry] !== undefined
+      && !SUPPORTED_FIELDS.has(key)
+      && !(key === "httpTransport" && value.url && value.httpTransport === "streamable-http")),
+    ...Object.keys(settings ?? {}).filter((key) => settings?.[key as keyof McpSettings] !== undefined
+      && key !== "directTools" && !isPresentationSetting(key)).map((key) => `settings.${key}`),
   ];
   if (unsupported.length) {
     return { ok: false, error: { code: "unsupported-fields", message: `Standard Pi MCP mode: unsupported fields for "${name}": ${unsupported.join(", ")}. This server was not registered; use native Pi configuration or the enhanced management host without dropping required policies.` } };
   }
-  const value = validated.value;
   const direct = value.directTools ?? settings?.directTools;
   const toolExposure = {
     ...(Array.isArray(direct) ? Object.fromEntries(direct.map((tool) => [tool, "direct" as const])) : {}),
@@ -72,6 +87,7 @@ export function mapStandardServer(name: string, entry: ServerEntry, settings?: M
   const common = {
     enabled: value.disabled === true ? false : value.enabled ?? true,
     exposure: value.exposure ?? (direct === true ? "direct" as const : "codemode" as const),
+    ...(value.description === undefined ? {} : { description: value.description }),
     ...(Object.keys(toolExposure).length ? { toolExposure } : {}),
     ...(value.requestTimeoutMs && value.requestTimeoutMs > 0 ? { timeout: value.requestTimeoutMs / 1000 } : {}),
   };

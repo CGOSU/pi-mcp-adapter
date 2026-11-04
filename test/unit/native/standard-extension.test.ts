@@ -87,6 +87,31 @@ describe("standard Pi extension compatibility", () => {
     expect(h.servers.has("remote")).toBe(false);
   });
 
+  it("imports Pi 1.5 server fields without blocking other valid servers", () => {
+    const h = host();
+    createMcpAdapter({ config: { mcpServers: {
+      plain: { command: "plain" },
+      typed: { type: "stdio", command: "typed", timeout: 1.5, description: "Fixture tools" },
+    } } })(h.pi);
+    h.handlers.get("session_start")!({}, h.context);
+    expect([...h.servers.keys()]).toEqual(["plain", "typed"]);
+    expect(h.servers.get("typed")?.config).toEqual({
+      command: "typed", enabled: true, exposure: "codemode", timeout: 1.5, description: "Fixture tools",
+    });
+  });
+
+  it.each(["http", "streamable-http"] as const)("normalizes %s and native timeout fields for programmatic registration", async (type) => {
+    const h = host();
+    createMcpAdapter({ config: { mcpServers: {} } })(h.pi);
+    const registration = registerMcpServer({ pi: h.pi, name: "remote", definition: {
+      type, url: "https://example.invalid/mcp", timeout: 2, requestTimeoutMs: 2000, description: "Remote fixture",
+    } });
+    expect(h.servers.get("remote")?.config).toEqual({
+      url: "https://example.invalid/mcp", enabled: true, exposure: "codemode", timeout: 2, description: "Remote fixture",
+    });
+    await registration.dispose();
+  });
+
   it("does not replace another extension's registration", () => {
     const h = host();
     h.pi.registerMcpServer("demo", { command: "other" });
@@ -104,6 +129,7 @@ describe("standard Pi extension compatibility", () => {
     { command: "demo", exposeResources: false },
     { url: "https://example.com", oauth: { clientId: "fixture" } },
     { url: "https://example.com", bearerTokenStore: true },
+    { url: "https://example.com", httpTransport: "sse" },
   ])("rejects policies or authentication that cannot be safely preserved: %j", (definition) => {
     const h = host();
     createMcpAdapter({ config: { mcpServers: {} } })(h.pi);
@@ -117,6 +143,50 @@ describe("standard Pi extension compatibility", () => {
     h.handlers.get("session_start")!({}, h.context);
     expect(h.servers.size).toBe(0);
     expect(h.notifications.some((message) => message.includes("outputGuard"))).toBe(true);
+  });
+
+  it("imports healthy servers with presentation settings and reports one warning without forwarding them", () => {
+    const h = host();
+    createMcpAdapter({ config: {
+      mcpServers: { first: { command: "first" }, second: { command: "second" } },
+      settings: {
+        showStatusIcon: true, mcpFooterStatus: "compact", notifyOnStartupConnect: false,
+        warnOnLargeDirectTools: false, toolResultRendering: "boxed", collapsedResultLines: 2,
+        authRequiredMessage: "private fixture text",
+      },
+    } })(h.pi);
+    h.handlers.get("session_start")!({}, h.context);
+    expect([...h.servers.keys()]).toEqual(["first", "second"]);
+    expect(h.servers.get("first")?.config).toEqual({ command: "first", enabled: true, exposure: "codemode" });
+    const warnings = h.notifications.filter((message) => message.includes("settings.showStatusIcon"));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("ignored");
+    expect(warnings[0]).toContain("settings.authRequiredMessage");
+    expect(warnings[0]).not.toContain("private fixture text");
+  });
+
+  it("still blocks an unsupported security policy alongside presentation settings", () => {
+    const h = host();
+    createMcpAdapter({ config: {
+      mcpServers: { demo: { command: "must-not-run" } },
+      settings: { showStatusIcon: true, outputGuard: { maxBytes: 100 } },
+    } })(h.pi);
+    h.handlers.get("session_start")!({}, h.context);
+    expect(h.servers.size).toBe(0);
+    expect(h.notifications.some((message) => message.includes("unsupported fields") && message.includes("outputGuard"))).toBe(true);
+  });
+
+  it("imports shared servers when the native file only contains presentation preferences", () => {
+    const h = host();
+    writeFileSync(join(agentDir, "mcp.json"), JSON.stringify({ mcpServers: {}, settings: { showStatusIcon: false } }));
+    sourceFixture.sources = [{
+      source: { id: "shared", label: "fixture", readPath: "/fixture/shared.json", writePath: "/fixture/shared.json", kind: "shared", scope: "global", shared: true },
+      config: { mcpServers: { extra: { command: "extra" } } },
+    }];
+    createMcpAdapter()(h.pi);
+    h.handlers.get("session_start")!({}, h.context);
+    expect(h.servers.has("extra")).toBe(true);
+    expect(h.notifications.some((message) => message.includes("settings.showStatusIcon") && message.includes("ignored"))).toBe(true);
   });
 
   it("propagates host registration failures without recording a successful registration", () => {

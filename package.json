@@ -90,6 +90,7 @@
     "skills",
     "docs/native-mcp-patch.md",
     "docs/native-mcp-protocol.md",
+    "docs/legacy-runtime.md",
     "patches",
     "scripts/managed-pi-update-hook.mjs",
     "scripts/install-managed-pi-update-hook.mjs",

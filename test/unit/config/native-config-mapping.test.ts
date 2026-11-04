@@ -425,14 +425,32 @@ describe("native MCP config normalization", () => {
   });
 
   it("keeps every public config field assigned to an explicit owner", () => {
-    expect(Object.keys(SERVER_ENTRY_FIELD_MAPPING)).toHaveLength(33);
+    expect(Object.keys(SERVER_ENTRY_FIELD_MAPPING)).toHaveLength(36);
     expect(Object.keys(MCP_SETTINGS_FIELD_MAPPING)).toHaveLength(25);
     expect(SERVER_ENTRY_FIELD_MAPPING.disabled.status).toBe("mapped");
     expect(SERVER_ENTRY_FIELD_MAPPING.enabled.owner).toBe("native-config");
     expect(SERVER_ENTRY_FIELD_MAPPING.exposure.owner).toBe("native-config");
     expect(SERVER_ENTRY_FIELD_MAPPING.toolExposure.owner).toBe("native-config");
     expect(SERVER_ENTRY_FIELD_MAPPING.oauth.owner).toBe("native-credentials");
+    expect(SERVER_ENTRY_FIELD_MAPPING.description.owner).toBe("native-config");
     expect(MCP_SETTINGS_FIELD_MAPPING.mcpFooterStatus.owner).toBe("adapter-presentation");
     expect(MCP_SETTINGS_FIELD_MAPPING.scriptMode.status).toBe("deferred");
+  });
+
+  it("normalizes native input aliases and retains the server summary on the enhanced path", () => {
+    const mapped = mapLoadedConfigSourcesToNative([{
+      source: {
+        id: "pi-global", label: "fixture", readPath: "/fixture/mcp.json", writePath: "/fixture/mcp.json",
+        kind: "user", shared: false, scope: "global",
+      },
+      config: { mcpServers: { docs: { type: "http", url: "https://example.test/mcp", timeout: 1.5, description: "Document search" } } },
+    }]);
+    expect(mapped).toMatchObject({
+      ok: true,
+      value: { servers: [{
+        name: "docs", connectable: true, deferredFields: [],
+        config: { url: "https://example.test/mcp", httpTransport: "streamable-http", requestTimeoutMs: 1500, description: "Document search" },
+      }] },
+    });
   });
 });

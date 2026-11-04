@@ -768,6 +768,9 @@ import stripJsonComments from "strip-json-comments";
 
 // src/config/validation.ts
 var SERVER_FIELDS = /* @__PURE__ */ new Set([
+  "type",
+  "timeout",
+  "description",
   "enabled",
   "exposure",
   "toolExposure",
@@ -994,10 +997,19 @@ function validateServerField(field, value, path, issues) {
     case "command":
     case "socket":
     case "cwd":
+    case "description":
     case "bearerToken":
     case "bearerTokenEnv":
     case "pluginDataDir":
       checkString(value, path, issues, code, field === "command" || field === "socket" ? "must be a non-empty string" : "must be a string", field !== "command" && field !== "socket");
+      break;
+    case "type":
+      checkEnum(value, ["stdio", "http", "streamable-http"], path, issues, code);
+      break;
+    case "timeout":
+      if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value * 1e3 > MAX_REQUEST_TIMEOUT_MS) {
+        addIssue(issues, code, path, `${path} must be a finite positive number of seconds within the supported timer range.`);
+      }
       break;
     case "args":
     case "includeTools":
@@ -1083,6 +1095,41 @@ function validateServerField(field, value, path, issues) {
       break;
   }
 }
+function equivalentTimeoutMs(left, right) {
+  if (!Number.isFinite(left) || !Number.isFinite(right)) return false;
+  const tolerance = 2 * Number.EPSILON * Math.max(Math.abs(left), Math.abs(right));
+  return Math.abs(left - right) <= tolerance;
+}
+function secondsToMilliseconds(seconds) {
+  const milliseconds = seconds * 1e3;
+  const nearestInteger = Math.round(milliseconds);
+  return equivalentTimeoutMs(milliseconds, nearestInteger) ? nearestInteger : milliseconds;
+}
+function validateServerAliases(raw, issues) {
+  const path = "mcpServers.<entry>";
+  if (raw.type === "stdio" && (raw.command === void 0 || raw.httpTransport !== void 0)) {
+    addIssue(issues, "invalid-server-field", `${path}.type`, `${path}.type stdio requires command and cannot select an HTTP transport.`);
+  }
+  if (raw.type === "http" || raw.type === "streamable-http") {
+    if (raw.url === void 0 || raw.httpTransport !== void 0 && raw.httpTransport !== "streamable-http") {
+      addIssue(issues, "invalid-server-field", `${path}.type`, `${path}.type HTTP requires url and cannot select a conflicting HTTP transport.`);
+    }
+  }
+  if (raw.httpTransport !== void 0 && (raw.command !== void 0 || raw.socket !== void 0)) {
+    addIssue(issues, "invalid-server-field", `${path}.httpTransport`, `${path}.httpTransport cannot be used with command or socket.`);
+  }
+  if (typeof raw.timeout === "number" && typeof raw.requestTimeoutMs === "number" && !equivalentTimeoutMs(secondsToMilliseconds(raw.timeout), raw.requestTimeoutMs)) {
+    addIssue(issues, "invalid-server-field", `${path}.timeout`, `${path}.timeout and requestTimeoutMs specify conflicting durations.`);
+  }
+}
+function normalizeServerAliases(raw) {
+  const entry = structuredClone(raw);
+  if (entry.type === "http" || entry.type === "streamable-http") entry.httpTransport = "streamable-http";
+  if (entry.timeout !== void 0) entry.requestTimeoutMs ??= secondsToMilliseconds(entry.timeout);
+  delete entry.type;
+  delete entry.timeout;
+  return entry;
+}
 function validateServerEntry(name, raw, options = {}) {
   const issues = [];
   if (name.trim().length === 0 || /[\u0000-\u001f\u007f]/.test(name)) {
@@ -1103,8 +1150,9 @@ function validateServerEntry(name, raw, options = {}) {
   for (const [field, value] of Object.entries(raw)) {
     if (SERVER_FIELDS.has(field) && value !== void 0) validateServerField(field, value, `mcpServers.<entry>.${field}`, issues);
   }
+  validateServerAliases(raw, issues);
   if (issues.length > 0) return fail(issues);
-  return { ok: true, value: structuredClone(raw) };
+  return { ok: true, value: normalizeServerAliases(raw) };
 }
 function validateSetting(field, value, issues) {
   const path = `settings.${field}`;
@@ -1837,6 +1885,9 @@ var mapped = (owner, reason) => ({ owner, status: "mapped", reason });
 var deferred = (owner, reason) => ({ owner, status: "deferred", reason });
 var adapterOwned = (owner, reason) => ({ owner, status: "adapter-owned", reason });
 var SERVER_ENTRY_FIELD_MAPPING = {
+  type: mapped("native-transport", "Input alias validated and normalized before native transport mapping."),
+  timeout: mapped("native-transport", "Input seconds are normalized to requestTimeoutMs before native mapping."),
+  description: mapped("native-config", "Native server summary retained for discovery and namespace descriptions."),
   enabled: mapped("native-config", "Native enablement; adapter disabled is accepted as its inverse."),
   exposure: mapped("native-config", "Native server exposure policy."),
   toolExposure: mapped("native-config", "Native per-tool exposure overrides."),
@@ -1954,6 +2005,7 @@ function mapNativeServerConfig(entry, globalTimeoutMs) {
   const configuredTimeout = entry.requestTimeoutMs !== void 0 && entry.requestTimeoutMs > 0 ? entry.requestTimeoutMs : globalTimeoutMs !== void 0 && globalTimeoutMs > 0 ? globalTimeoutMs : void 0;
   const oauth = mapOAuthConfig(entry);
   const common = {
+    ...entry.description === void 0 ? {} : { description: entry.description },
     ...configuredTimeout === void 0 ? {} : { requestTimeoutMs: configuredTimeout },
     ...entry.protocolVersion === void 0 ? {} : { protocolVersion: entry.protocolVersion },
     ...entry.lifecycle === void 0 ? {} : { lifecycle: entry.lifecycle },
@@ -3831,19 +3883,26 @@ var SUPPORTED_FIELDS = /* @__PURE__ */ new Set([
   "exposure",
   "toolExposure",
   "directTools",
-  "requestTimeoutMs"
+  "requestTimeoutMs",
+  "description"
 ]);
+function isPresentationSetting(key) {
+  return Object.hasOwn(MCP_SETTINGS_FIELD_MAPPING, key) && MCP_SETTINGS_FIELD_MAPPING[key].owner === "adapter-presentation";
+}
+function getStandardPresentationSettings(settings) {
+  return Object.keys(settings ?? {}).filter((key) => settings?.[key] !== void 0 && isPresentationSetting(key)).map((key) => `settings.${key}`);
+}
 function mapStandardServer(name, entry, settings) {
   const validated = validateServerEntry(name, entry, { requireTransport: true });
   if (!validated.ok) return { ok: false, error: { code: "invalid-server", message: validated.error.message } };
+  const value = validated.value;
   const unsupported = [
-    ...Object.keys(entry).filter((key) => entry[key] !== void 0 && !SUPPORTED_FIELDS.has(key)),
-    ...Object.keys(settings ?? {}).filter((key) => settings?.[key] !== void 0 && key !== "directTools").map((key) => `settings.${key}`)
+    ...Object.keys(value).filter((key) => value[key] !== void 0 && !SUPPORTED_FIELDS.has(key) && !(key === "httpTransport" && value.url && value.httpTransport === "streamable-http")),
+    ...Object.keys(settings ?? {}).filter((key) => settings?.[key] !== void 0 && key !== "directTools" && !isPresentationSetting(key)).map((key) => `settings.${key}`)
   ];
   if (unsupported.length) {
     return { ok: false, error: { code: "unsupported-fields", message: `Standard Pi MCP mode: unsupported fields for "${name}": ${unsupported.join(", ")}. This server was not registered; use native Pi configuration or the enhanced management host without dropping required policies.` } };
   }
-  const value = validated.value;
   const direct = value.directTools ?? settings?.directTools;
   const toolExposure = {
     ...Array.isArray(direct) ? Object.fromEntries(direct.map((tool) => [tool, "direct"])) : {},
@@ -3852,6 +3911,7 @@ function mapStandardServer(name, entry, settings) {
   const common = {
     enabled: value.disabled === true ? false : value.enabled ?? true,
     exposure: value.exposure ?? (direct === true ? "direct" : "codemode"),
+    ...value.description === void 0 ? {} : { description: value.description },
     ...Object.keys(toolExposure).length ? { toolExposure } : {},
     ...value.requestTimeoutMs && value.requestTimeoutMs > 0 ? { timeout: value.requestTimeoutMs / 1e3 } : {}
   };
@@ -3879,9 +3939,10 @@ function supportsStandardMcp(pi) {
 function hasStandardAdapter(pi) {
   return adapters.has(pi);
 }
-function report(state, message, error = false) {
-  if (state.context?.hasUI) state.context.ui.notify(message, error ? "error" : "info");
-  else if (error) console.error(`MCP adapter: ${message}`);
+function report(state, message, level = "info") {
+  if (state.context?.hasUI) state.context.ui.notify(message, level);
+  else if (level === "error") console.error(`MCP adapter: ${message}`);
+  else if (level === "warning") console.warn(`MCP adapter: ${message}`);
   else console.info(`MCP adapter: ${message}`);
 }
 function register(pi, state, name, config, configured) {
@@ -3903,7 +3964,7 @@ function loadConfiguration(pi, state, options, context) {
   const native = readStandardNativeConfiguration(new Set([...nativePaths].filter((path) => context.isProjectTrusted() || path !== resolve3(getProjectPiConfigPath(context.cwd)))));
   state.nativeConfigurationAvailable = native.ok;
   if (!native.ok) {
-    report(state, `${native.error.code}: ${native.error.message}`, true);
+    report(state, `${native.error.code}: ${native.error.message}`, "error");
     return;
   }
   state.reserved.clear();
@@ -3911,7 +3972,7 @@ function loadConfiguration(pi, state, options, context) {
     state.reserved.add(name);
     if (state.owned.has(name)) {
       release(pi, state, name);
-      report(state, `Adapter registration "${name}" was removed because native Pi configuration owns this name.`, true);
+      report(state, `Adapter registration "${name}" was removed because native Pi configuration owns this name.`, "error");
     }
   }
   const nativeSettings = native.value.settings;
@@ -3923,22 +3984,26 @@ function loadConfiguration(pi, state, options, context) {
       continue;
     }
     if (source.error || source.validationIssues?.length) {
-      report(state, `Adapter MCP source could not be imported safely (${source.error?.code ?? source.validationIssues?.[0]?.code}).`, true);
+      report(state, `Adapter MCP source could not be imported safely (${source.error?.code ?? source.validationIssues?.[0]?.code}).`, "error");
       return;
     }
     if (source.config) config = mergeConfigs(config, source.config);
+  }
+  const presentationSettings = getStandardPresentationSettings(config.settings);
+  if (presentationSettings.length) {
+    report(state, `Standard Pi MCP mode: presentation settings are ignored because Pi controls the interface: ${presentationSettings.join(", ")}. Server configuration and execution policies are checked separately.`, "warning");
   }
   for (const [name, entry] of Object.entries(config.mcpServers)) {
     if (state.reserved.has(name)) continue;
     const mapped2 = mapStandardServer(name, entry, config.settings);
     if (!mapped2.ok) {
-      report(state, mapped2.error.message, true);
+      report(state, mapped2.error.message, "error");
       continue;
     }
     try {
       register(pi, state, name, mapped2.value, true);
     } catch {
-      report(state, `MCP server "${name}" could not be registered: ${state.owned.has(name) || pi.getMcpServers().some((server) => server.name === name) ? "already registered" : "the Pi host rejected registration"}.`, true);
+      report(state, `MCP server "${name}" could not be registered: ${state.owned.has(name) || pi.getMcpServers().some((server) => server.name === name) ? "already registered" : "the Pi host rejected registration"}.`, "error");
     }
   }
 }
@@ -3958,7 +4023,7 @@ function installStandardAdapter(pi, options) {
     try {
       loadConfiguration(pi, state, options, context);
     } catch {
-      report(state, "Adapter MCP configuration could not be loaded safely; no additional sources will be imported.", true);
+      report(state, "Adapter MCP configuration could not be loaded safely; no additional sources will be imported.", "error");
     }
   });
   pi.on("session_shutdown", () => {
@@ -3967,7 +4032,7 @@ function installStandardAdapter(pi, options) {
       try {
         release(pi, state, name);
       } catch {
-        report(state, `The Pi host rejected removal of MCP server "${name}" during shutdown.`, true);
+        report(state, `The Pi host rejected removal of MCP server "${name}" during shutdown.`, "error");
       }
     }
     state.context = void 0;

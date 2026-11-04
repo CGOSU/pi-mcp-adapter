@@ -2,7 +2,7 @@
 
 ## 项目与迁移
 
-- 项目：`pi-mcp-adapter`，版本 `2.27.1`；技术栈为 Node.js、TypeScript、Pi 扩展 API 和 Vitest。
+- 项目：`pi-mcp-adapter`，版本 `2.27.1`；技术栈为 Node.js、TypeScript、Pi 扩展 API 和 Vitest。用户明确的当前支持目标是标准 Pi 1.5.0 及以上版本；旧补丁资料只用于历史维护。
 - Pi 原生 MCP 迁移的十二项工作均已完成，包括原生管理能力、配置与信任边界、系统密钥环凭据衔接、`directTools` 持久化、面板迁移、同会话回归，以及固定版本补丁和发布产物交付。唯一详细实施顺序与恢复条件见 [`docs/todo.md`](todo.md)；适配器与 Pi 原生管理 API 的对应关系见 [`docs/native-mcp-evidence.md`](native-mcp-evidence.md) 和 [`docs/native-mcp-protocol.md`](native-mcp-protocol.md)。
 - 早先因业务契约冲突而暂停的 `native-panel-status-and-live-catalog` 未重试，也未宣称完成；澄清和副作用记录保留在 [`docs/session-log.md`](session-log.md)。
 
@@ -11,23 +11,24 @@
 - Pi 原生 MCP 运行时始终是唯一连接 owner。发布入口按能力选择：完整 patched management API 提供增强管理模式；无该 API 但公开 `registerMcpServer`/`unregisterMcpServer`/`getMcpServers` 时使用有限标准兼容模式。后者无增强面板、适配器 keyring/OAuth、执行策略和状态快照；不支持字段 fail-closed。两条路径都不启动 adapter 自建连接 runtime。契约与边界见 [`README.md`](../README.md#pi-宿主兼容模式)。
 - 原生入口只注册 `/mcp-adapter`；Pi 自带的 `/mcp` 仍由 Pi 原生 MCP 扩展负责。
 - 保留的旧适配器运行时源码仍位于 `src/**`，并由对应测试覆盖，但不会从 `dist/index.js` 加载，也不包含在发布包中。
-- 增强管理模式的原生配置限制，以及标准兼容模式对执行策略/凭据功能的限制，见 [`README.md`](../README.md#pi-宿主兼容模式) 和“原生管理方下的行为变化”。
-- Pi 原生 MCP 补丁分别固定在 Pi 1.2.0 commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff`、Pi 1.3.0 commit `71023aec1546d6d677a65669c5665c0927ce0dd0` 与 Pi 1.4.0 commit `4a080252f06caf63a525d7873c5d94d3c23887e0`；只有这三个补丁后的固定基线完成本仓库验证。三个 patch、manifest、hash 与复现范围以 [`docs/native-mcp-patch.md`](native-mcp-patch.md) 为准。Pi 上游未提交、未推送、未发布或打标签。
+- 标准模式支持 `type: stdio/http/streamable-http`、`description` 和秒制 `timeout` 输入；矛盾传输及冲突超时拒绝。七个纯展示设置集中警告后忽略，执行策略／凭据限制仍不静默丢弃。当前契约见 [`README.md`](../README.md)，增强模式历史参考见 [`legacy-runtime.md`](legacy-runtime.md)。
+- Pi 原生 MCP 补丁分别固定在 Pi 1.2.0 commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff`、Pi 1.3.0 commit `71023aec1546d6d677a65669c5665c0927ce0dd0` 与 Pi 1.4.0 commit `4a080252f06caf63a525d7873c5d94d3c23887e0`；这些是历史增强模式固定基线，不能代替标准 Pi 1.5+ 的验证。三个 patch、manifest、hash 与复现范围以 [`docs/native-mcp-patch.md`](native-mcp-patch.md) 为准。Pi 上游未提交、未推送、未发布或打标签。
 - 职责拆分专用 Pi 源码工作区 `/Users/cgosu/code/JavaScript/pi-session-refactor` 位于分支 `refactor/session-responsibilities`。23条历史 `recommend-split` 中，Pi 19项已完成、`AgentSession` 1项部分完成、Windows `windows.rs` 1项按用户决定延期；adapter 2项已完成。AgentSession仍由主类持有运行状态、队列、事件及生命周期，剩余扩展绑定因耦合保留；Windows源码未改，且本机没有Windows target验证环境。拆分模块、逐项验证、预算校准与未处理项见 [`docs/session-log.md`](session-log.md)；Rustup查询引发的固定1.96.0 toolchain部分下载及未处理状态见 [`docs/pitfalls.md`](pitfalls.md)。本批Pi代码最终 `npm run check` 通过；本批改动均未提交或推送。Pi 1.2.0固定补丁 artifact 构建/发布链路仍未在该分支验证；支持版本和artifact范围以 [`docs/native-mcp-patch.md`](native-mcp-patch.md) 为准。
-- 本机 managed Pi 已安装非阻断 post-update hook，并将已验证 Pi 1.3.0 patched release 作为当前 managed release；stock `1.3.0` release 和 launcher 原版备份均保留。hook 当前登记 Pi 1.3.0 与 1.4.0 artifact；未知版本/补丁失败只警告，不影响核心更新退出状态。源码与已部署 hook 的 CLI 参数解析已补齐 `resolve` 导入，定向回归和隔离参数探针通过，详见 [会话记录](session-log.md)。运行中的旧 Pi 进程仍须完全退出并重启才能加载新 release。
+- 本次诊断实际运行的是 stock Pi 1.5.0。旧 managed hook／patched release 的交付记录见 [`session-log.md`](session-log.md)，不能把旧记录当作当前运行版本。本轮未变更 managed 安装、hook 或用户运行中的进程。源码仓库和 `~/.pi/agent/git/github.com/CGOSU/pi-mcp-adapter` 安装副本独立，本次代码及 dist 修改尚未同步到安装副本。
 
 ## 源码、启动与发布布局
 
 - 根目录保留 `index.ts`、`config.ts`、`metadata-cache.ts`、`types.ts`、`oauth.ts` 和 `cli.js` 作为公共兼容入口；实现位于 `src/contracts`、`src/catalog`、`src/config`、`src/runtime`、`src/auth`、`src/tools`、`src/ui`、`src/commands` 和 `src/extension`。已删除 53 个未发布的根目录转发文件；内部模块直接依赖所属领域路径，不反向依赖公共聚合入口。
-- `index.ts` 的静态依赖包括配置读取、元数据缓存、JSON Schema、工具表面、注册代码，以及原生管理方所需的同步密钥环和 bearer 令牌凭据适配层（`src/auth/mcp-auth.ts`、`src/auth/mcp-bearer-store.ts`）。OAuth 流程与提供方、命令、旧运行时工具、脚本执行和 UI 运行时仍通过缓存的 `import()` 延迟加载。
-- 有效且完全采用延迟加载模式的元数据缓存可跳过 `session_start` 的完整运行时初始化；启动时连接、保持连接、冷缓存和 `MCP_DIRECT_TOOLS` 的既有语义保留。目录索引与 `MetadataCatalogSnapshot` 会在一次目录构建或同步中复用。
+- 公共入口保持原生 owner 装配与按能力选择标准／增强模式；不会回退到适配器自建连接。旧代理、脚本工具和 UI runtime 不从发布入口启动，历史教程已移入 [`legacy-runtime.md`](legacy-runtime.md)。
+- 旧 runtime 的 lazy 缓存优化仅适用于保留的历史源码；当前标准 Pi 在会话启动时后台连接服务器，连接状态以原生 `/mcp` 为准。`/mcp-adapter` 只列模式与注册名称，导入诊断来自启动／reload 通知。
 - 发布包包含五个 ESM（ECMAScript 模块）入口：包根、`types`、`config`、`metadata-cache` 和 `oauth`；Pi 扩展由 `extensions/index.js` 转发到 `dist/index.js`，命令行入口为 `dist/cli.js`。`package.json` 不发布 `src/**` 或测试目录。
-- 最新 `npm pack --ignore-scripts --dry-run --json` 检查得到 35 个文件，包含构建后的 `dist`、扩展入口、README 所链接文档、固定 patch/manifest 与托管更新 hook 脚本；不包含 `src/**`、`test/**`、`node_modules/**` 或 source map。未发布 npm 包。
+- 最新 `npm pack --ignore-scripts --dry-run --json` 检查得到38个文件，包含18个构建产物、扩展入口、README 所链接文档（含历史文档）、固定 patch/manifest 与托管更新 hook 脚本；不包含 `src/**`、`test/**`、`node_modules/**` 或 source map。未发布 npm 包。
 
 ## 测试、发布与验证结果
 
 - 测试按 `test/unit`、`test/integration`、`test/node` 和 `test/fixtures` 分区；仓库根目录不保留测试文件或 `__tests__` 目录。
-- 本机 Node `v26.11.1`：此前全仓 `npm run test:vitest` 的 119 个测试文件、1,350 项通过记录属于历史版本。本轮标准兼容改造的 5 个 native 测试文件 37 项通过；`npm run typecheck`、真实 stock Pi 1.5.0 loader smoke、`npm run build:public` 和 4 项 public build/export 测试通过，未执行全仓测试。
+- 本机 Node `v26.11.1`：本轮配置／原生接入／配置集成／启动依赖的16个测试文件143项通过；`npm run typecheck`、`npm run build:public` 和4项 public build/export 测试通过。此前119文件1,350项全仓测试通过属于历史版本，本轮未运行全仓测试。
+- 本轮 stock Pi 1.5.0 bundled CLI 在隔离配置中加载本次 dist，原生及共享来源三个本地 stdio fixture 全部完成握手与 tools/list，`/mcp` 返回 connected；展示设置一次 warning，正常关闭且无模型调用。源码目录旧 patched Pi peer 会令该探针走增强模式而失败，标准验证必须使用实际 stock peer。详细过程和边界见 [`session-log.md`](session-log.md)。
 - Pi 1.3.0 固定补丁为 49 个路径、SHA-256 `67df3bb7…54eaf33`；隔离 staging 中完整 `npm run build` 通过，输出 83 个 CLI bundle 文件。4 个 Pi owner/management 定向测试 71 项通过；adapter `test:public-types -- --pi-source <patched Pi>` 的 typecheck、5 个 public/export/package 检查和 packed consumer 通过，版本化 runner 6 项通过，adapter native bridge 定向测试 3 文件/9 项通过。fresh packed CLI + adapter 在 peer omitted、无 ancestor `node_modules` 的隔离目录中通过 RPC 冒烟：管理 API 与 18 项能力可见，built-in owner 连接 programmatic fixture 并得到 3 项 live tools，`/mcp-adapter` prompt 被处理，status/notify 可见，未产生模型推理事件，EOF 后 CLI 与 fixture 均正常退出。Pi 1.2.0 的既有 fixed patch/public consumer/same-session 验证保持不变；两版 patch/manifest hash 及可复现细节见 [`docs/native-mcp-patch.md`](native-mcp-patch.md)。
 - `npm run test:oauth` 的 141 项测试曾全部通过；仅安装生产依赖后的临时安装、公共子路径导入和命令行冒烟检查也有通过记录。详细命令及当时的验证范围见 [`docs/session-log.md`](session-log.md)。
 - Pi 1.3.0 隔离 staging 的 `npm run build` 已在模型数据 hydration 后通过；完整 Pi `npm run check` 与全量测试未在本轮最终状态运行，因此不宣称它们通过。此前 fixed baseline 在 hydration 前的 `check` 曾因缺失生成模型数据失败，见历史 session 记录。
@@ -35,18 +36,10 @@
 - Pi 1.4.0 固定补丁为 49 个路径、patch SHA-256 `e832267a…5817698`、manifest SHA-256 `b9559fb7…08c13f3e`；干净 checkout 上的 apply、`git diff --check`、反向 apply 与 4 文件 59 项 owner/management 测试通过，完整 `npm run build` 产出 84 个 bundle 文件与 tarball SHA-256 `9a3f27b8…de50531ed`。adapter 的 `test:public-types`、`test:patched-native-session`（同一 patched checkout）、版本化 runner 7 项、managed hook 12 项、`test/unit/native` 30 项与 `typecheck` 均通过；隔离 managed root 中真实 tarball 完成离线安装并切换到 `native-mcp-1.4.0-9a3f27b857`（stock `1.4.0` release 保留）。fresh packed CLI RPC smoke 中 owner 连接 fixture 并取得 3 项 live tools，`/mcp-adapter` 被处理，未产生模型推理事件。
 - 最终 3 次启动基准中，源码与发布包的模块导入/主流程/总耗时中位数分别为 `437/475/1128ms` 和 `199/228/754ms`，未出现可重复的 15% 以上回退；静态启动依赖检查通过。目录基准 `npm run benchmark:catalog -- --runs 5` 中，5×100、20×100、50×100 项时，direct 与 live 共用索引的测量值分别为 `4.72/4.45ms`、`18.73/17.43ms`、`45.07/45.05ms`；旧的逐服务器索引 50×100 项对照为 `989.27ms`。一万工具搜索冷启动为 `50.28ms`，5 次热运行中位数为 `5.73ms`，结果正确。
 - Windows 完整 Vitest 可能受全局配置污染、Linux 密钥环、`taskkill`、符号链接、Unix 套接字、文件权限和命令行 shebang 等平台差异影响；这些限制不代表源码布局回归，相关环境应使用针对性验证。
-- `.github/workflows/ci.yml` 已改为检出固定 Pi 基线、应用仓库补丁，再运行原生管理方测试、适配器公共类型/产物检查和同会话回归。远端 GitHub Actions 尚未运行；本机通过不能代替远端持续集成结果。
+- `.github/workflows/ci.yml` 与开发依赖仍围绕旧固定补丁基线；统一迁移到用户指定的标准 Pi 1.5+ 是后续工作。本轮未修改依赖／CI，也未运行远端 GitHub Actions。
 
 ## 尚待完成的交付
 
-- 先前 Pi 1.3.0 fixed-patch 交付已按用户明确要求推送至 `origin/main`；本轮 CLI 验证、managed update hook 实现与文档已完成，按项目规则创建中文本地提交，未 push。用户授权的本机 managed install 已切换到独立 patched release，launcher 原版与 stock release 均保留；当前运行中的 Pi process 尚未重启。未执行真实 `pi update --all`、npm 发布、部署或打 tag。远端 CI 是否完成尚未核实；详细 Git 与 runtime 范围见 [`docs/session-log.md`](session-log.md)。
-- 补丁回归 runner 仍须向 `npm run test:public-types -- --pi-source <已应用对应补丁的固定 Pi 源码目录>` 显式提供 Pi 固定基线，以验证完整 management 协议类型；这与运行时标准兼容路径分开。详见 [`docs/native-mcp-patch.md`](native-mcp-patch.md)。
-- Pi 1.4.0 patched tarball 与 adapter tarball 目前只存在于隔离临时目录；真实 managed install 仍指向 Pi 1.3.0 patched release，未运行真实 `pi update --all`。标准兼容模式允许公开 MCP 注册 API 可用的 stock Pi 使用基本配置，无需安装补丁；若需要增强面板与管理能力，才需要安装匹配的 patched artifact 并重启。步骤：
-
-  ```sh
-  npm run install:managed-pi-update-hook -- --artifact <pi-1.4.0 patched tarball>
-  # 然后完全退出并重新启动 Pi
-  ```
-
-  未提供已登记 tarball、未登记该 hash、或安装/API/版本校验失败时，installer 会 fail-closed 且不改动 `current-version`；兼容的 stock Pi 现在走有限标准注册路径，不再要求安装补丁才能注册基本 MCP 配置。
-- `AGENTS.md` 和 `docs/clean-code.md` 未在本轮修改。
+- 第一批配置兼容、展示设置和 README／Skill 修正已在源码仓库实现并重建 dist，尚未同步到本机 Pi 安装副本。未发布、部署或重启真实会话；保留用户既有 `AGENTS.md` 修改。Git 收尾授权见 [`session-log.md`](session-log.md)。
+- 开发／peer 依赖和 CI 的标准 Pi 1.5+ 基线迁移、导入诊断的来源与字段定位、旧实现清理均未纳入本批。标准 Pi 无须安装旧补丁；历史增强模式的补丁 runner 继续按 [`native-mcp-patch.md`](native-mcp-patch.md) 指定固定源码验证。
+- 历史 Pi 源码职责拆分和 Windows 延期项目沿用既有边界，见 [`session-log.md`](session-log.md) 与 [`pitfalls.md`](pitfalls.md)。本批不处理上游 checkout、managed 安装或工具链遗留。

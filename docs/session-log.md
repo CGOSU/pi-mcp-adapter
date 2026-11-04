@@ -8,6 +8,16 @@
 
 ## 会话
 
+### 2026-11-04：Pi 1.5+ 第一批配置兼容与使用说明修正
+
+- 完成：在用户确认第一批范围后，支持 `type: stdio/http/streamable-http`、`description` 和秒制 `timeout` 输入，并归一化到既有契约。矛盾传输、SSE 别名、未知字段及不等价超时仍拒绝；修正秒／毫秒换算的浮点边界。标准模式按既有字段归属表区分七个展示设置，集中警告后忽略；认证、审批、过滤、输出保护等执行策略仍拒绝不支持的映射。补充普通与原生文件中的展示设置、多个服务器、程序化注册和别名覆盖回归。
+- 文档：README 以用户指定的 Pi 1.5.0+ 为主线；随包 `mcp-scripting` 保留名称，改用实际 codemode／工具发现与调用接口，区分普通 `graph_*` 工具与 MCP。旧 README 移入 `docs/legacy-runtime.md` 并纳入发布文件。`/mcp-adapter` 仅显示模式与注册名称，导入诊断来自启动／reload 通知；`/mcp` 查看真实连接。
+- 验证：`npm run typecheck` 通过；`node node_modules/vitest/vitest.mjs run test/unit/config test/unit/native test/integration/config test/unit/package/startup-import-graph.test.ts` 的16文件143项通过；`npm run build:public` 生成18个文件；public build/export 的4项 Node 测试通过；`npm pack --ignore-scripts --dry-run --json` 得到38个文件，包含历史文档且不含源码、测试、node_modules 或 source map。文档链接与示例语法检查通过。
+- 真实宿主：在隔离 HOME／agent dir 中，将本次未改写的 `dist/` 和扩展入口配合 stock Pi 1.5.0 peer，使用 stock bundled CLI RPC 启动三个本地 stdio fixture（一个原生、一个普通共享、一个带 `type`／`description`／小数 `timeout`）。三者均完成 initialize／tools/list，`/mcp` 返回 connected，各1工具；展示设置仅一次 warning，EOF 后 CLI 和三服务正常退出，零模型推理事件。未测试生产 MCP、真实认证或远程 HTTP。
+- 开发依赖遗留：首次直接从源码 checkout 加载时，仓库本地 patched Pi 1.3.0 peer 令适配器进入增强模式；stock CLI 仅连接原生 fixture，额外导入未完成，探针失败。换成隔离的 stock 1.5.0 peer 后同一份 dist 验证通过。不能将仓库旧 patched peer 当作当前宿主能力，依赖／CI 迁移留待下一批；未修改本机 node_modules。探针与失败／成功记录保存在本次 Codex 工作目录的 `work/mcp-pi150-compatibility`。
+- 范围：已重建源码仓库的发布产物；未同步 `~/.pi/agent/git/github.com/CGOSU/pi-mcp-adapter` 安装副本、修改真实配置或重启用户会话。保留用户既有 `AGENTS.md` 修改；未改依赖版本、CI、旧运行时或补丁资产，未运行全仓测试，未 commit／push／发布。
+- Git 收尾授权：用户随后明确要求 `commit push`，本批源码、测试、发布产物及文档纳入提交／推送；用户既有 `AGENTS.md` 修改排除在外。此授权不包含同步安装副本或发布版本。
+
 ### 2026-11-03：按历史大文件建议完成本批拆分并延期 Windows 项
 
 - 范围：复核历史会话 `01a19f8f-7a8d-72d2-a152-83da3b8cc2cc` 中的23项 `recommend-split`。结果为 Pi 19项完成、AgentSession 1项部分完成、Windows 1项延期；adapter 2项完成。历史建议是结构评估，不等于原先已完成，也不将本批结果描述为23项全部完成。

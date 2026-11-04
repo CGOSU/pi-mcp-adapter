@@ -8,6 +8,13 @@
 
 ## 已知问题
 
+### 2026-11-04：启动的 Pi 版本不等于扩展实际解析的 peer
+
+- 现象：stock Pi 1.5.0 直接加载源码仓库扩展时进入了旧增强模式，共享服务器未导入。
+- 原因：仓库本地安装的 patched Pi peer 可被原生模块导入命中，适配器据其导出判断能力；不能只用 CLI 的版本推断扩展看到的能力。
+- 处理：标准模式端到端验证须将构建产物与 stock peer 放在隔离目录，避免旧 patched node_modules 干扰。根治所需的开发依赖和 CI 基线迁移仍待后续处理，不通过放宽能力校验掩盖。
+- 验证：同一份 dist 配合 stock Pi 1.5.0 peer 后，三个本地服务器均完成连接与工具发现，详见 [`session-log.md`](session-log.md)。
+
 ### 2026-11-03：查询未完整安装的固定 Rust toolchain 可能触发下载
 
 - 现象：在 Pi checkout 内执行 `rustup target list --installed --toolchain 1.96.0` 时，rustup 开始同步 `1.96.0-aarch64-apple-darwin` 并下载组件，命令超时；后续只读检查看到 toolchain 目录存在但没有 `bin/rustc`。

@@ -221,6 +221,9 @@ import stripJsonComments from "strip-json-comments";
 
 // src/config/validation.ts
 var SERVER_FIELDS = /* @__PURE__ */ new Set([
+  "type",
+  "timeout",
+  "description",
   "enabled",
   "exposure",
   "toolExposure",
@@ -447,10 +450,19 @@ function validateServerField(field, value, path, issues) {
     case "command":
     case "socket":
     case "cwd":
+    case "description":
     case "bearerToken":
     case "bearerTokenEnv":
     case "pluginDataDir":
       checkString(value, path, issues, code, field === "command" || field === "socket" ? "must be a non-empty string" : "must be a string", field !== "command" && field !== "socket");
+      break;
+    case "type":
+      checkEnum(value, ["stdio", "http", "streamable-http"], path, issues, code);
+      break;
+    case "timeout":
+      if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value * 1e3 > MAX_REQUEST_TIMEOUT_MS) {
+        addIssue(issues, code, path, `${path} must be a finite positive number of seconds within the supported timer range.`);
+      }
       break;
     case "args":
     case "includeTools":
@@ -536,6 +548,41 @@ function validateServerField(field, value, path, issues) {
       break;
   }
 }
+function equivalentTimeoutMs(left, right) {
+  if (!Number.isFinite(left) || !Number.isFinite(right)) return false;
+  const tolerance = 2 * Number.EPSILON * Math.max(Math.abs(left), Math.abs(right));
+  return Math.abs(left - right) <= tolerance;
+}
+function secondsToMilliseconds(seconds) {
+  const milliseconds = seconds * 1e3;
+  const nearestInteger = Math.round(milliseconds);
+  return equivalentTimeoutMs(milliseconds, nearestInteger) ? nearestInteger : milliseconds;
+}
+function validateServerAliases(raw, issues) {
+  const path = "mcpServers.<entry>";
+  if (raw.type === "stdio" && (raw.command === void 0 || raw.httpTransport !== void 0)) {
+    addIssue(issues, "invalid-server-field", `${path}.type`, `${path}.type stdio requires command and cannot select an HTTP transport.`);
+  }
+  if (raw.type === "http" || raw.type === "streamable-http") {
+    if (raw.url === void 0 || raw.httpTransport !== void 0 && raw.httpTransport !== "streamable-http") {
+      addIssue(issues, "invalid-server-field", `${path}.type`, `${path}.type HTTP requires url and cannot select a conflicting HTTP transport.`);
+    }
+  }
+  if (raw.httpTransport !== void 0 && (raw.command !== void 0 || raw.socket !== void 0)) {
+    addIssue(issues, "invalid-server-field", `${path}.httpTransport`, `${path}.httpTransport cannot be used with command or socket.`);
+  }
+  if (typeof raw.timeout === "number" && typeof raw.requestTimeoutMs === "number" && !equivalentTimeoutMs(secondsToMilliseconds(raw.timeout), raw.requestTimeoutMs)) {
+    addIssue(issues, "invalid-server-field", `${path}.timeout`, `${path}.timeout and requestTimeoutMs specify conflicting durations.`);
+  }
+}
+function normalizeServerAliases(raw) {
+  const entry = structuredClone(raw);
+  if (entry.type === "http" || entry.type === "streamable-http") entry.httpTransport = "streamable-http";
+  if (entry.timeout !== void 0) entry.requestTimeoutMs ??= secondsToMilliseconds(entry.timeout);
+  delete entry.type;
+  delete entry.timeout;
+  return entry;
+}
 function validateServerEntry(name, raw, options = {}) {
   const issues = [];
   if (name.trim().length === 0 || /[\u0000-\u001f\u007f]/.test(name)) {
@@ -556,8 +603,9 @@ function validateServerEntry(name, raw, options = {}) {
   for (const [field, value] of Object.entries(raw)) {
     if (SERVER_FIELDS.has(field) && value !== void 0) validateServerField(field, value, `mcpServers.<entry>.${field}`, issues);
   }
+  validateServerAliases(raw, issues);
   if (issues.length > 0) return fail(issues);
-  return { ok: true, value: structuredClone(raw) };
+  return { ok: true, value: normalizeServerAliases(raw) };
 }
 function validateSetting(field, value, issues) {
   const path = `settings.${field}`;

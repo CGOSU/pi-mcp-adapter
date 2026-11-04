@@ -30,7 +30,7 @@ export type ConfigValidationResult<T> =
   | { readonly ok: false; readonly error: ConfigValidationError };
 
 const SERVER_FIELDS = new Set([
-  "enabled", "exposure", "toolExposure", "command", "args", "socket", "env", "cwd", "url", "headers",
+  "type", "timeout", "description", "enabled", "exposure", "toolExposure", "command", "args", "socket", "env", "cwd", "url", "headers",
   "requestHeadersCommand", "auth", "bearerToken", "bearerTokenEnv", "bearerTokenStore", "oauth", "lifecycle",
   "idleTimeout", "requestTimeoutMs", "exposeResources", "directTools", "toolPrefix", "includeTools", "excludeTools",
   "searchKeywords", "approveTools", "debug", "trace", "httpTransport", "pluginDataDir", "literalEnv",
@@ -285,10 +285,19 @@ function validateServerField(field: string, value: unknown, path: string, issues
     case "command":
     case "socket":
     case "cwd":
+    case "description":
     case "bearerToken":
     case "bearerTokenEnv":
     case "pluginDataDir":
       checkString(value, path, issues, code, field === "command" || field === "socket" ? "must be a non-empty string" : "must be a string", field !== "command" && field !== "socket");
+      break;
+    case "type":
+      checkEnum(value, ["stdio", "http", "streamable-http"], path, issues, code);
+      break;
+    case "timeout":
+      if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value * 1000 > MAX_REQUEST_TIMEOUT_MS) {
+        addIssue(issues, code, path, `${path} must be a finite positive number of seconds within the supported timer range.`);
+      }
       break;
     case "args":
     case "includeTools":
@@ -375,6 +384,45 @@ function validateServerField(field: string, value: unknown, path: string, issues
   }
 }
 
+function equivalentTimeoutMs(left: number, right: number): boolean {
+  if (!Number.isFinite(left) || !Number.isFinite(right)) return false;
+  const tolerance = 2 * Number.EPSILON * Math.max(Math.abs(left), Math.abs(right));
+  return Math.abs(left - right) <= tolerance;
+}
+
+function secondsToMilliseconds(seconds: number): number {
+  const milliseconds = seconds * 1000;
+  const nearestInteger = Math.round(milliseconds);
+  return equivalentTimeoutMs(milliseconds, nearestInteger) ? nearestInteger : milliseconds;
+}
+
+function validateServerAliases(raw: Record<string, unknown>, issues: ConfigValidationIssue[]): void {
+  const path = "mcpServers.<entry>";
+  if (raw.type === "stdio" && (raw.command === undefined || raw.httpTransport !== undefined)) {
+    addIssue(issues, "invalid-server-field", `${path}.type`, `${path}.type stdio requires command and cannot select an HTTP transport.`);
+  }
+  if (raw.type === "http" || raw.type === "streamable-http") {
+    if (raw.url === undefined || (raw.httpTransport !== undefined && raw.httpTransport !== "streamable-http")) {
+      addIssue(issues, "invalid-server-field", `${path}.type`, `${path}.type HTTP requires url and cannot select a conflicting HTTP transport.`);
+    }
+  }
+  if (raw.httpTransport !== undefined && (raw.command !== undefined || raw.socket !== undefined)) {
+    addIssue(issues, "invalid-server-field", `${path}.httpTransport`, `${path}.httpTransport cannot be used with command or socket.`);
+  }
+  if (typeof raw.timeout === "number" && typeof raw.requestTimeoutMs === "number" && !equivalentTimeoutMs(secondsToMilliseconds(raw.timeout), raw.requestTimeoutMs)) {
+    addIssue(issues, "invalid-server-field", `${path}.timeout`, `${path}.timeout and requestTimeoutMs specify conflicting durations.`);
+  }
+}
+
+function normalizeServerAliases(raw: Record<string, unknown>): ServerEntry {
+  const entry = structuredClone(raw) as ServerEntry;
+  if (entry.type === "http" || entry.type === "streamable-http") entry.httpTransport = "streamable-http";
+  if (entry.timeout !== undefined) entry.requestTimeoutMs ??= secondsToMilliseconds(entry.timeout);
+  delete entry.type;
+  delete entry.timeout;
+  return entry;
+}
+
 export function validateServerEntry(
   name: string,
   raw: unknown,
@@ -403,8 +451,9 @@ export function validateServerEntry(
   for (const [field, value] of Object.entries(raw)) {
     if (SERVER_FIELDS.has(field) && value !== undefined) validateServerField(field, value, `mcpServers.<entry>.${field}`, issues);
   }
+  validateServerAliases(raw, issues);
   if (issues.length > 0) return fail(issues);
-  return { ok: true, value: structuredClone(raw) as unknown as ServerEntry };
+  return { ok: true, value: normalizeServerAliases(raw) };
 }
 
 function validateSetting(field: string, value: unknown, issues: ConfigValidationIssue[]): void {

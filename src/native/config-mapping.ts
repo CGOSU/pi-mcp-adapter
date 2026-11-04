@@ -30,6 +30,9 @@ const adapterOwned = (owner: ConfigFieldOwner, reason: string): ConfigFieldMappi
 
 /** Exhaustive ownership ledger: adding a ServerEntry field requires an explicit migration decision. */
 export const SERVER_ENTRY_FIELD_MAPPING = {
+  type: mapped("native-transport", "Input alias validated and normalized before native transport mapping."),
+  timeout: mapped("native-transport", "Input seconds are normalized to requestTimeoutMs before native mapping."),
+  description: mapped("native-config", "Native server summary retained for discovery and namespace descriptions."),
   enabled: mapped("native-config", "Native enablement; adapter disabled is accepted as its inverse."),
   exposure: mapped("native-config", "Native server exposure policy."),
   toolExposure: mapped("native-config", "Native per-tool exposure overrides."),
@@ -231,6 +234,7 @@ function mapNativeServerConfig(entry: ServerEntry, globalTimeoutMs: number | und
       : undefined;
   const oauth = mapOAuthConfig(entry);
   const common = {
+    ...(entry.description === undefined ? {} : { description: entry.description }),
     ...(configuredTimeout === undefined ? {} : { requestTimeoutMs: configuredTimeout }),
     ...(entry.protocolVersion === undefined ? {} : { protocolVersion: entry.protocolVersion }),
     ...(entry.lifecycle === undefined ? {} : { lifecycle: entry.lifecycle }),
