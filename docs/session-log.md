@@ -8,6 +8,12 @@
 
 ## 会话
 
+### 2026-11-06：删除仓库旧 MCP 更新 hook 代码
+
+- 完成：用户明确指出仅卸载本机 hook 不足，继续删除仓库的4个 hook 实现／登记文件及5个专属测试文件，移除 `package.json` 的2条命令和4项发布条目、CI 的 hook 测试步骤。README、CHANGELOG 与历史指南标明退役，撤下已不存在的安装／卸载命令；历史卸载指引链接到可追溯的旧提交。
+- 验证：`npm_config_ignore_scripts=true npm_config_cache=/private/tmp/pi-mcp-hook-removal-npm-cache node --test test/node/package/package-tarball.test.mjs test/node/package/build-artifacts.test.mjs` 的4项测试全部通过。`npm pack --ignore-scripts --dry-run --json` 与清单断言通过，包内不再包含 hook 资产，保留固定补丁；最新文件计数见 [`current-state.md`](current-state.md)。首次手动清单探针按数组解析 npm JSON 而失败，修正探针以兼容对象输出后通过，未因此改动产品代码。
+- 范围与交付：运行时代码、`dist/`、依赖和锁文件、固定补丁及其 runner 未改；没有再次修改本机安装、清除旧 release／缓存或运行真实更新。可执行引用扫描、文档文件链接核对、`git diff --check` 和独立审阅完成，CHANGELOG 明确旧执行策略仅属于历史增强模式。沿用本任务 `commit push` 授权提交和推送此次清理，继续排除用户既有 `AGENTS.md` 改动。未运行全仓测试、typecheck、构建、远端 CI 或 npm 发布。
+
 ### 2026-11-06：移除本机旧 MCP 更新 hook
 
 - 授权与完成：用户在确认旧补丁 hook 的用途后要求移除；恢复 `~/.pi/agent/bin/pi` 的原始 managed launcher。现有标准 release 指针和 `~/.local/bin/pi` 符号链接保持不变；保留旧补丁 release、artifact 缓存及 `pi.native-mcp-original` 备份，未重启用户进程或运行真实更新。

@@ -2,9 +2,9 @@
 
 > 本文保存迁移前 README 的历史说明，包括旧自包含运行时、固定 Pi 1.2.0／1.3.0／1.4.0 补丁和当时的过渡说明。它用于维护旧实现及追溯设计，不是当前 Pi 1.5+ 的安装或调用指南。当前行为以[主 README](../README.md)及实际宿主工具列表为准。
 >
-> 文中的 `mcp` 代理工具、`mcpScript`、`tools.search`、旧版 lazy 生命周期和增强面板不能用于推断标准 Pi 1.5+ 会话的行为。旧源码、测试和补丁仍留在仓库；移入归档不代表删除、重新验证或重新发布它们。
+> 文中的 `mcp` 代理工具、`mcpScript`、`tools.search`、旧版 lazy 生命周期和增强面板不能用于推断标准 Pi 1.5+ 会话的行为。旧运行时源码、测试和固定补丁仍留在仓库；独立的 managed 更新 hook 已退役，见下文说明。移入归档不代表重新验证或重新发布旧实现。
 >
-> 归档来源：README 在提交 `d45549742274f11e737026a7c14287f9541b6bd9` 的内容；本次仅调整下文相对文件链接以适配归档位置。
+> 归档来源：README 在提交 `d45549742274f11e737026a7c14287f9541b6bd9` 的内容；相对文件链接已适配归档位置，后续退役事项在对应段落标明。
 
 ---
 
@@ -60,23 +60,13 @@ pi install git:github.com/CGOSU/pi-mcp-adapter.git
 
 各版补丁都不改变 Pi npm 依赖。两种模式下 Pi 都是唯一 MCP 连接 owner；标准模式使用 Pi 公共注册 API，补丁模式额外提供增强管理能力。适配器不会创建第二套连接运行时。
 
-### 托管 Pi 更新后的非阻断补丁
+### 已退役的托管 Pi 更新 hook
 
-托管安装可选择安装一个本地 post-update hook。它只接入通过 `~/.pi/agent/bin/pi` 启动的 managed Pi；在 Pi 自身更新成功后，按固定 package version 查找本机已登记且 SHA-256 匹配的 Pi artifact，在独立 staging 中离线安装、验证 MCP management API，再以独立 release 和 `current-version` 指针切换。安装时须提供事先验证过的 Pi tarball；artifact 不从临时目录或未登记远端下载。在 adapter 仓库或已安装 package 的根目录执行：
+旧版本曾提供本地 post-update hook，在 managed Pi 核心更新成功后安装精确匹配的增强补丁。标准 Pi 1.5+ 不依赖它；2026-11-06 已从仓库移除 hook、安装器、登记表及专属测试，当前包不再提供安装或卸载命令。固定 Pi 补丁及其验证流程继续保留。
 
-```sh
-npm run install:managed-pi-update-hook -- --artifact /path/to/verified-pi-coding-agent.tgz
-```
+若其他机器仍安装了旧 wrapper，应先核对已安装内容及原启动器备份，再从 Git 历史取出与该 wrapper 匹配的配套卸载器恢复。不要使用当前包中已删除的脚本，也不要仅凭 hook 标记覆盖启动器。匹配旧模板的注意事项见[踩坑记录](https://github.com/CGOSU/pi-mcp-adapter/blob/9d2cf049ff406d2d4e4d959db52ace8d444c6c8a/docs/pitfalls.md#2026-11-06新版-hook-卸载器无法匹配早期已安装-wrapper)，本机卸载与验证见[会话记录](https://github.com/CGOSU/pi-mcp-adapter/blob/9d2cf049ff406d2d4e4d959db52ace8d444c6c8a/docs/session-log.md#2026-11-06移除本机旧-mcp-更新-hook)。
 
-安装器会备份原始 launcher，当前登记的 artifact 覆盖 Pi 1.3.0 与 1.4.0。未来执行托管 `pi update --all` 时，官方 Pi 核心更新先照常完成；未知版本、artifact 缺失或校验/安装/验证失败只警告 adapter 可能不可用，不暂停、不回滚、不 pin 核心版本，且保留 Pi 原更新退出状态。Pi 核心仍是唯一 MCP owner；stock 或不完整版本上的 adapter 继续明确失败，不启用第二套 runtime。`pi update --models` 与 `pi update --extensions` 不应用核心补丁。
-
-删除 hook 会恢复原始 launcher；若当前指针仍指向 hook 激活的版本，也恢复先前 release。独立补丁 release 与本地 artifact 缓存保留以便审计/回滚：
-
-```sh
-npm run install:managed-pi-update-hook -- --remove
-```
-
-安装或移除后需完全退出并重新启动 Pi，当前运行进程不会因 `current-version` 指针切换而换载已加载的宿主代码。完整安装、故障语义与当前登记范围见 [`docs/native-mcp-patch.md`](../docs/native-mcp-patch.md)。
+旧 hook 的设计和历史验证范围见[固定补丁文档](native-mcp-patch.md#已退役的托管-pi-更新-hook)。
 
 ### MCP 管理入口
 

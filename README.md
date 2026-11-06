@@ -22,6 +22,8 @@ pi install git:github.com/CGOSU/pi-mcp-adapter.git
 
 仓库仍保留旧补丁增强模式及旧运行时源码。历史补丁安装、旧工具和迁移细节见[历史参考](docs/legacy-runtime.md)，不作为 Pi 1.5+ 的常规安装步骤。
 
+旧 managed 更新 hook 已移除，不再提供自动安装核心补丁的脚本或登记表。以前单独安装的 hook 不会随扩展更新自动卸载，恢复原启动器的方法见[历史 hook 说明](docs/native-mcp-patch.md#已退役的托管-pi-更新-hook)。
+
 ## 快速开始
 
 在需要共享配置的项目根目录创建 `.mcp.json`：
