@@ -8,6 +8,13 @@
 
 ## 已知问题
 
+### 2026-11-06：新版 hook 卸载器无法匹配早期已安装 wrapper
+
+- 现象：本机仍使用早期 managed update wrapper，而仓库模板已增加从适配器安装包读取 hook 和 registry 的逻辑；静态核对发现新版卸载器会拒绝旧 wrapper。
+- 原因：`removeManagedUpdateHook` 要求已安装 launcher 与其相邻模板逐字相等，以免覆盖用户修改；扩展包更新不会自动替换早期单独安装的 wrapper。
+- 处理：先与 Git 历史模板进行完整字节核验，再使用匹配提交的配套卸载器；保持精确匹配保护，不仅凭 hook 标记覆盖启动器。恢复前验证备份，并确认当前标准 release 不等于 hook state 的 patched release，避免回退版本。
+- 验证：匹配历史模板后的隔离卸载与本机恢复均通过，具体命令和验证边界见 [`session-log.md`](session-log.md) 的同日记录。源码卸载器未改动。
+
 ### 2026-11-04：启动的 Pi 版本不等于扩展实际解析的 peer
 
 - 现象：stock Pi 1.5.0 直接加载源码仓库扩展时进入了旧增强模式，共享服务器未导入。

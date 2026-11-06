@@ -8,6 +8,13 @@
 
 ## 会话
 
+### 2026-11-06：移除本机旧 MCP 更新 hook
+
+- 授权与完成：用户在确认旧补丁 hook 的用途后要求移除；恢复 `~/.pi/agent/bin/pi` 的原始 managed launcher。现有标准 release 指针和 `~/.local/bin/pi` 符号链接保持不变；保留旧补丁 release、artifact 缓存及 `pi.native-mcp-original` 备份，未重启用户进程或运行真实更新。
+- 卸载方式：本机旧 wrapper 与提交 `7ec2f8586e899fb8224a772f82a97794b14d68bd` 的模板完全一致。将该提交的 installer、hook 和 launcher 提取到 `/private/tmp/pi-hook-removal-aqq6_f_k/scripts`，在复制安装元数据及启动器的隔离 fixture 中验证卸载后，再执行 `node /private/tmp/pi-hook-removal-aqq6_f_k/scripts/install-managed-pi-update-hook.mjs --remove --agent-dir /Users/cgosu/.pi/agent`，成功恢复启动器。当前模板不能直接卸载旧 wrapper 的原因与处理见 [`pitfalls.md`](pitfalls.md)。
+- 验证：隔离卸载通过；实际启动器与原始备份及卸载前备份 SHA-256 一致，无 hook 标记或调用路径；`current-version` 字节未变；`sh -n /Users/cgosu/.pi/agent/bin/pi` 通过，`/Users/cgosu/.local/bin/pi --version` 返回 `1.5.0`。安装副本 HEAD 和发布入口与源码一致，当前值维护在 [`current-state.md`](current-state.md)。未运行全仓测试、构建或真实 MCP 连接验证。
+- 范围与 Git 收尾：未修改适配器源码、用户配置或仓库历史补丁资产；用户随后明确要求 `commit push`，本批仅将 `current-state.md`、`pitfalls.md` 与本记录纳入提交和推送，排除用户既有 `AGENTS.md` 修改。`git diff --check` 通过；未发布 npm 包。
+
 ### 2026-11-04：Pi 1.5+ 第一批配置兼容与使用说明修正
 
 - 完成：在用户确认第一批范围后，支持 `type: stdio/http/streamable-http`、`description` 和秒制 `timeout` 输入，并归一化到既有契约。矛盾传输、SSE 别名、未知字段及不等价超时仍拒绝；修正秒／毫秒换算的浮点边界。标准模式按既有字段归属表区分七个展示设置，集中警告后忽略；认证、审批、过滤、输出保护等执行策略仍拒绝不支持的映射。补充普通与原生文件中的展示设置、多个服务器、程序化注册和别名覆盖回归。
